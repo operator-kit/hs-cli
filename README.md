@@ -42,7 +42,7 @@ go build -o build/hs ./cmd/hs
 
 ## Authentication
 
-The CLI uses HelpScout's OAuth2 client credentials flow. You'll need an App ID and App Secret from your HelpScout app settings (My Apps > Create My App).
+The CLI uses HelpScout's OAuth2 client credentials flow. You'll need an App ID and App Secret from your HelpScout app settings (**Your Profile** > My Apps > Create App).
 
 ### Interactive login (recommended)
 
