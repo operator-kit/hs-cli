@@ -1,0 +1,54 @@
+version: 2
+
+project_name: hs
+
+builds:
+  - main: ./cmd/hs
+    binary: hs
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: true
+
+brews:
+  - repository:
+      owner: operator-kit
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/operator-kit/hs-cli"
+    description: "HelpScout CLI — manage mailboxes, conversations, customers and more"
+    install: |
+      bin.install "hs"
+    test: |
+      system "#{bin}/hs", "version"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

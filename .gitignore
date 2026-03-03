@@ -1,0 +1,24 @@
+# Binary
+/hs
+/hs.exe
+/helpscout
+/helpscout.exe
+/build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.claude/
+
+# Debug
+hs-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+/dist/
+
+.agents

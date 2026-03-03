@@ -1,0 +1,32 @@
+{
+  "name": "@operatorkit/hs",
+  "version": "0.0.0-development",
+  "description": "HelpScout CLI with embedded MCP server",
+  "license": "MIT",
+  "homepage": "https://github.com/operator-kit/hs-cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/operator-kit/hs-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/operator-kit/hs-cli/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "hs": "bin/hs.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node ./bin/install.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "tar": "^7.4.3"
+  }
+}
