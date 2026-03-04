@@ -12,6 +12,7 @@ import (
 
 	"github.com/operator-kit/hs-cli/internal/api"
 	"github.com/operator-kit/hs-cli/internal/auth"
+	"github.com/operator-kit/hs-cli/internal/config"
 )
 
 func newAuthCmd() *cobra.Command {
@@ -60,9 +61,14 @@ func authLoginCmd() *cobra.Command {
 			}
 			json.Unmarshal(data, &resp)
 
-			// Store in keyring
+			// Store in keyring, fall back to config file
 			if err := auth.StoreInboxCredentials(appID, appSecret); err != nil {
-				return fmt.Errorf("storing credentials: %w", err)
+				if err := promptConfigFallback(reader, cfgPath, err, func(c *config.Config) {
+					c.InboxAppID = appID
+					c.InboxAppSecret = appSecret
+				}); err != nil {
+					return err
+				}
 			}
 
 			fmt.Printf("Authenticated. Found %d mailboxes.\n", resp.Page.TotalElements)
@@ -76,12 +82,22 @@ func authStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Check authentication status",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Try keyring first
 			id, _, err := auth.LoadInboxCredentials()
-			if err != nil || id == "" {
-				fmt.Fprintln(cmd.OutOrStdout(), "Not authenticated. Run: hs inbox auth login")
+			if err == nil && id != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Authenticated (app: %s...%s)\n", id[:4], id[len(id)-4:])
 				return nil
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Authenticated (app: %s...%s)\n", id[:4], id[len(id)-4:])
+
+			// Fall back to config file
+			c, cerr := config.Load(cfgPath)
+			if cerr == nil && c.InboxAppID != "" {
+				id = c.InboxAppID
+				fmt.Fprintf(cmd.OutOrStdout(), "Authenticated (app: %s...%s)\n", id[:4], id[len(id)-4:])
+				return nil
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Not authenticated. Run: hs inbox auth login")
 			return nil
 		},
 	}
@@ -93,6 +109,15 @@ func authLogoutCmd() *cobra.Command {
 		Short: "Remove stored credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			auth.DeleteInboxCredentials()
+
+			// Also clear from config file
+			c, err := config.Load(cfgPath)
+			if err == nil && (c.InboxAppID != "" || c.InboxAppSecret != "") {
+				c.InboxAppID = ""
+				c.InboxAppSecret = ""
+				_ = config.Save(cfgPath, c)
+			}
+
 			fmt.Fprintln(cmd.OutOrStdout(), "Credentials removed.")
 			return nil
 		},

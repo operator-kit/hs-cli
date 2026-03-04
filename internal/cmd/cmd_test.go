@@ -150,7 +150,10 @@ func TestAuthStatus_NotAuthenticated_E2E(t *testing.T) {
 func TestAuthStatus_WithConfigCreds_E2E(t *testing.T) {
 	home, buf := setupE2E(t)
 
-	// Write config with credentials
+	t.Setenv("HS_INBOX_APP_ID", "")
+	t.Setenv("HS_INBOX_APP_SECRET", "")
+
+	// Write config with credentials — status now falls back to config when keyring unavailable
 	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
 	require.NoError(t, config.Save(cfgFile, &config.Config{
 		InboxAppID:     "test-id-1234abcd",
@@ -158,21 +161,9 @@ func TestAuthStatus_WithConfigCreds_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	// auth status reads from keyring first, then config.
-	// In isolated env, keyring will fail, so it falls through to config.
-	// However, the current auth status command only checks keyring via auth.LoadCredentials.
-	// Let's use env vars instead for a reliable test.
-	t.Setenv("HS_INBOX_APP_ID", "test-id-1234abcd")
-	t.Setenv("HS_INBOX_APP_SECRET", "test-secret")
-
-	// Auth status checks keyring directly, not config.
-	// In CI/isolated env, keyring will fail. So auth status says "Not authenticated".
-	// This is expected behavior — keyring isolation is hard without Docker.
 	rootCmd.SetArgs([]string{"inbox", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
-	// The output will either show authenticated (if keyring happens to work)
-	// or "Not authenticated" — both are valid in this isolated test.
-	assert.NotEmpty(t, buf.String())
+	assert.Contains(t, buf.String(), "Authenticated")
 }
 
 func TestAuthLogout_E2E(t *testing.T) {

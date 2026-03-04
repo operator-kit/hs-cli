@@ -5,7 +5,7 @@ A command-line interface and [MCP](https://modelcontextprotocol.io/) server for 
 **Built for automation and AI-assisted workflows**
 - Ships with a deterministic, layered PII redaction pipeline (structured fields + free-text + source payload protection), plus strict per-command override controls.
 - An allowlist-based permission system (`resource:operation` pairs) lets you restrict exactly which actions are permitted.
-- See [PII Redaction Pipeline](#pii-redaction-pipeline) · [Permissions](#permissions).
+- See [PII Redaction Pipeline](https://github.com/operator-kit/hs-cli#pii-redaction-pipeline) · [Permissions](https://github.com/operator-kit/hs-cli#permissions).
 
 ## Install
 
@@ -37,6 +37,28 @@ npx -y @operatorkit/hs inbox conversations list --status active
 # Search articles
 npx -y @operatorkit/hs docs articles search --query "getting started"
 ```
+
+## Authentication
+
+The CLI uses HelpScout's OAuth2 client credentials flow. You'll need an App ID and App Secret from your HelpScout app settings:
+
+> **Your Profile** > My Apps > Create App
+
+### Interactive login (recommended for CLI)
+
+```bash
+npx -y @operatorkit/hs inbox auth login
+```
+
+This prompts for your App ID and App Secret, validates them against the API, and stores them securely in your OS keyring.
+
+### Environment variables & non interactive setup
+
+Use `npx -y @operatorkit/hs inbox config set` commands to configure authentication non-interactively or set environment variables.
+
+For MCP you can pass in the environment variables via [MCP config](#mcp-server).
+
+[More information and exmaples can be found here](https://github.com/operator-kit/hs-cli/#authentication);
 
 ## API coverage
 

@@ -25,6 +25,13 @@ func DefaultPath() string {
 	return filepath.Join(dir, "hs", "config.yaml")
 }
 
+func ResolvedPath(path string) string {
+	if path == "" {
+		return DefaultPath()
+	}
+	return path
+}
+
 func Load(path string) (*Config, error) {
 	if path == "" {
 		path = DefaultPath()
