@@ -54,7 +54,7 @@ function isDevVersion(version) {
 
 function releaseAssetURL(version, target) {
   const tag = `v${version}`;
-  const asset = `hs_${tag}_${target.os}_${target.arch}${target.archiveExt}`;
+  const asset = `hs_${version}_${target.os}_${target.arch}${target.archiveExt}`;
   return {
     tag,
     asset,

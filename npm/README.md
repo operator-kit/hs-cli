@@ -1,8 +1,11 @@
 # @operatorkit/hs
 
-A command-line interface for the [HelpScout](https://www.helpscout.com/) API. Manage mailboxes, conversations, customers, tags, users, workflows, webhooks, and knowledge base content from the terminal.
+A command-line interface and [MCP](https://modelcontextprotocol.io/) server for the [HelpScout](https://www.helpscout.com/) API. Manage mailboxes, conversations, customers, tags, users, workflows, webhooks, and knowledge base content from the terminal.
 
-Ships with an embedded [MCP](https://modelcontextprotocol.io/) server for AI-assisted workflows.
+**Built for automation and AI-assisted workflows**
+- Ships with a deterministic, layered PII redaction pipeline (structured fields + free-text + source payload protection), plus strict per-command override controls.
+- An allowlist-based permission system (`resource:operation` pairs) lets you restrict exactly which actions are permitted.
+- See [PII Redaction Pipeline](#pii-redaction-pipeline) · [Permissions](#permissions).
 
 ## Install
 
