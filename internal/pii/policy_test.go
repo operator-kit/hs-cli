@@ -20,6 +20,68 @@ func TestNormalizeMode(t *testing.T) {
 	}
 }
 
+func TestIsValidMode(t *testing.T) {
+	valid := []string{"off", "customers", "all"}
+	for _, v := range valid {
+		if !IsValidMode(v) {
+			t.Fatalf("IsValidMode(%q) = false, want true", v)
+		}
+	}
+	for _, v := range []string{"foo", "none", "partial"} {
+		if IsValidMode(v) {
+			t.Fatalf("IsValidMode(%q) = true, want false", v)
+		}
+	}
+	// Case+whitespace normalization means these ARE valid
+	for _, v := range []string{"ALL", "Customers", " all ", " OFF"} {
+		if !IsValidMode(v) {
+			t.Fatalf("IsValidMode(%q) = false, want true (normalized)", v)
+		}
+	}
+}
+
+func TestIsEnabled(t *testing.T) {
+	tests := []struct {
+		mode string
+		want bool
+	}{
+		{"off", false},
+		{"", false},
+		{"customers", true},
+		{"all", true},
+		{"unknown", false},
+	}
+	for _, tt := range tests {
+		if got := IsEnabled(tt.mode); got != tt.want {
+			t.Fatalf("IsEnabled(%q) = %v, want %v", tt.mode, got, tt.want)
+		}
+	}
+}
+
+func TestShouldRedactType(t *testing.T) {
+	tests := []struct {
+		mode, entity string
+		want         bool
+	}{
+		{"off", "customer", false},
+		{"off", "user", false},
+		{"customers", "customer", true},
+		{"customers", "Customer", true}, // case-insensitive
+		{"customers", "user", false},
+		{"customers", "unknown", false},
+		{"customers", "", false},
+		{"all", "customer", true},
+		{"all", "user", true},
+		{"all", "unknown", true},
+		{"all", "", true},
+	}
+	for _, tt := range tests {
+		if got := ShouldRedactType(tt.mode, tt.entity); got != tt.want {
+			t.Fatalf("ShouldRedactType(%q, %q) = %v, want %v", tt.mode, tt.entity, got, tt.want)
+		}
+	}
+}
+
 func TestEffectiveMode(t *testing.T) {
 	mode, err := EffectiveMode(ModeCustomers, false, false)
 	if err != nil || mode != ModeCustomers {

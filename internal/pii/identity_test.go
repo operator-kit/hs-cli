@@ -215,6 +215,166 @@ func TestRedactText_EmailInText_StaysRedacted(t *testing.T) {
 	}
 }
 
+func TestEngineMode(t *testing.T) {
+	tests := []struct {
+		mode, want string
+	}{
+		{"all", ModeAll},
+		{"customers", ModeCustomers},
+		{"off", ModeOff},
+		{"", ModeOff},
+		{"unknown", ModeOff},
+	}
+	for _, tt := range tests {
+		e := NewEngine(tt.mode, "")
+		if got := e.Mode(); got != tt.want {
+			t.Fatalf("NewEngine(%q).Mode() = %q, want %q", tt.mode, got, tt.want)
+		}
+	}
+}
+
+func TestEngineEnabled(t *testing.T) {
+	if NewEngine(ModeOff, "").Enabled() {
+		t.Fatal("off engine should not be enabled")
+	}
+	if !NewEngine(ModeAll, "").Enabled() {
+		t.Fatal("all engine should be enabled")
+	}
+	if !NewEngine(ModeCustomers, "").Enabled() {
+		t.Fatal("customers engine should be enabled")
+	}
+}
+
+func TestEngineShouldRedactType(t *testing.T) {
+	e := NewEngine(ModeCustomers, "")
+	if !e.ShouldRedactType("customer") {
+		t.Fatal("customers mode should redact customer type")
+	}
+	if e.ShouldRedactType("user") {
+		t.Fatal("customers mode should not redact user type")
+	}
+}
+
+func TestRedactPerson_EmptyInputs(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	// All empty → passthrough
+	f, l, em := e.RedactPerson("", "", "")
+	if f != "" || l != "" || em != "" {
+		t.Fatalf("expected empty passthrough, got %q %q %q", f, l, em)
+	}
+}
+
+func TestRedactPerson_EmailOnly(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	f, l, em := e.RedactPerson("", "", "test@example.com")
+	if f != "" || l != "" {
+		t.Fatalf("expected empty name for email-only, got %q %q", f, l)
+	}
+	if em == "test@example.com" {
+		t.Fatal("email should be redacted")
+	}
+}
+
+func TestRedactPerson_NameOnly(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	f, l, em := e.RedactPerson("Alice", "Smith", "")
+	if f == "Alice" || l == "Smith" {
+		t.Fatalf("name should be redacted, got %q %q", f, l)
+	}
+	if em != "" {
+		t.Fatalf("empty email should stay empty, got %q", em)
+	}
+}
+
+func TestRedactPerson_SecretChangesOutput(t *testing.T) {
+	e1 := NewEngine(ModeAll, "secret1")
+	e2 := NewEngine(ModeAll, "secret2")
+	_, _, em1 := e1.RedactPerson("Alice", "Smith", "alice@example.com")
+	_, _, em2 := e2.RedactPerson("Alice", "Smith", "alice@example.com")
+	if em1 == em2 {
+		t.Fatal("different secrets should produce different redacted emails")
+	}
+}
+
+func TestRedactEmail_Standalone(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	out := e.RedactEmail("test@example.com")
+	if out == "test@example.com" {
+		t.Fatal("email should be redacted")
+	}
+	if !strings.Contains(out, "@") {
+		t.Fatalf("redacted email should still contain @: %q", out)
+	}
+}
+
+func TestRedactEmail_Empty(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	if out := e.RedactEmail(""); out != "" {
+		t.Fatalf("expected empty passthrough, got %q", out)
+	}
+	if out := e.RedactEmail("  "); out != "  " {
+		t.Fatalf("expected whitespace passthrough, got %q", out)
+	}
+}
+
+func TestRedactEmail_Deterministic(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	a := e.RedactEmail("test@example.com")
+	b := e.RedactEmail("test@example.com")
+	if a != b {
+		t.Fatalf("redacted email should be deterministic: %q vs %q", a, b)
+	}
+}
+
+func TestRedactPhone_Standalone(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	out := e.RedactPhone("+1 (555) 123-4567")
+	if out == "+1 (555) 123-4567" {
+		t.Fatal("phone should be redacted")
+	}
+	// Format should be preserved (parens, dashes, spaces)
+	if !strings.Contains(out, "(") || !strings.Contains(out, ")") || !strings.Contains(out, "-") {
+		t.Fatalf("phone format should be preserved: %q", out)
+	}
+}
+
+func TestRedactPhone_Empty(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	if out := e.RedactPhone(""); out != "" {
+		t.Fatalf("expected empty passthrough, got %q", out)
+	}
+}
+
+func TestRedactPhone_Deterministic(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	a := e.RedactPhone("555-123-4567")
+	b := e.RedactPhone("555-123-4567")
+	if a != b {
+		t.Fatalf("redacted phone should be deterministic: %q vs %q", a, b)
+	}
+}
+
+func TestRedactPhone_DigitsOnly(t *testing.T) {
+	e := NewEngine(ModeAll, "")
+	out := e.RedactPhone("5551234567")
+	if out == "5551234567" {
+		t.Fatal("phone should be redacted")
+	}
+	if len(out) != 10 {
+		t.Fatalf("expected 10-digit output, got %q (len %d)", out, len(out))
+	}
+}
+
+func TestWithNER_AttachesDetector(t *testing.T) {
+	d := noNER()
+	e := NewEngine(ModeAll, "", WithNER(d))
+	// Should not return notice when NER is attached
+	out := e.RedactText("hello world", nil)
+	if out == RedactTextNotice {
+		t.Fatal("should not return notice when NER is attached")
+	}
+}
+
 func TestRedactJSON(t *testing.T) {
 	e := NewEngine(ModeAll, "")
 	input := json.RawMessage(`{
