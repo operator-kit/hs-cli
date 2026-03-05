@@ -7,6 +7,7 @@ import (
 
 	"github.com/operator-kit/hs-cli/internal/output"
 	"github.com/operator-kit/hs-cli/internal/pii"
+	"github.com/operator-kit/hs-cli/internal/pii/ner"
 	"github.com/operator-kit/hs-cli/internal/types"
 )
 
@@ -25,7 +26,14 @@ func newPIIEngine() (*pii.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return pii.NewEngine(mode, os.Getenv("HS_INBOX_PII_SECRET")), nil
+	var opts []pii.EngineOption
+	if ner.IsModelReady() {
+		d, nerErr := ner.NewDetector()
+		if nerErr == nil {
+			opts = append(opts, pii.WithNER(d))
+		}
+	}
+	return pii.NewEngine(mode, os.Getenv("HS_INBOX_PII_SECRET"), opts...), nil
 }
 
 func printRawWithPII(data json.RawMessage) error {

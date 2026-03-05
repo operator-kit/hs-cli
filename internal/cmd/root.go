@@ -102,7 +102,8 @@ var rootCmd = &cobra.Command{
 		if name == "login" || name == "logout" || name == "status" ||
 			name == "version" || name == "completion" || name == "update" ||
 			name == "permissions" || name == "mcp" ||
-			parent == "completion" || name == "hs" || name == "inbox" || name == "docs" {
+			parent == "completion" || parent == "ner" ||
+			name == "hs" || name == "inbox" || name == "docs" || name == "ner" {
 			return nil
 		}
 

@@ -19,9 +19,31 @@ type KnownIdentity struct {
 	Phone string
 }
 
+// NameDetector detects person names in free-form text.
+type NameDetector interface {
+	DetectNames(text string) ([]NameSpan, error)
+}
+
+// NameSpan represents a detected name in text.
+type NameSpan struct {
+	Text  string
+	Start int
+	End   int
+	Score float32
+}
+
+// EngineOption configures optional Engine behaviour.
+type EngineOption func(*Engine)
+
+// WithNER attaches a name detector for freeform text redaction.
+func WithNER(d NameDetector) EngineOption {
+	return func(e *Engine) { e.ner = d }
+}
+
 type Engine struct {
 	mode   string
 	secret string
+	ner    NameDetector
 
 	mu      sync.RWMutex
 	people  map[string]fakePerson
@@ -34,13 +56,17 @@ type fakePerson struct {
 	Email string
 }
 
-func NewEngine(mode, secret string) *Engine {
-	return &Engine{
+func NewEngine(mode, secret string, opts ...EngineOption) *Engine {
+	e := &Engine{
 		mode:    NormalizeMode(mode),
 		secret:  secret,
 		people:  map[string]fakePerson{},
 		replace: map[string]string{},
 	}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
 func (e *Engine) Mode() string {

@@ -33,8 +33,7 @@ var (
 	addressMainRe    = regexp.MustCompile(`(?i)(\d+[-\s]?\w*|\d+-\d+-\d+)[\s,]+([A-Za-z\p{L}]+([\s'-][A-Za-z\p{L}]+)*[\s,]+)+(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Place|Pl|Boulevard|Blvd|Way|Plaza|Square|Sq|Court|Ct|Terrace|Ter|Circle|Cir|Alley|Row|Highway|Hwy|Parkway|Pkwy|Path|Trail|Tr|Crescent|Cres|Rue|Strasse|Straße|Calle|Via|Viale|Avenida|Carrer|Straat|Gasse|Weg|Camino|Ulica|Utca|Prospekt|Dori|Jalan|Marg|Dao|Jie|Lu|út|de la|del|di|van|von)\b`)
 	zipRe            = regexp.MustCompile(`\b\d{5}(?:[-\s]\d{4})?\b`)
 	poBoxRe          = regexp.MustCompile(`(?i)P\.? ?O\.? Box \d+`)
-	linkRe           = regexp.MustCompile(`(?:(?:https?:\/\/)?(?:[a-z0-9.\-]+|www|[a-z0-9.\-])[.](?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?]))`)
-	nameRe           = regexp.MustCompile(`\b[A-Z][a-z]+ [A-Z][a-z]+\b`)
+	linkRe = regexp.MustCompile(`(?:(?:https?:\/\/)?(?:[a-z0-9.\-]+|www|[a-z0-9.\-])[.](?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?]))`)
 )
 
 var textRules = []textRule{
@@ -55,18 +54,54 @@ var textRules = []textRule{
 	{kind: "zip", re: zipRe},
 	{kind: "po_box", re: poBoxRe},
 	{kind: "url", re: linkRe},
-	{kind: "name", re: nameRe},
 }
 
+// RedactTextNotice is shown for freeform text when NER is not installed.
+const RedactTextNotice = `[redacted — run "hs ner install" for content]`
+
 // RedactText redacts free-form text using known identities followed by regex sweeps.
+// When NER is available, names are detected via ML. Without NER, freeform text is
+// hidden entirely (structured field redaction still works).
 func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 	if !e.Enabled() || text == "" {
 		return text
 	}
 
-	out := e.redactKnown(text, known)
-	ssnContext := ssnContextRe.MatchString(out)
+	// Without NER: can't safely redact names in freeform text
+	if e.ner == nil {
+		return RedactTextNotice
+	}
 
+	// 1. Detect names via NER on ORIGINAL text (natural language, best accuracy)
+	nerNames, _ := e.ner.DetectNames(text)
+
+	// 2. Known identity replacement
+	out, inserted := e.redactKnown(text, known)
+
+	// 3. Replace NER-detected names not already handled by known identities
+	for _, span := range nerNames {
+		name := span.Text
+		if inserted[name] {
+			continue
+		}
+		skip := false
+		for _, w := range strings.Fields(name) {
+			if inserted[w] {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		fp := e.fakePersonForKey("name:" + canonical(name))
+		fakeFull := fp.First + " " + fp.Last
+		out = replaceWordInsensitive(out, name, fakeFull)
+		inserted[fakeFull] = true
+	}
+
+	// 4. Regex sweep — email, phone, SSN, address, etc. (no name regex)
+	ssnContext := ssnContextRe.MatchString(out)
 	for _, rule := range textRules {
 		out = applyRegexWithContext(out, rule.re, func(match string, start, end int, full string) string {
 			switch rule.kind {
@@ -77,11 +112,6 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 					return match
 				}
 				return e.token(rule.kind, rawDigits)
-			case "name":
-				if looksLikeAddressContext(full, start, end) {
-					return match
-				}
-				return e.token(rule.kind, match)
 			default:
 				return e.token(rule.kind, match)
 			}
@@ -90,8 +120,13 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 	return out
 }
 
-func (e *Engine) redactKnown(text string, known []KnownIdentity) string {
+// redactKnown replaces known identity data with fake names (for name parts)
+// and deterministic tokens (for emails, phones). The returned set tracks
+// fake names inserted so the regex sweep can skip them.
+func (e *Engine) redactKnown(text string, known []KnownIdentity) (string, map[string]bool) {
 	out := text
+	inserted := map[string]bool{}
+
 	for _, id := range known {
 		key := personKey(id.First, id.Last, id.Email)
 		if key == "" && strings.TrimSpace(id.Phone) != "" {
@@ -101,55 +136,45 @@ func (e *Engine) redactKnown(text string, known []KnownIdentity) string {
 			continue
 		}
 
+		fp := e.fakePersonForKey(key)
+		fakeFull := fp.First + " " + fp.Last
 		personToken := e.token("person", key)
 
+		// 1. Full email & phone → tokens (safe from regex interference)
 		if id.Email != "" {
 			out = replaceLiteralInsensitive(out, id.Email, personToken)
-			parts := strings.Split(id.Email, "@")
-			if len(parts) > 0 && parts[0] != "" {
-				out = replaceWordInsensitive(out, parts[0], personToken)
-			}
 		}
 		if id.Phone != "" {
 			out = replaceLiteralInsensitive(out, id.Phone, personToken)
 		}
 
+		// 2. Names → fake names
 		fullName := strings.TrimSpace(strings.TrimSpace(id.First) + " " + strings.TrimSpace(id.Last))
 		if fullName != "" {
-			out = replaceWordInsensitive(out, fullName, personToken)
+			out = replaceWordInsensitive(out, fullName, fakeFull)
+			inserted[fakeFull] = true
 		}
 		if len(strings.TrimSpace(id.First)) >= 3 {
-			out = replaceWordInsensitive(out, id.First, personToken)
+			out = replaceWordInsensitive(out, id.First, fp.First)
+			inserted[fp.First] = true
 		}
 		if len(strings.TrimSpace(id.Last)) >= 3 {
-			out = replaceWordInsensitive(out, id.Last, personToken)
+			out = replaceWordInsensitive(out, id.Last, fp.Last)
+			inserted[fp.Last] = true
+		}
+
+		// 3. Email prefix as last resort — catches standalone uses like "hey alice"
+		// that weren't already handled by name replacement above.
+		if id.Email != "" {
+			parts := strings.Split(id.Email, "@")
+			if len(parts) > 0 && parts[0] != "" {
+				out = replaceWordInsensitive(out, parts[0], fp.First)
+			}
 		}
 	}
-	return out
+	return out, inserted
 }
 
-func looksLikeAddressContext(full string, start, end int) bool {
-	const span = 36
-	lo := start - span
-	if lo < 0 {
-		lo = 0
-	}
-	hi := end + span
-	if hi > len(full) {
-		hi = len(full)
-	}
-	window := strings.ToLower(full[lo:hi])
-	addressWords := []string{
-		"street", "st ", "avenue", "road", "drive", "lane", "boulevard", "blvd", "suite", "apt", "po box",
-		"address", "city", "zip", "postal", "located at", "lives at",
-	}
-	for _, w := range addressWords {
-		if strings.Contains(window, w) {
-			return true
-		}
-	}
-	return false
-}
 
 func applyRegexWithContext(text string, re *regexp.Regexp, fn func(match string, start, end int, full string) string) string {
 	idxs := re.FindAllStringIndex(text, -1)
@@ -190,4 +215,3 @@ func replaceWordInsensitive(text, literal, replacement string) string {
 	re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(literal) + `\b`)
 	return re.ReplaceAllString(text, replacement)
 }
-
