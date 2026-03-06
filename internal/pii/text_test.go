@@ -165,13 +165,8 @@ func TestRedactText_NERWithRegexSweep(t *testing.T) {
 	}
 }
 
-func TestRedactText_ModeCustomers_SkipsUserType(t *testing.T) {
+func TestRedactText_ModeCustomers_RedactsCustomer(t *testing.T) {
 	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
-	// Known identity with type "user" should be skipped in customers mode
-	// (redactKnown uses ShouldRedactType internally via the engine)
-	// Actually redactKnown doesn't filter by type — it always replaces.
-	// The type filtering happens at the structured JSON level.
-	// So in RedactText, all known identities are replaced regardless of type.
 	out := e.RedactText("Hello Alice", []KnownIdentity{{
 		Type:  "customer",
 		First: "Alice",
@@ -180,6 +175,60 @@ func TestRedactText_ModeCustomers_SkipsUserType(t *testing.T) {
 	}})
 	if strings.Contains(out, "Alice") {
 		t.Fatalf("customer identity should be redacted: %q", out)
+	}
+}
+
+func TestRedactText_ModeCustomers_ProtectsUserNames(t *testing.T) {
+	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	known := []KnownIdentity{
+		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
+		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
+	}
+	// User name should NOT be replaced in customers mode
+	out := e.RedactText("Brenda Torres helped Alice", known)
+	if !strings.Contains(out, "Brenda") {
+		t.Fatalf("user name should be preserved in customers mode: %q", out)
+	}
+	if strings.Contains(out, "Alice") {
+		t.Fatalf("customer name should be redacted: %q", out)
+	}
+}
+
+func TestRedactText_ModeCustomers_NERProtectsUserNames(t *testing.T) {
+	// NER detects both a user name and customer name — only customer should be replaced
+	d := nerWith(
+		NameSpan{Text: "Brenda Torres", Start: 0, End: 13, Score: 0.95},
+		NameSpan{Text: "Alice Smith", Start: 22, End: 33, Score: 0.93},
+	)
+	e := NewEngine(ModeCustomers, "", WithNER(d))
+	known := []KnownIdentity{
+		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
+		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
+	}
+	out := e.RedactText("Brenda Torres helped Alice Smith with her issue", known)
+	if !strings.Contains(out, "Brenda") || !strings.Contains(out, "Torres") {
+		t.Fatalf("user name should be preserved: %q", out)
+	}
+	if strings.Contains(out, "Alice") || strings.Contains(out, "Smith") {
+		t.Fatalf("customer name should be redacted: %q", out)
+	}
+}
+
+func TestRedactText_ModeAll_RedactsBothTypes(t *testing.T) {
+	d := nerWith(
+		NameSpan{Text: "Brenda Torres", Start: 0, End: 13, Score: 0.95},
+	)
+	e := NewEngine(ModeAll, "", WithNER(d))
+	known := []KnownIdentity{
+		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
+		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
+	}
+	out := e.RedactText("Brenda Torres helped Alice Smith", known)
+	if strings.Contains(out, "Brenda") || strings.Contains(out, "Torres") {
+		t.Fatalf("user name should be redacted in all mode: %q", out)
+	}
+	if strings.Contains(out, "Alice") || strings.Contains(out, "Smith") {
+		t.Fatalf("customer name should be redacted in all mode: %q", out)
 	}
 }
 

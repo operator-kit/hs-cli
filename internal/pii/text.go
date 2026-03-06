@@ -62,6 +62,10 @@ const RedactTextNotice = `[redacted — run "hs ner install" for content]`
 // RedactText redacts free-form text using known identities followed by regex sweeps.
 // When NER is available, names are detected via ML. Without NER, freeform text is
 // hidden entirely (structured field redaction still works).
+//
+// In mode-restricted operation (e.g. "customers"), only identities whose Type
+// matches the mode are redacted; other known identities are "protected" so
+// neither redactKnown nor NER replaces them.
 func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 	if !e.Enabled() || text == "" {
 		return text
@@ -72,21 +76,32 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 		return RedactTextNotice
 	}
 
+	// Partition known identities: redact vs protect based on mode.
+	var toRedact []KnownIdentity
+	protected := map[string]bool{}
+	for _, id := range known {
+		if e.ShouldRedactType(id.Type) {
+			toRedact = append(toRedact, id)
+		} else {
+			protectIdentityNames(protected, id)
+		}
+	}
+
 	// 1. Detect names via NER on ORIGINAL text (natural language, best accuracy)
 	nerNames, _ := e.ner.DetectNames(text)
 
-	// 2. Known identity replacement
-	out, inserted := e.redactKnown(text, known)
+	// 2. Known identity replacement (only redactable types)
+	out, inserted := e.redactKnown(text, toRedact)
 
-	// 3. Replace NER-detected names not already handled by known identities
+	// 3. Replace NER-detected names not already handled and not protected
 	for _, span := range nerNames {
 		name := span.Text
-		if inserted[name] {
+		if inserted[name] || protected[canonical(name)] {
 			continue
 		}
 		skip := false
 		for _, w := range strings.Fields(name) {
-			if inserted[w] {
+			if inserted[w] || protected[canonical(w)] {
 				skip = true
 				break
 			}
@@ -118,6 +133,30 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 		})
 	}
 	return out
+}
+
+// protectIdentityNames adds all name forms of an identity to the protected set
+// so NER won't replace them. Only names >= 3 chars are added individually to
+// avoid protecting common short words.
+func protectIdentityNames(m map[string]bool, id KnownIdentity) {
+	first := strings.TrimSpace(id.First)
+	last := strings.TrimSpace(id.Last)
+	full := strings.TrimSpace(first + " " + last)
+	if full != "" {
+		m[canonical(full)] = true
+	}
+	if len(first) >= 3 {
+		m[canonical(first)] = true
+	}
+	if len(last) >= 3 {
+		m[canonical(last)] = true
+	}
+	if id.Email != "" {
+		parts := strings.Split(id.Email, "@")
+		if len(parts) > 0 && len(parts[0]) >= 3 {
+			m[canonical(parts[0])] = true
+		}
+	}
 }
 
 // redactKnown replaces known identity data with fake names (for name parts)

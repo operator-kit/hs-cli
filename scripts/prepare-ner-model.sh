@@ -29,12 +29,24 @@ declare -A ORT_URLS=(
   ["windows-arm64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-win-arm64-${ORT_VERSION}.zip"
 )
 
-# Runtime lib filenames per platform
+# Runtime lib filenames per platform (target name in bundle)
 declare -A ORT_LIBS=(
   ["linux-amd64"]="libonnxruntime.so"
   ["linux-arm64"]="libonnxruntime.so"
   ["darwin-amd64"]="libonnxruntime.dylib"
   ["darwin-arm64"]="libonnxruntime.dylib"
+  ["windows-amd64"]="onnxruntime.dll"
+  ["windows-arm64"]="onnxruntime.dll"
+)
+
+# Real (versioned) filenames inside ORT archives — avoids symlink issues on Windows.
+# Linux/macOS tarballs ship symlinks (e.g. .so → .so.1 → .so.1.23.0); we extract
+# the versioned file directly and rename it to the canonical name.
+declare -A ORT_REAL_LIBS=(
+  ["linux-amd64"]="libonnxruntime.so.${ORT_VERSION}"
+  ["linux-arm64"]="libonnxruntime.so.${ORT_VERSION}"
+  ["darwin-amd64"]="libonnxruntime.${ORT_VERSION}.dylib"
+  ["darwin-arm64"]="libonnxruntime.${ORT_VERSION}.dylib"
   ["windows-amd64"]="onnxruntime.dll"
   ["windows-arm64"]="onnxruntime.dll"
 )
@@ -62,16 +74,27 @@ for platform in "${!ORT_URLS[@]}"; do
   ort_file="$TMPDIR/ort-${platform}"
   curl -fsSL "$url" -o "$ort_file"
 
-  # Extract the runtime lib
+  # Extract the runtime lib (use versioned filename to avoid symlink issues on Windows)
   bundledir="$TMPDIR/bundle-${platform}"
   mkdir -p "$bundledir"
+  real_lib="${ORT_REAL_LIBS[$platform]}"
 
   if [[ "$url" == *.zip ]]; then
     unzip -q -j "$ort_file" "**/lib/${lib}" -d "$bundledir" 2>/dev/null || \
     unzip -q -j "$ort_file" "**/${lib}" -d "$bundledir"
   else
-    tar xzf "$ort_file" --strip-components=2 -C "$bundledir" --wildcards "**/lib/${lib}" 2>/dev/null || \
-    tar xzf "$ort_file" --strip-components=1 -C "$bundledir" --wildcards "**/${lib}"
+    # Extract the real (versioned) file, not the symlink
+    ort_extract="$TMPDIR/ort-extract-${platform}"
+    mkdir -p "$ort_extract"
+    tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/lib/${real_lib}" 2>/dev/null || \
+    tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/${real_lib}"
+    find "$ort_extract" -name "$real_lib" -exec cp {} "$bundledir/${lib}" \;
+    rm -rf "$ort_extract"
+  fi
+
+  if [[ ! -f "$bundledir/${lib}" ]]; then
+    echo "  ERROR: failed to extract ${lib} for ${platform}"
+    exit 1
   fi
 
   # Copy model files
