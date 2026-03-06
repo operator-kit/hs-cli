@@ -2,9 +2,10 @@
 
 A command-line interface for the [HelpScout](https://www.helpscout.com/) API. Manage mailboxes, conversations, customers, tags, users, workflows, and webhooks from the terminal.
 
+> [!TIP]
 > **Built for shared and AI-assisted workflows**
-> hs-cli ships with a deterministic, layered PII redaction pipeline (structured fields + free-text + source payload protection), plus strict per-command override controls.
-> An allowlist-based permission system (`resource:operation` pairs) lets you restrict exactly which actions are permitted.
+> ML-powered, deterministic PII redaction — real identities are replaced with consistent fake ones so output stays fully readable for LLMs, debugging, and triage.
+> Allowlist-based permissions (`resource:operation` pairs) restrict exactly which actions are permitted.
 > See [PII Redaction Pipeline](#pii-redaction-pipeline) · [Permissions](#permissions).
 
 ## Install
@@ -176,42 +177,66 @@ npx wrapper:
 
 ## PII Redaction Pipeline
 
-hs-cli includes a production-focused PII redaction system designed for shared terminals, MCP/LLM workflows, and incident-safe exports.
+hs-cli includes an ML-powered PII redaction system designed for shared terminals, MCP/LLM workflows, and incident-safe exports.
 
 ### Why this matters
 
-- Prevents accidental exposure of customer/agent data in terminal output.
-- Keeps output useful for debugging and triage by preserving structure and readability.
-- Gives operators explicit control: strict defaults with an auditable per-command escape hatch.
+Traditional redaction tools either hide entire blocks of content (destroying context) or rely on brittle regex patterns that miss real names. hs-cli takes a different approach:
 
-### Depth of protection
+- **Full content, no PII.** An ML-based Named Entity Recognition (NER) model detects person names in freeform text — conversation bodies, notes, subjects — and replaces them with consistent fake identities. The output reads naturally and retains its full meaning.
+- **LLM-ready output.** Redacted conversations can be piped directly to AI tools for summarisation, triage, or analysis without leaking customer data. The content stays complete and coherent, unlike blanked-out or `[REDACTED]` approaches.
+- **Deterministic pseudonyms.** The same real identity always maps to the same fake name, email, and phone — across commands and sessions. You can follow a conversation thread, cross-reference between outputs, and reason about the data just as you would with the originals.
+- **Mode-aware.** In `customers` mode, only customer data is redacted; team member names are preserved so internal context stays clear.
+
+### How it works
 
 Redaction is applied in layered stages:
 
-1. Structured identity redaction
-- Redacts known person/customer/user fields (names, emails, phones) across table, csv, json, and json-full outputs.
-- Covers nested payloads through a JSON walker.
+1. **Structured identity redaction**
+   - Redacts known person/customer/user fields (names, emails, phones) across table, csv, json, and json-full outputs.
+   - A JSON walker covers nested payloads and infers entity types from field names and structure.
 
-2. Free-text redaction
-- Scans thread/content text (`body`, `action`, `subject`, `preview`, source payloads) with a broad regex pipeline.
-- Detects and replaces common PII classes such as emails, phones, SSNs, card-like values, addresses, IPs, URLs, and person-name patterns.
+2. **ML-powered free-text redaction** (requires NER model)
+   - A multilingual DistilBERT NER model detects person names in freeform text — thread bodies, subjects, previews, action text, and source payloads.
+   - Detected names are replaced with deterministic fake names. Known identities from structured fields are cross-referenced so replacements stay consistent.
+   - A regex pipeline catches non-name PII: emails, phones, SSNs, credit card numbers, addresses, IPs, MACs, and URLs.
+   - Long text is automatically chunked to handle conversations of any length.
 
-3. Raw source protection
-- `threads source` and `threads source-rfc822` are redacted when PII mode is enabled.
+3. **Raw source protection**
+   - `threads source` and `threads source-rfc822` are redacted when PII mode is enabled.
 
-### Deterministic anonymization and cache behavior
+4. **Fallback without NER**
+   - If the NER model is not installed, freeform text fields are hidden entirely rather than shown unredacted. Structured field redaction still works.
+
+### Installing the NER model
+
+The NER model is a one-time download (~100 MB) that runs locally — no API calls, no data leaves your machine.
+
+```bash
+hs ner install
+```
+
+This downloads the model bundle (ONNX Runtime + DistilBERT weights + tokenizer) to your OS cache directory. The model supports Linux (amd64/arm64), macOS (amd64/arm64), and Windows (amd64/arm64).
+
+To check status or remove:
+
+```bash
+hs ner status
+hs ner remove
+```
+
+### Deterministic anonymization
 
 - Replacements are deterministic: the same input maps to the same pseudonym across commands and runs.
-- `HS_INBOX_PII_SECRET` (optional) adds a secret salt for stronger pseudonym generation.
-- Without `HS_INBOX_PII_SECRET`, deterministic hashing is still used (stable fallback).
-- The engine also keeps an in-memory per-command cache so repeated values in the same output are co-derived consistently and processed efficiently.
+- `HS_INBOX_PII_SECRET` (optional) adds a secret salt for stronger pseudonym generation. Without it, deterministic hashing is still used (stable fallback).
+- The engine keeps an in-memory per-command cache so repeated values in the same output are consistent and efficiently processed.
 
 ### Modes and override controls
 
 PII mode:
 
 - `off`: no redaction (default)
-- `customers`: redact customer identities
+- `customers`: redact customer identities only (team member names preserved)
 - `all`: redact customer + user identities
 
 Override policy:
@@ -223,15 +248,18 @@ Override policy:
 ### Quick-start examples
 
 ```bash
+# Install the NER model (one-time, ~100 MB)
+hs ner install
+
 # Enable customer-only redaction globally
 hs inbox config set --inbox-pii-mode customers
 
 # Allow temporary per-command bypasses (for incident response/debugging)
 hs inbox config set --inbox-pii-allow-unredacted
 
-# Run safely redacted output
+# Run safely redacted output — full content, fake identities
 hs inbox conversations list --format json
-hs inbox conversations threads source-rfc822 12345 67890
+hs inbox conversations get 12345 --embed threads
 
 # Temporarily bypass redaction for one command (only if allowed)
 hs inbox --unredacted conversations get 12345 --format json-full
@@ -242,6 +270,17 @@ hs inbox config set --inbox-pii-allow-unredacted=false
 # Fully disable redaction
 hs inbox config set --inbox-pii-mode off --inbox-pii-allow-unredacted=false
 ```
+
+### Limitations
+
+PII redaction is a best-effort safety layer, not a guarantee:
+
+- The NER model may miss unusual names, single-token names under 3 characters, or names embedded in dense code/markup. It performs best on natural language text.
+- Names not present in the known identity set (e.g. third parties mentioned in passing) are detected by NER and replaced, but accuracy depends on the model's confidence.
+- Regex-based detection of emails, phones, addresses etc. uses broad patterns and may occasionally match non-PII strings (e.g. version numbers matching phone patterns).
+- The redaction pipeline operates on CLI output only — it does not modify data in HelpScout.
+
+For high-sensitivity environments, pair PII redaction with `inbox_pii_allow_unredacted: false` to prevent accidental bypasses.
 
 ## Commands
 
