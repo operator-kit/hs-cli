@@ -6,7 +6,7 @@
 # Output: per-platform tarballs + SHA-256 hashes ready for GitHub Release upload.
 set -euo pipefail
 
-VERSION="${PII_MODEL_VERSION:-1.0.0}"
+VERSION="${PII_MODEL_VERSION:-0.2.0}"
 MODEL_REPO="Xenova/distilbert-base-multilingual-cased-ner-hrl"
 ORT_VERSION="1.23.0"
 OUTDIR="${1:-dist/pii-model}"

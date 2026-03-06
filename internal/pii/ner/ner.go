@@ -24,7 +24,7 @@ const maxSeqLen = 512
 const maxChunkChars = 1200
 
 // ModelVersion is the version tag used for bundle download URLs.
-const ModelVersion = "1.0.0"
+const ModelVersion = "0.2.0"
 
 // Detector performs named entity recognition on text.
 type Detector struct {
