@@ -15,6 +15,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+// Patch: fix runtime.AddCleanup panic — cleanup closure captures *Value ptr,
+// preventing GC from collecting it. See patches/onnxruntime-purego/onnxruntime/value.go.
+replace github.com/shota3506/onnxruntime-purego => ./patches/onnxruntime-purego
+
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
