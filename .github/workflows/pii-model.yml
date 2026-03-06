@@ -1,0 +1,35 @@
+name: PII Model Release
+
+on:
+  push:
+    tags:
+      - "pii-model-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/pii-model-v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build platform bundles
+        run: ./scripts/prepare-pii-model.sh dist/pii-model
+        env:
+          PII_MODEL_VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Create release and upload assets
+        run: |
+          gh release create "pii-model-v${{ steps.version.outputs.version }}" \
+            --title "PII Model v${{ steps.version.outputs.version }}" \
+            --notes "PII redaction model bundle (distilbert-base-multilingual-cased-ner-hrl, INT8 quantized) + ONNX Runtime." \
+            dist/pii-model/pii-model-*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
