@@ -21,8 +21,8 @@ func TestCacheDir_ReturnsNonEmpty(t *testing.T) {
 	if dir == "" {
 		t.Fatal("CacheDir should return non-empty path")
 	}
-	if !strings.Contains(dir, "ner-model") {
-		t.Fatalf("CacheDir should contain 'ner-model': %s", dir)
+	if !strings.Contains(dir, "pii-model") {
+		t.Fatalf("CacheDir should contain 'pii-model': %s", dir)
 	}
 }
 

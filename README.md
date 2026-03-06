@@ -267,9 +267,9 @@ Setting `HS_INBOX_PII_SECRET` (optional) adds a secret salt to the hash, making 
 The CLI handles model setup automatically — on first use you'll be prompted to download the model bundle (~100 MB). Everything runs locally; no API calls, no data leaves your machine.
 
 ```bash
-hs ner install   # download/update the model bundle
-hs ner status    # check install status
-hs ner remove    # remove the model from disk
+hs pii-model install     # download the model bundle
+hs pii-model status      # check install status
+hs pii-model uninstall   # remove the model from disk
 ```
 
 The model supports Linux (amd64/arm64), macOS (amd64/arm64), and Windows (amd64/arm64).

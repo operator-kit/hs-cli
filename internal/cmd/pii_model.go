@@ -9,29 +9,29 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(newNERCmd())
+	rootCmd.AddCommand(newPIIModelCmd())
 }
 
-func newNERCmd() *cobra.Command {
+func newPIIModelCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ner",
-		Short: "Manage NER model for PII name detection",
+		Use:   "pii-model",
+		Short: "Manage PII redaction model",
 	}
-	cmd.AddCommand(nerInstallCmd(), nerStatusCmd(), nerRemoveCmd())
+	cmd.AddCommand(piiModelInstallCmd(), piiModelUninstallCmd(), piiModelStatusCmd())
 	return cmd
 }
 
-func nerInstallCmd() *cobra.Command {
+func piiModelInstallCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "install",
-		Short: "Download NER model bundle for the current platform",
+		Short: "Download PII redaction model for the current platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ner.IsModelReady() {
-				fmt.Fprintln(cmd.OutOrStdout(), "NER model already installed.")
+				fmt.Fprintln(cmd.OutOrStdout(), "PII model already installed.")
 				return nil
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Downloading NER model v%s...\n", ner.ModelVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "Downloading PII model v%s...\n", ner.ModelVersion)
 
 			_, err := ner.EnsureModel(func(read, total int64) {
 				if total > 0 {
@@ -53,19 +53,19 @@ func nerInstallCmd() *cobra.Command {
 	}
 }
 
-func nerStatusCmd() *cobra.Command {
+func piiModelStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Show NER model installation status",
+		Short: "Show PII model installation status",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !ner.IsModelReady() {
-				fmt.Fprintln(cmd.OutOrStdout(), "NER model: not installed")
-				fmt.Fprintln(cmd.OutOrStdout(), "Run 'hs ner install' to download.")
+				fmt.Fprintln(cmd.OutOrStdout(), "PII model: not installed")
+				fmt.Fprintln(cmd.OutOrStdout(), "Run 'hs pii-model install' to download.")
 				return nil
 			}
 
 			dir, _ := ner.CacheDir()
-			fmt.Fprintf(cmd.OutOrStdout(), "NER model: installed (v%s)\n", ner.ModelVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "PII model: installed (v%s)\n", ner.ModelVersion)
 			fmt.Fprintf(cmd.OutOrStdout(), "Location: %s\n", dir)
 			fmt.Fprintln(cmd.OutOrStdout(), "Model: distilbert-base-multilingual-cased-ner-hrl (INT8)")
 			fmt.Fprintln(cmd.OutOrStdout(), "Languages: Arabic, German, English, Spanish, French, Italian, Latvian, Dutch, Portuguese, Chinese")
@@ -74,21 +74,21 @@ func nerStatusCmd() *cobra.Command {
 	}
 }
 
-func nerRemoveCmd() *cobra.Command {
+func piiModelUninstallCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove",
-		Short: "Delete cached NER model files",
+		Use:   "uninstall",
+		Short: "Remove cached PII model files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !ner.IsModelReady() {
-				fmt.Fprintln(cmd.OutOrStdout(), "NER model is not installed.")
+				fmt.Fprintln(cmd.OutOrStdout(), "PII model is not installed.")
 				return nil
 			}
 
 			dir, _ := ner.CacheDir()
 			if err := ner.RemoveModel(); err != nil {
-				return fmt.Errorf("remove failed: %w", err)
+				return fmt.Errorf("uninstall failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed NER model from %s\n", dir)
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed PII model from %s\n", dir)
 			return nil
 		},
 	}

@@ -57,7 +57,7 @@ var textRules = []textRule{
 }
 
 // RedactTextNotice is shown for freeform text when NER is not installed.
-const RedactTextNotice = `[redacted — run "hs ner install" for content]`
+const RedactTextNotice = `[redacted — run "hs pii-model install" for content]`
 
 // RedactText redacts free-form text using known identities followed by regex sweeps.
 // When NER is available, names are detected via ML. Without NER, freeform text is

@@ -102,8 +102,8 @@ var rootCmd = &cobra.Command{
 		if name == "login" || name == "logout" || name == "status" ||
 			name == "version" || name == "completion" || name == "update" ||
 			name == "permissions" || name == "mcp" ||
-			parent == "completion" || parent == "ner" ||
-			name == "hs" || name == "inbox" || name == "docs" || name == "ner" {
+			parent == "completion" || parent == "pii-model" ||
+			name == "hs" || name == "inbox" || name == "docs" || name == "pii-model" {
 			return nil
 		}
 

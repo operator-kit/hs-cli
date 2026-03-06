@@ -23,13 +23,13 @@ type Paths struct {
 }
 
 // baseURL is the GitHub release download URL template.
-const baseURL = "https://github.com/operator-kit/hs-cli/releases/download/ner-model-v%s/ner-model-%s-%s-%s.tar.gz"
+const baseURL = "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v%s/pii-model-%s-%s-%s.tar.gz"
 
 // ProgressFunc reports download progress (bytesRead, totalBytes).
 // totalBytes may be -1 if unknown.
 type ProgressFunc func(bytesRead, totalBytes int64)
 
-// CacheDir returns the OS-specific cache directory for the NER model.
+// CacheDir returns the OS-specific cache directory for the PII model.
 func CacheDir() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
@@ -37,7 +37,7 @@ func CacheDir() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(home, "Library", "Caches", "hs", "ner-model"), nil
+		return filepath.Join(home, "Library", "Caches", "hs", "pii-model"), nil
 	case "windows":
 		dir := os.Getenv("LOCALAPPDATA")
 		if dir == "" {
@@ -47,7 +47,7 @@ func CacheDir() (string, error) {
 			}
 			dir = filepath.Join(home, "AppData", "Local")
 		}
-		return filepath.Join(dir, "hs", "ner-model"), nil
+		return filepath.Join(dir, "hs", "pii-model"), nil
 	default: // linux, freebsd, etc
 		dir := os.Getenv("XDG_CACHE_HOME")
 		if dir == "" {
@@ -57,7 +57,7 @@ func CacheDir() (string, error) {
 			}
 			dir = filepath.Join(home, ".cache")
 		}
-		return filepath.Join(dir, "hs", "ner-model"), nil
+		return filepath.Join(dir, "hs", "pii-model"), nil
 	}
 }
 
@@ -82,7 +82,7 @@ func ModelPaths() (*Paths, error) {
 		return nil, err
 	}
 	if !IsModelReady() {
-		return nil, fmt.Errorf("model not installed (run \"hs ner install\")")
+		return nil, fmt.Errorf("model not installed (run \"hs pii-model install\")")
 	}
 
 	libName := runtimeLibName()

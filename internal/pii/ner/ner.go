@@ -2,7 +2,7 @@
 // It uses ONNX Runtime (via purego) and a multilingual DistilBERT NER model
 // to detect person names in freeform text.
 //
-// The model bundle is downloaded separately via `hs ner install` and cached
+// The model bundle is downloaded separately via `hs pii-model install` and cached
 // in the user's OS-specific cache directory. When the bundle is not present,
 // the NER detector cannot be created and freeform text is hidden instead.
 package ner

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# prepare-ner-model.sh — Download NER model + ONNX Runtime, create per-platform bundles.
+# prepare-pii-model.sh — Download PII model + ONNX Runtime, create per-platform bundles.
 #
-# Usage: ./scripts/prepare-ner-model.sh [output_dir]
+# Usage: ./scripts/prepare-pii-model.sh [output_dir]
 #
 # Output: per-platform tarballs + SHA-256 hashes ready for GitHub Release upload.
 set -euo pipefail
@@ -9,7 +9,7 @@ set -euo pipefail
 VERSION="1.0.0"
 MODEL_REPO="Xenova/distilbert-base-multilingual-cased-ner-hrl"
 ORT_VERSION="1.23.0"
-OUTDIR="${1:-dist/ner-model}"
+OUTDIR="${1:-dist/pii-model}"
 
 # HuggingFace ONNX model files (universal)
 HF_BASE="https://huggingface.co/${MODEL_REPO}/resolve/main"
@@ -103,7 +103,7 @@ for platform in "${!ORT_URLS[@]}"; do
   cp "$MODELDIR/config.json" "$bundledir/"
 
   # Create tarball
-  tarball="$OUTDIR/ner-model-${VERSION}-${platform}.tar.gz"
+  tarball="$OUTDIR/pii-model-${VERSION}-${platform}.tar.gz"
   tar czf "$tarball" -C "$bundledir" .
   sha256sum "$tarball" | awk '{print $1}' > "${tarball}.sha256"
 
@@ -113,11 +113,11 @@ done
 
 echo ""
 echo "=== Done ==="
-echo "Upload assets from $OUTDIR to GitHub Release: ner-model-v${VERSION}"
+echo "Upload assets from $OUTDIR to GitHub Release: pii-model-v${VERSION}"
 echo ""
 echo "Go constants for embedding:"
 for platform in "${!ORT_URLS[@]}"; do
-  sha=$(cat "$OUTDIR/ner-model-${VERSION}-${platform}.tar.gz.sha256")
+  sha=$(cat "$OUTDIR/pii-model-${VERSION}-${platform}.tar.gz.sha256")
   govar=$(echo "$platform" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
   echo "  SHA256_${govar} = \"${sha}\""
 done

@@ -404,8 +404,8 @@ func TestRedactJSON_WithoutNER_FreeformIsNotice(t *testing.T) {
 		t.Fatalf("RedactJSON error: %v", err)
 	}
 	s := string(out)
-	if !strings.Contains(s, "hs ner install") {
-		t.Fatalf("expected freeform text to contain ner install notice, got %s", s)
+	if !strings.Contains(s, "hs pii-model install") {
+		t.Fatalf("expected freeform text to contain pii-model install notice, got %s", s)
 	}
 	// Structured fields should still be redacted
 	if strings.Contains(s, "alice@example.com") {
