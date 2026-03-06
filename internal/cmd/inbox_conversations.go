@@ -170,12 +170,19 @@ func conversationsListCmd() *cobra.Command {
 				convs = append(convs, c)
 			}
 
-			cols := []string{"id", "number", "subject", "status", "customer", "updated"}
+			cols := []string{"id", "number", "subject", "status", "customer", "assigned", "updated"}
 			rows := make([]map[string]string, len(convs))
 			for i, c := range convs {
 				customer := c.PrimaryCustomer.Email
 				if customer == "" {
 					customer = fmt.Sprintf("%s %s", c.PrimaryCustomer.First, c.PrimaryCustomer.Last)
+				}
+				assigned := "unassigned"
+				if c.Assignee != nil {
+					assigned = strings.TrimSpace(c.Assignee.First + " " + c.Assignee.Last)
+					if assigned == "" {
+						assigned = c.Assignee.Email
+					}
 				}
 				rows[i] = map[string]string{
 					"id":       strconv.Itoa(c.ID),
@@ -183,14 +190,15 @@ func conversationsListCmd() *cobra.Command {
 					"subject":  truncate(c.Subject, 50),
 					"status":   c.Status,
 					"customer": customer,
-					"updated":  c.ModifiedAt,
+					"assigned": assigned,
+					"updated":  output.RelativeTime(c.ModifiedAt),
 				}
 			}
 			if err := output.Print(getFormat(), cols, rows); err != nil {
 				return err
 			}
 			if pageInfo != nil && !noPaginate {
-				fmt.Fprintf(output.Out, "\nPage %d of %d (%d total)\n", pageInfo.Number, pageInfo.TotalPages, pageInfo.TotalElements)
+				fmt.Fprintf(output.Out, "%s\n\n", output.Dim(fmt.Sprintf("Page %d of %d (%d total)", pageInfo.Number, pageInfo.TotalPages, pageInfo.TotalElements)))
 			}
 			return nil
 		},
@@ -274,7 +282,7 @@ func conversationsGetCmd() *cobra.Command {
 			// Default: detail view
 			fields := []output.Field{
 				{Label: "ID", Value: strconv.Itoa(c.ID)},
-				{Label: "Number", Value: strconv.Itoa(c.Number)},
+				{Label: "Number", Value: output.Blue(fmt.Sprintf("#%d", c.Number))},
 				{Label: "Subject", Value: c.Subject},
 				{Label: "Status", Value: c.Status},
 				{Label: "Type", Value: c.Type},
@@ -293,8 +301,8 @@ func conversationsGetCmd() *cobra.Command {
 			// Embedded threads
 			threads := parseEmbeddedThreads(data)
 			if len(threads) > 0 {
-				fmt.Fprintf(output.Out, "\nThreads (%d):\n", len(threads))
-				fmt.Fprintln(output.Out, strings.Repeat("─", 60))
+				fmt.Fprintf(output.Out, "\n%s\n", output.Dim(fmt.Sprintf("Threads (%d):", len(threads))))
+				fmt.Fprintln(output.Out, output.Dim(strings.Repeat("─", 60)))
 				for _, t := range threads {
 					originalAuthor := t.CreatedBy
 					authorType := threadAuthorType(t.Type)

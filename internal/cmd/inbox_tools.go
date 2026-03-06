@@ -31,7 +31,6 @@ func newToolsCmd() *cobra.Command {
 	briefingCmd := briefingCmd()
 	permission.Annotate(briefingCmd, "conversations", permission.OpRead)
 	briefingCmd.Flags().String("assigned-to", "", "filter by assigned user ID")
-	briefingCmd.Flags().String("status", "active", "conversation status filter")
 	briefingCmd.Flags().String("embed", "", "embed sub-resources (e.g. threads)")
 
 	toolsCmd.AddCommand(briefingCmd)
@@ -45,7 +44,6 @@ func briefingCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			assignedTo, _ := cmd.Flags().GetString("assigned-to")
-			status, _ := cmd.Flags().GetString("status")
 			embed, _ := cmd.Flags().GetString("embed")
 
 			embedThreads := strings.Contains(embed, "threads")
@@ -53,25 +51,70 @@ func briefingCmd() *cobra.Command {
 				return fmt.Errorf("--embed threads requires --assigned-to")
 			}
 
+			// Multi-status query: active + pending + closed in last 7d
 			params := url.Values{}
-			params.Set("status", status)
-			if assignedTo != "" {
-				params.Set("assigned_to", assignedTo)
-				params.Set("embed", "threads") // free in single API call; team overview skips to avoid large payloads
+			params.Set("query", `(status:"active" OR status:"pending" OR (status:"closed" AND modifiedAt:[NOW-7d TO *]))`)
+
+			if assignedTo == "" {
+				items, _, err := api.PaginateAll(ctx, apiClient.ListConversations, params, "conversations", true)
+				if err != nil {
+					return err
+				}
+				return renderTeamOverview(items)
 			}
+
+			// Agent-specific: restrict to this agent and embed threads
+			params.Set("assigned_to", assignedTo)
+			params.Set("embed", "threads")
 
 			items, _, err := api.PaginateAll(ctx, apiClient.ListConversations, params, "conversations", true)
 			if err != nil {
 				return err
 			}
 
-			if assignedTo == "" {
-				return renderTeamOverview(items)
+			// Compute counts, extract agent name, filter to active+pending
+			engine, engineErr := newPIIEngine()
+			if engineErr != nil {
+				return engineErr
 			}
+			var nActive, nPending, nClosed int
+			var agentName string
+			var openItems []json.RawMessage
+			for _, raw := range items {
+				var c types.Conversation
+				json.Unmarshal(raw, &c)
+				if agentName == "" && c.Assignee != nil {
+					p := *c.Assignee
+					if engine.Enabled() {
+						redactPersonForOutput(engine, &p, "user")
+					}
+					agentName = strings.TrimSpace(p.First + " " + p.Last)
+				}
+				switch c.Status {
+				case "closed":
+					nClosed++
+				case "pending":
+					nPending++
+					openItems = append(openItems, raw)
+				default:
+					nActive++
+					openItems = append(openItems, raw)
+				}
+			}
+
+			if len(items) > 0 && !isJSON() {
+				if agentName == "" {
+					agentName = "Unknown"
+				}
+				fmt.Fprintf(output.Out, "%s\n\n", output.Blue(
+					fmt.Sprintf("Briefing — %s — %d open, %d pending and %d closed (7d)",
+						agentName, nActive, nPending, nClosed)))
+			}
+
 			if embedThreads {
-				return renderAgentWithThreads(items)
+				return renderAgentWithThreads(openItems)
 			}
-			return renderAgentSummary(items)
+			return renderAgentSummary(openItems)
 		},
 	}
 }
@@ -84,48 +127,84 @@ func renderTeamOverview(items []json.RawMessage) error {
 	}
 
 	type agentCount struct {
-		name  string
-		email string
-		count int
+		id      int
+		name    string
+		email   string
+		active  int
+		pending int
+		closed  int
 	}
 
 	counts := map[string]*agentCount{}
-	var unassigned int
+	var unassignedActive, unassignedPending, unassignedClosed int
+	var totalActive, totalPending, totalClosed int
 
 	for _, raw := range items {
 		var c types.Conversation
 		json.Unmarshal(raw, &c)
+
+		// Count totals and per-agent by status
+		isActive := c.Status != "pending" && c.Status != "closed"
+
 		if c.Assignee == nil {
-			unassigned++
+			switch {
+			case c.Status == "pending":
+				unassignedPending++
+				totalPending++
+			case c.Status == "closed":
+				unassignedClosed++
+				totalClosed++
+			default:
+				unassignedActive++
+				totalActive++
+			}
 			continue
 		}
+
 		redactPersonForOutput(engine, c.Assignee, "user")
 		key := c.Assignee.Email
 		if key == "" {
 			key = strings.TrimSpace(c.Assignee.First + " " + c.Assignee.Last)
 		}
-		if ac, ok := counts[key]; ok {
-			ac.count++
-		} else {
+		ac, ok := counts[key]
+		if !ok {
 			name := strings.TrimSpace(c.Assignee.First + " " + c.Assignee.Last)
-			counts[key] = &agentCount{name: name, email: c.Assignee.Email, count: 1}
+			ac = &agentCount{id: c.Assignee.ID, name: name, email: c.Assignee.Email}
+			counts[key] = ac
+		}
+		switch {
+		case c.Status == "pending":
+			ac.pending++
+			totalPending++
+		case c.Status == "closed":
+			ac.closed++
+			totalClosed++
+		case isActive:
+			ac.active++
+			totalActive++
 		}
 	}
 
-	// Sort agents by count descending
+	// Sort agents by active count descending
 	agents := make([]*agentCount, 0, len(counts))
 	for _, ac := range counts {
 		agents = append(agents, ac)
 	}
-	sort.Slice(agents, func(i, j int) bool { return agents[i].count > agents[j].count })
+	sort.Slice(agents, func(i, j int) bool { return agents[i].active > agents[j].active })
 
 	if isJSON() {
 		result := make([]map[string]any, 0, len(agents)+1)
 		for _, ac := range agents {
-			result = append(result, map[string]any{"agent": ac.name, "email": ac.email, "count": ac.count})
+			result = append(result, map[string]any{
+				"id": ac.id, "agent": ac.name, "email": ac.email,
+				"active": ac.active, "pending": ac.pending, "closed": ac.closed,
+			})
 		}
-		if unassigned > 0 {
-			result = append(result, map[string]any{"agent": "(unassigned)", "email": "", "count": unassigned})
+		if unassignedActive+unassignedPending+unassignedClosed > 0 {
+			result = append(result, map[string]any{
+				"id": nil, "agent": "(unassigned)", "email": "",
+				"active": unassignedActive, "pending": unassignedPending, "closed": unassignedClosed,
+			})
 		}
 		return printRawWithPII(mustMarshal(result))
 	}
@@ -133,16 +212,20 @@ func renderTeamOverview(items []json.RawMessage) error {
 	rows := make([]map[string]string, 0, len(agents)+1)
 	for _, ac := range agents {
 		rows = append(rows, map[string]string{
-			"agent": ac.name,
-			"email": ac.email,
-			"count": strconv.Itoa(ac.count),
+			"id":      strconv.Itoa(ac.id),
+			"agent":   ac.name,
+			"active":  strconv.Itoa(ac.active),
+			"pending": strconv.Itoa(ac.pending),
+			"closed (7d)":  strconv.Itoa(ac.closed),
 		})
 	}
-	if unassigned > 0 {
+	if unassignedActive+unassignedPending+unassignedClosed > 0 {
 		rows = append(rows, map[string]string{
-			"agent": "(unassigned)",
-			"email": "",
-			"count": strconv.Itoa(unassigned),
+			"id":      "-",
+			"agent":   "(unassigned)",
+			"active":  strconv.Itoa(unassignedActive),
+			"pending": strconv.Itoa(unassignedPending),
+			"closed (7d)":  strconv.Itoa(unassignedClosed),
 		})
 	}
 
@@ -151,11 +234,12 @@ func renderTeamOverview(items []json.RawMessage) error {
 		return nil
 	}
 
-	cols := []string{"agent", "email", "count"}
+	fmt.Fprintf(output.Out, "%s\n\n", output.Blue("Team Briefing — Active Conversations"))
+	cols := []string{"id", "agent", "active", "pending", "closed (7d)"}
 	if err := output.Print(getFormat(), cols, rows); err != nil {
 		return err
 	}
-	fmt.Fprintf(output.Out, "\n%d conversations\n", len(items))
+	fmt.Fprintf(output.Out, "%s\n\n", output.Green(fmt.Sprintf("Total: %d active · %d pending · %d closed", totalActive, totalPending, totalClosed)))
 	return nil
 }
 
@@ -237,7 +321,7 @@ func renderAgentSummary(items []json.RawMessage) error {
 			"status":        c.Status,
 			"customer":      customer,
 			"threads":       strconv.Itoa(summary.ThreadCount),
-			"last_activity": summary.LastActivity,
+			"last_activity": output.RelativeTime(summary.LastActivity),
 			"response_min":  responseMin,
 			"age_days":      ageDays,
 		}
@@ -353,10 +437,10 @@ func renderAgentWithThreads(items []json.RawMessage) error {
 			ageDays = fmt.Sprintf("%.1fd", *summary.AgeDays)
 		}
 
-		fmt.Fprintf(output.Out, "\n#%d %s [%s] — %s | threads:%d response:%s age:%s\n",
-			c.Number, truncate(c.Subject, 50), c.Status, customer,
+		fmt.Fprintf(output.Out, "\n%s %s [%s] — %s | threads:%d response:%s age:%s\n",
+			output.Blue(fmt.Sprintf("#%d", c.Number)), truncate(c.Subject, 50), c.Status, customer,
 			summary.ThreadCount, responseMin, ageDays)
-		fmt.Fprintln(output.Out, strings.Repeat("─", 60))
+		fmt.Fprintln(output.Out, output.Dim(strings.Repeat("─", 60)))
 
 		for _, t := range threads {
 			originalAuthor := t.CreatedBy

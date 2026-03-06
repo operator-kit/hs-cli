@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 )
 
 type TableFormatter struct{}
@@ -27,12 +28,13 @@ func (f *TableFormatter) Format(w io.Writer, columns []string, rows []map[string
 		}
 	}
 
-	// Print header
+	// Print header (pad before coloring to preserve alignment)
 	for i, col := range columns {
 		if i > 0 {
 			fmt.Fprint(w, "  ")
 		}
-		fmt.Fprintf(w, "%-*s", widths[i], strings.ToUpper(col))
+		padded := fmt.Sprintf("%-*s", widths[i], titleCase(col))
+		fmt.Fprint(w, Dim(padded))
 	}
 	fmt.Fprintln(w)
 
@@ -41,7 +43,7 @@ func (f *TableFormatter) Format(w io.Writer, columns []string, rows []map[string
 		if i > 0 {
 			fmt.Fprint(w, "  ")
 		}
-		fmt.Fprint(w, strings.Repeat("─", width))
+		fmt.Fprint(w, Dim(strings.Repeat("─", width)))
 	}
 	fmt.Fprintln(w)
 
@@ -55,5 +57,24 @@ func (f *TableFormatter) Format(w io.Writer, columns []string, rows []map[string
 		}
 		fmt.Fprintln(w)
 	}
+	fmt.Fprintln(w)
 	return nil
+}
+
+// abbreviations that should stay fully uppercase in title case.
+var upperWords = map[string]bool{
+	"id": true, "ip": true, "url": true, "api": true, "ssl": true,
+}
+
+// titleCase converts "some_column" to "Some Column", keeping abbreviations uppercase.
+func titleCase(s string) string {
+	words := strings.Split(strings.ReplaceAll(s, "_", " "), " ")
+	for i, w := range words {
+		if upperWords[strings.ToLower(w)] {
+			words[i] = strings.ToUpper(w)
+		} else if len(w) > 0 {
+			words[i] = string(unicode.ToUpper(rune(w[0]))) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }

@@ -22,7 +22,7 @@ func TestTableFormatter_Basic(t *testing.T) {
 	out := buf.String()
 
 	assert.Contains(t, out, "ID")
-	assert.Contains(t, out, "NAME")
+	assert.Contains(t, out, "Name")
 	assert.Contains(t, out, "Alice")
 	assert.Contains(t, out, "Bob")
 	assert.Contains(t, out, "──") // separator

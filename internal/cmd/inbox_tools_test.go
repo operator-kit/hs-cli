@@ -16,18 +16,18 @@ import (
 func TestBriefingTeamOverview(t *testing.T) {
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
-			assert.Equal(t, "active", params.Get("status"))
-			assert.Empty(t, params.Get("embed")) // team overview must NOT embed threads
+			assert.NotEmpty(t, params.Get("query")) // team overview uses query for multi-status
+			assert.Empty(t, params.Get("embed"))     // team overview must NOT embed threads
 			return halJSON("conversations", `[
 				{"id":1,"number":100,"subject":"A","status":"active",
 				 "primaryCustomer":{"email":"c1@test.com"},"userUpdatedAt":"2025-01-01",
-				 "assignee":{"first":"Ross","last":"Morsali","email":"ross@test.com"}},
-				{"id":2,"number":101,"subject":"B","status":"active",
+				 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}},
+				{"id":2,"number":101,"subject":"B","status":"pending",
 				 "primaryCustomer":{"email":"c2@test.com"},"userUpdatedAt":"2025-01-02",
-				 "assignee":{"first":"Ross","last":"Morsali","email":"ross@test.com"}},
-				{"id":3,"number":102,"subject":"C","status":"active",
+				 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}},
+				{"id":3,"number":102,"subject":"C","status":"closed",
 				 "primaryCustomer":{"email":"c3@test.com"},"userUpdatedAt":"2025-01-03",
-				 "assignee":{"first":"Jane","last":"Doe","email":"jane@test.com"}},
+				 "assignee":{"id":55,"first":"Jane","last":"Doe","email":"jane@test.com"}},
 				{"id":4,"number":103,"subject":"D","status":"active",
 				 "primaryCustomer":{"email":"c4@test.com"},"userUpdatedAt":"2025-01-04"}
 			]`), nil
@@ -40,10 +40,15 @@ func TestBriefingTeamOverview(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
-	assert.Contains(t, out, "Ross Morsali")
+	assert.Contains(t, out, "42") // agent ID for Alex
+	assert.Contains(t, out, "Alex Morgan")
+	assert.Contains(t, out, "55") // agent ID for Jane
 	assert.Contains(t, out, "Jane Doe")
 	assert.Contains(t, out, "(unassigned)")
-	assert.Contains(t, out, "4 conversations")
+	assert.Contains(t, out, "Total: 2 active")
+	assert.Contains(t, out, "1 pending")
+	assert.Contains(t, out, "1 closed")
+	assert.Contains(t, out, "Team Briefing")
 }
 
 func TestBriefingAgentSummary(t *testing.T) {
@@ -51,10 +56,12 @@ func TestBriefingAgentSummary(t *testing.T) {
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
 			assert.Equal(t, "99", params.Get("assigned_to"))
 			assert.Equal(t, "threads", params.Get("embed"))
+			assert.NotEmpty(t, params.Get("query")) // multi-status query
 			return halJSON("conversations", `[
 				{"id":1,"number":100,"subject":"Help me","status":"active",
 				 "createdAt":"2025-01-01T10:00:00Z",
 				 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
+				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
 				 "_embedded":{"threads":[
 					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
 					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
@@ -62,9 +69,15 @@ func TestBriefingAgentSummary(t *testing.T) {
 				{"id":2,"number":101,"subject":"Billing question","status":"pending",
 				 "createdAt":"2025-01-02T08:00:00Z",
 				 "primaryCustomer":{"email":"bob@test.com"},"userUpdatedAt":"2025-01-02",
+				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
 				 "_embedded":{"threads":[
 					{"id":20,"type":"customer","body":"Question","createdAt":"2025-01-02T08:00:00Z","createdBy":{"email":"bob@test.com"}}
-				 ]}}
+				 ]}},
+				{"id":3,"number":102,"subject":"Old issue","status":"closed",
+				 "createdAt":"2025-01-03T08:00:00Z",
+				 "primaryCustomer":{"email":"carol@test.com"},"userUpdatedAt":"2025-01-03",
+				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
+				 "_embedded":{"threads":[]}}
 			]`), nil
 		},
 	}
@@ -75,14 +88,24 @@ func TestBriefingAgentSummary(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
+	// Summary line with agent name and counts
+	assert.Contains(t, out, "Briefing")
+	assert.Contains(t, out, "Alex Morgan")
+	assert.Contains(t, out, "1 open")
+	assert.Contains(t, out, "1 pending")
+	assert.Contains(t, out, "1 closed (7d)")
+	// Active and pending conversations shown
 	assert.Contains(t, out, "Help me")
 	assert.Contains(t, out, "alice@test.com")
 	assert.Contains(t, out, "Billing question")
 	assert.Contains(t, out, "bob@test.com")
-	// Thread summary columns present (headers are uppercased by formatter)
-	assert.Contains(t, out, "THREADS")
-	assert.Contains(t, out, "LAST_ACTIVITY")
-	assert.Contains(t, out, "2025-01-01T11:30:00Z") // last activity for conv 1
+	// Closed conversation filtered out
+	assert.NotContains(t, out, "Old issue")
+	assert.NotContains(t, out, "carol@test.com")
+	// Thread summary columns present (headers are title case)
+	assert.Contains(t, out, "Threads")
+	assert.Contains(t, out, "Last Activity")
+	assert.Contains(t, out, "ago") // last activity shown as relative time
 }
 
 func TestBriefingAgentSummaryJSON(t *testing.T) {
@@ -92,13 +115,13 @@ func TestBriefingAgentSummaryJSON(t *testing.T) {
 				{"id":1,"number":100,"subject":"Help me","status":"active",
 				 "createdAt":"2025-01-01T10:00:00Z",
 				 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
-				 "assignee":{"first":"Ross","last":"M","email":"ross@test.com"},
+				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
 				 "userUpdatedAt":"2025-01-01",
 				 "_embedded":{"threads":[
 					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z",
 					 "createdBy":{"first":"Alice","last":"Smith","email":"alice@test.com"}},
 					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z",
-					 "createdBy":{"first":"Ross","last":"M","email":"ross@test.com"}}
+					 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
 				 ]}}
 			]`), nil
 		},
@@ -120,7 +143,7 @@ func TestBriefingAgentSummaryJSON(t *testing.T) {
 	assert.Equal(t, float64(1), conv["id"])
 	assert.Equal(t, "Help me", conv["subject"])
 	assert.Equal(t, "Alice Smith (alice@test.com)", conv["customer"])
-	assert.Equal(t, "Ross M (ross@test.com)", conv["assignee"])
+	assert.Equal(t, "Alex M (alex@test.com)", conv["assignee"])
 
 	// Summary block present
 	summary, ok := conv["summary"].(map[string]any)
@@ -143,6 +166,7 @@ func TestBriefingAgentWithThreads(t *testing.T) {
 				{"id":1,"number":100,"subject":"Help me","status":"active",
 				 "createdAt":"2025-01-01T10:00:00Z",
 				 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
+				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
 				 "_embedded":{"threads":[
 					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
 					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
@@ -157,6 +181,10 @@ func TestBriefingAgentWithThreads(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
+	// Summary line
+	assert.Contains(t, out, "Briefing")
+	assert.Contains(t, out, "Alex Morgan")
+	assert.Contains(t, out, "1 open")
 	// Detail view: conversation header
 	assert.Contains(t, out, "#100")
 	assert.Contains(t, out, "Help me")
@@ -178,7 +206,7 @@ func TestBriefingAgentThreadsJSON(t *testing.T) {
 				{"id":1,"number":100,"subject":"Help me","status":"active",
 				 "createdAt":"2025-01-01T10:00:00Z",
 				 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
-				 "assignee":{"first":"Ross","last":"M","email":"ross@test.com"},
+				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
 				 "tags":[{"id":1,"name":"billing","slug":"billing","color":"#f00"}],
 				 "userUpdatedAt":"2025-01-01",
 				 "_embedded":{"threads":[
@@ -190,7 +218,7 @@ func TestBriefingAgentThreadsJSON(t *testing.T) {
 					 "_embedded":{"attachments":[]},
 					 "_links":{"createdByCustomer":{"href":"/customers/1"}}},
 					{"id":11,"type":"reply","body":"<p>On it!</p>","createdAt":"2025-01-01T11:30:00Z",
-					 "createdBy":{"first":"Ross","last":"M","email":"ross@test.com"}}
+					 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
 				 ]},
 				 "_links":{"self":{"href":"/conversations/1"}}}
 			]`), nil
@@ -218,7 +246,7 @@ func TestBriefingAgentThreadsJSON(t *testing.T) {
 	assert.Equal(t, float64(1), conv["id"])
 	assert.Equal(t, "Help me", conv["subject"])
 	assert.Equal(t, "Alice Smith (alice@test.com)", conv["customer"])
-	assert.Equal(t, "Ross M (ross@test.com)", conv["assignee"])
+	assert.Equal(t, "Alex M (alex@test.com)", conv["assignee"])
 
 	// Summary block with computed metrics
 	summary, ok := conv["summary"].(map[string]any)
@@ -305,7 +333,7 @@ func TestBriefingTeamOverviewNoThreadEmbed(t *testing.T) {
 			return halJSON("conversations", `[
 				{"id":1,"number":100,"subject":"A","status":"active",
 				 "primaryCustomer":{"email":"c1@test.com"},
-				 "assignee":{"first":"Ross","last":"M","email":"ross@test.com"}}
+				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"}}
 			]`), nil
 		},
 	}
@@ -315,7 +343,7 @@ func TestBriefingTeamOverviewNoThreadEmbed(t *testing.T) {
 	// Explicit --embed "" to reset cobra flag state from prior tests
 	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--embed", ""})
 	require.NoError(t, rootCmd.Execute())
-	assert.Contains(t, buf.String(), "Ross M")
+	assert.Contains(t, buf.String(), "Alex M")
 }
 
 // Regression: agent views must always embed threads (summary data depends on it).

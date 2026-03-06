@@ -127,20 +127,17 @@ In addition to 1:1 API command coverage, hs-cli includes higher-level workflow t
 **Team briefing** gives you an instant overview of your support team's workload:
 
 ```bash
-# Team overview — conversation counts per agent
+# Team overview — active/pending/closed counts per agent
 hs inbox tools briefing
 
-# Filter by status
-hs inbox tools briefing --status pending
-
-# Agent summary — list a specific agent's conversations
+# Agent summary — list a specific agent's open conversations
 hs inbox tools briefing --assigned-to 531600
 
 # Full agent briefing with thread data (ideal for LLM context)
 hs inbox tools briefing --assigned-to 531600 --embed threads --format json
 ```
 
-The briefing command operates in three modes. Without flags, it shows every agent with their active conversation count. With `--assigned-to`, it lists that agent's conversations (same columns as `conversations list`). Add `--embed threads` to include full thread data per conversation — particularly useful for feeding to an LLM for triage, summarisation, or draft replies.
+The briefing command operates in three tiers. Without flags, it shows every agent with their active, pending, and closed (7d) conversation counts. With `--assigned-to`, it shows a summary line for that agent and lists their open conversations. Add `--embed threads` to include full thread data per conversation — particularly useful for feeding to an LLM for triage, summarisation, or draft replies.
 
 ## Output formats
 
