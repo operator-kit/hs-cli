@@ -51,25 +51,18 @@ func briefingCmd() *cobra.Command {
 				return fmt.Errorf("--embed threads requires --assigned-to")
 			}
 
-			// Multi-status query: active + pending + closed in last 7d
-			params := url.Values{}
-			params.Set("query", `(status:"active" OR status:"pending" OR (status:"closed" AND modifiedAt:[NOW-7d TO *]))`)
-
-			if assignedTo == "" {
-				items, _, err := api.PaginateAll(ctx, apiClient.ListConversations, params, "conversations", true)
-				if err != nil {
-					return err
-				}
-				return renderTeamOverview(items)
+			// status: is not a valid query field — fetch each status separately
+			embedParam := embed
+			if assignedTo != "" && embedParam == "" {
+				embedParam = "threads"
 			}
-
-			// Agent-specific: restrict to this agent and embed threads
-			params.Set("assigned_to", assignedTo)
-			params.Set("embed", "threads")
-
-			items, _, err := api.PaginateAll(ctx, apiClient.ListConversations, params, "conversations", true)
+			items, err := fetchBriefingConversations(ctx, assignedTo, embedParam)
 			if err != nil {
 				return err
+			}
+
+			if assignedTo == "" {
+				return renderTeamOverview(items)
 			}
 
 			// Compute counts, extract agent name, filter to active+pending
@@ -117,6 +110,47 @@ func briefingCmd() *cobra.Command {
 			return renderAgentSummary(openItems)
 		},
 	}
+}
+
+// fetchBriefingConversations fetches active + pending + recently closed (7d)
+// via 3 separate API calls (status: is not a valid query field).
+func fetchBriefingConversations(ctx context.Context, assignedTo, embed string) ([]json.RawMessage, error) {
+	fetch := func(status string, extraParams ...func(url.Values)) ([]json.RawMessage, error) {
+		p := url.Values{}
+		p.Set("status", status)
+		if assignedTo != "" {
+			p.Set("assigned_to", assignedTo)
+		}
+		if embed != "" {
+			p.Set("embed", embed)
+		}
+		for _, fn := range extraParams {
+			fn(p)
+		}
+		items, _, err := api.PaginateAll(ctx, apiClient.ListConversations, p, "conversations", true)
+		return items, err
+	}
+
+	active, err := fetch("active")
+	if err != nil {
+		return nil, err
+	}
+	pending, err := fetch("pending")
+	if err != nil {
+		return nil, err
+	}
+	closed, err := fetch("closed", func(p url.Values) {
+		p.Set("modifiedSince", time.Now().AddDate(0, 0, -7).UTC().Format(time.RFC3339))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]json.RawMessage, 0, len(active)+len(pending)+len(closed))
+	items = append(items, active...)
+	items = append(items, pending...)
+	items = append(items, closed...)
+	return items, nil
 }
 
 // renderTeamOverview groups conversations by assignee and shows counts.

@@ -16,21 +16,33 @@ import (
 func TestBriefingTeamOverview(t *testing.T) {
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
-			assert.NotEmpty(t, params.Get("query")) // team overview uses query for multi-status
-			assert.Empty(t, params.Get("embed"))     // team overview must NOT embed threads
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"A","status":"active",
-				 "primaryCustomer":{"email":"c1@test.com"},"userUpdatedAt":"2025-01-01",
-				 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}},
-				{"id":2,"number":101,"subject":"B","status":"pending",
-				 "primaryCustomer":{"email":"c2@test.com"},"userUpdatedAt":"2025-01-02",
-				 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}},
-				{"id":3,"number":102,"subject":"C","status":"closed",
-				 "primaryCustomer":{"email":"c3@test.com"},"userUpdatedAt":"2025-01-03",
-				 "assignee":{"id":55,"first":"Jane","last":"Doe","email":"jane@test.com"}},
-				{"id":4,"number":103,"subject":"D","status":"active",
-				 "primaryCustomer":{"email":"c4@test.com"},"userUpdatedAt":"2025-01-04"}
-			]`), nil
+			assert.Empty(t, params.Get("embed")) // team overview must NOT embed threads
+			switch params.Get("status") {
+			case "active":
+				return halJSON("conversations", `[
+					{"id":1,"number":100,"subject":"A","status":"active",
+					 "primaryCustomer":{"email":"c1@test.com"},"userUpdatedAt":"2025-01-01",
+					 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}},
+					{"id":4,"number":103,"subject":"D","status":"active",
+					 "primaryCustomer":{"email":"c4@test.com"},"userUpdatedAt":"2025-01-04"}
+				]`), nil
+			case "pending":
+				return halJSON("conversations", `[
+					{"id":2,"number":101,"subject":"B","status":"pending",
+					 "primaryCustomer":{"email":"c2@test.com"},"userUpdatedAt":"2025-01-02",
+					 "assignee":{"id":42,"first":"Alex","last":"Morgan","email":"alex@test.com"}}
+				]`), nil
+			case "closed":
+				assert.NotEmpty(t, params.Get("modifiedSince"))
+				return halJSON("conversations", `[
+					{"id":3,"number":102,"subject":"C","status":"closed",
+					 "primaryCustomer":{"email":"c3@test.com"},"userUpdatedAt":"2025-01-03",
+					 "assignee":{"id":55,"first":"Jane","last":"Doe","email":"jane@test.com"}}
+				]`), nil
+			default:
+				t.Fatalf("unexpected status: %q", params.Get("status"))
+				return nil, nil
+			}
 		},
 	}
 	buf := setupTest(mock)
@@ -56,29 +68,40 @@ func TestBriefingAgentSummary(t *testing.T) {
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
 			assert.Equal(t, "99", params.Get("assigned_to"))
 			assert.Equal(t, "threads", params.Get("embed"))
-			assert.NotEmpty(t, params.Get("query")) // multi-status query
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"Help me","status":"active",
-				 "createdAt":"2025-01-01T10:00:00Z",
-				 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
-				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
-				 "_embedded":{"threads":[
-					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
-					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
-				 ]}},
-				{"id":2,"number":101,"subject":"Billing question","status":"pending",
-				 "createdAt":"2025-01-02T08:00:00Z",
-				 "primaryCustomer":{"email":"bob@test.com"},"userUpdatedAt":"2025-01-02",
-				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
-				 "_embedded":{"threads":[
-					{"id":20,"type":"customer","body":"Question","createdAt":"2025-01-02T08:00:00Z","createdBy":{"email":"bob@test.com"}}
-				 ]}},
-				{"id":3,"number":102,"subject":"Old issue","status":"closed",
-				 "createdAt":"2025-01-03T08:00:00Z",
-				 "primaryCustomer":{"email":"carol@test.com"},"userUpdatedAt":"2025-01-03",
-				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
-				 "_embedded":{"threads":[]}}
-			]`), nil
+			switch params.Get("status") {
+			case "active":
+				return halJSON("conversations", `[
+					{"id":1,"number":100,"subject":"Help me","status":"active",
+					 "createdAt":"2025-01-01T10:00:00Z",
+					 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
+					 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
+					 "_embedded":{"threads":[
+						{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
+						{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
+					 ]}}
+				]`), nil
+			case "pending":
+				return halJSON("conversations", `[
+					{"id":2,"number":101,"subject":"Billing question","status":"pending",
+					 "createdAt":"2025-01-02T08:00:00Z",
+					 "primaryCustomer":{"email":"bob@test.com"},"userUpdatedAt":"2025-01-02",
+					 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
+					 "_embedded":{"threads":[
+						{"id":20,"type":"customer","body":"Question","createdAt":"2025-01-02T08:00:00Z","createdBy":{"email":"bob@test.com"}}
+					 ]}}
+				]`), nil
+			case "closed":
+				return halJSON("conversations", `[
+					{"id":3,"number":102,"subject":"Old issue","status":"closed",
+					 "createdAt":"2025-01-03T08:00:00Z",
+					 "primaryCustomer":{"email":"carol@test.com"},"userUpdatedAt":"2025-01-03",
+					 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
+					 "_embedded":{"threads":[]}}
+				]`), nil
+			default:
+				t.Fatalf("unexpected status: %q", params.Get("status"))
+				return nil, nil
+			}
 		},
 	}
 	buf := setupTest(mock)
@@ -109,21 +132,25 @@ func TestBriefingAgentSummary(t *testing.T) {
 }
 
 func TestBriefingAgentSummaryJSON(t *testing.T) {
+	activeConv := `[
+		{"id":1,"number":100,"subject":"Help me","status":"active",
+		 "createdAt":"2025-01-01T10:00:00Z",
+		 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
+		 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
+		 "userUpdatedAt":"2025-01-01",
+		 "_embedded":{"threads":[
+			{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z",
+			 "createdBy":{"first":"Alice","last":"Smith","email":"alice@test.com"}},
+			{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z",
+			 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
+		 ]}}
+	]`
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"Help me","status":"active",
-				 "createdAt":"2025-01-01T10:00:00Z",
-				 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
-				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
-				 "userUpdatedAt":"2025-01-01",
-				 "_embedded":{"threads":[
-					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z",
-					 "createdBy":{"first":"Alice","last":"Smith","email":"alice@test.com"}},
-					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z",
-					 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
-				 ]}}
-			]`), nil
+			if params.Get("status") == "active" {
+				return halJSON("conversations", activeConv), nil
+			}
+			return halJSON("conversations", `[]`), nil
 		},
 	}
 	buf := setupTest(mock)
@@ -159,19 +186,23 @@ func TestBriefingAgentSummaryJSON(t *testing.T) {
 }
 
 func TestBriefingAgentWithThreads(t *testing.T) {
+	activeConv := `[
+		{"id":1,"number":100,"subject":"Help me","status":"active",
+		 "createdAt":"2025-01-01T10:00:00Z",
+		 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
+		 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
+		 "_embedded":{"threads":[
+			{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
+			{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
+		 ]}}
+	]`
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
 			assert.Equal(t, "threads", params.Get("embed"))
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"Help me","status":"active",
-				 "createdAt":"2025-01-01T10:00:00Z",
-				 "primaryCustomer":{"email":"alice@test.com"},"userUpdatedAt":"2025-01-01",
-				 "assignee":{"first":"Alex","last":"Morgan","email":"alex@test.com"},
-				 "_embedded":{"threads":[
-					{"id":10,"type":"customer","body":"Need help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"alice@test.com"}},
-					{"id":11,"type":"reply","body":"On it","createdAt":"2025-01-01T11:30:00Z","createdBy":{"email":"agent@test.com"}}
-				 ]}}
-			]`), nil
+			if params.Get("status") == "active" {
+				return halJSON("conversations", activeConv), nil
+			}
+			return halJSON("conversations", `[]`), nil
 		},
 	}
 	buf := setupTest(mock)
@@ -200,28 +231,32 @@ func TestBriefingAgentWithThreads(t *testing.T) {
 }
 
 func TestBriefingAgentThreadsJSON(t *testing.T) {
+	activeConv := `[
+		{"id":1,"number":100,"subject":"Help me","status":"active",
+		 "createdAt":"2025-01-01T10:00:00Z",
+		 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
+		 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
+		 "tags":[{"id":1,"name":"billing","slug":"billing","color":"#f00"}],
+				 "userUpdatedAt":"2025-01-01",
+		 "_embedded":{"threads":[
+			{"id":10,"type":"customer",
+			 "body":"<p>I need help with <strong>billing</strong>. See <a href=\"https://example.com/inv\">invoice</a>.</p>",
+			 "createdAt":"2025-01-01T10:00:00Z",
+			 "createdBy":{"first":"Alice","last":"Smith","email":"alice@test.com"},
+			 "attachments":[{"id":55,"filename":"invoice.pdf","mimeType":"application/pdf","size":43008}],
+			 "_embedded":{"attachments":[]},
+			 "_links":{"createdByCustomer":{"href":"/customers/1"}}},
+			{"id":11,"type":"reply","body":"<p>On it!</p>","createdAt":"2025-01-01T11:30:00Z",
+			 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
+		 ]},
+		 "_links":{"self":{"href":"/conversations/1"}}}
+	]`
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"Help me","status":"active",
-				 "createdAt":"2025-01-01T10:00:00Z",
-				 "primaryCustomer":{"first":"Alice","last":"Smith","email":"alice@test.com"},
-				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"},
-				 "tags":[{"id":1,"name":"billing","slug":"billing","color":"#f00"}],
-				 "userUpdatedAt":"2025-01-01",
-				 "_embedded":{"threads":[
-					{"id":10,"type":"customer",
-					 "body":"<p>I need help with <strong>billing</strong>. See <a href=\"https://example.com/inv\">invoice</a>.</p>",
-					 "createdAt":"2025-01-01T10:00:00Z",
-					 "createdBy":{"first":"Alice","last":"Smith","email":"alice@test.com"},
-					 "attachments":[{"id":55,"filename":"invoice.pdf","mimeType":"application/pdf","size":43008}],
-					 "_embedded":{"attachments":[]},
-					 "_links":{"createdByCustomer":{"href":"/customers/1"}}},
-					{"id":11,"type":"reply","body":"<p>On it!</p>","createdAt":"2025-01-01T11:30:00Z",
-					 "createdBy":{"first":"Alex","last":"M","email":"alex@test.com"}}
-				 ]},
-				 "_links":{"self":{"href":"/conversations/1"}}}
-			]`), nil
+			if params.Get("status") == "active" {
+				return halJSON("conversations", activeConv), nil
+			}
+			return halJSON("conversations", `[]`), nil
 		},
 	}
 	buf := setupTest(mock)
@@ -330,11 +365,14 @@ func TestBriefingTeamOverviewNoThreadEmbed(t *testing.T) {
 			// This is the key assertion: embed must be empty for team overview
 			assert.Empty(t, params.Get("embed"), "team overview should not request embed=threads")
 			assert.Empty(t, params.Get("assigned_to"))
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"A","status":"active",
-				 "primaryCustomer":{"email":"c1@test.com"},
-				 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"}}
-			]`), nil
+			if params.Get("status") == "active" {
+				return halJSON("conversations", `[
+					{"id":1,"number":100,"subject":"A","status":"active",
+					 "primaryCustomer":{"email":"c1@test.com"},
+					 "assignee":{"first":"Alex","last":"M","email":"alex@test.com"}}
+				]`), nil
+			}
+			return halJSON("conversations", `[]`), nil
 		},
 	}
 	buf := setupTest(mock)
@@ -351,14 +389,17 @@ func TestBriefingAgentViewsAlwaysEmbedThreads(t *testing.T) {
 	mock := &mockClient{
 		ListConversationsFn: func(ctx context.Context, params url.Values) (json.RawMessage, error) {
 			assert.Equal(t, "threads", params.Get("embed"), "agent views must embed threads")
-			return halJSON("conversations", `[
-				{"id":1,"number":100,"subject":"A","status":"active",
-				 "createdAt":"2025-01-01T10:00:00Z",
-				 "primaryCustomer":{"email":"c1@test.com"},
-				 "_embedded":{"threads":[
-					{"id":10,"type":"customer","body":"Help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"c1@test.com"}}
-				 ]}}
-			]`), nil
+			if params.Get("status") == "active" {
+				return halJSON("conversations", `[
+					{"id":1,"number":100,"subject":"A","status":"active",
+					 "createdAt":"2025-01-01T10:00:00Z",
+					 "primaryCustomer":{"email":"c1@test.com"},
+					 "_embedded":{"threads":[
+						{"id":10,"type":"customer","body":"Help","createdAt":"2025-01-01T10:00:00Z","createdBy":{"email":"c1@test.com"}}
+					 ]}}
+				]`), nil
+			}
+			return halJSON("conversations", `[]`), nil
 		},
 	}
 	buf := setupTest(mock)

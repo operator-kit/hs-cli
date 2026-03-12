@@ -180,32 +180,147 @@ hs inbox mailboxes list --no-paginate
 ### Conversations
 
 ```bash
-# List conversations
+# List conversations (default: active, sorted by createdAt desc)
 hs inbox conversations list
 hs inbox conv list               # alias
 
 # Filter by status
+hs inbox conversations list --status active   # default
 hs inbox conversations list --status closed
 hs inbox conversations list --status pending
-hs inbox conversations list --status all
+hs inbox conversations list --status spam
+hs inbox conversations list --status all      # everything
 
-# Filter by mailbox
+# Filter by mailbox (or set a default: hs inbox config set --inbox-default-mailbox 12345)
 hs inbox conversations list --mailbox 12345
 
-# Advanced filters
+# Combine filters — folder, tag, assignee
 hs inbox conversations list --folder 12 --tag billing --assigned-to 99
+
+# Filter by modification date
 hs inbox conversations list --modified-since "2026-01-01T00:00:00Z"
+
+# Look up by conversation number
 hs inbox conversations list --number 23053
 
-# Search
-hs inbox conversations list --query "billing issue"
+# Sort options: createdAt, modifiedAt, number, subject, status, customerEmail,
+#               customerName, mailboxid, score, waitingSince
+hs inbox conversations list --sort-field modifiedAt --sort-order asc
+hs inbox conversations list --sort-field waitingSince --sort-order desc
 
-# Sort and custom fields
-hs inbox conversations list --sort-field createdAt --sort-order desc
-hs inbox conversations list --custom-fields-by-ids "10:foo,11:bar"
+# Custom field filters (requires --mailbox)
+hs inbox conversations list --mailbox 12345 --custom-fields-by-ids "10:foo,11:bar"
 
 # Embed threads in response
 hs inbox conversations list --embed threads
+
+# Pagination
+hs inbox conversations list --page 2 --per-page 50
+hs inbox conversations list --no-paginate   # fetch ALL pages
+
+# Combine flags freely
+hs inbox conversations list --mailbox 12345 --status closed --tag billing \
+  --sort-field modifiedAt --sort-order desc --format json
+```
+
+#### conversations list: `--query` (advanced search)
+
+The `--query` flag maps directly to the HelpScout search API. It accepts a mini query language with field names, operators, and date ranges. When combined with other flags (e.g. `--mailbox`), they are ANDed together.
+
+```bash
+# Free-text search (searches subject + body)
+hs inbox conversations list --query "billing issue"
+
+# Search by subject
+hs inbox conversations list --query '(subject:"password reset")'
+hs inbox conversations list --query '(subject:"shipping" OR subject:"delivery")'
+
+# Search by email (matches to, cc, bcc, and customer profile)
+hs inbox conversations list --query '(email:"alice@example.com")'
+hs inbox conversations list --query '(email:(alice@example.com OR bob@example.com))'
+
+# Search message body
+hs inbox conversations list --query '(body:"error 500")'
+hs inbox conversations list --query '(body:"timeout" OR body:"connection refused")'
+
+# Search by tag
+hs inbox conversations list --query '(tag:"vip")'
+hs inbox conversations list --query '(tag:"urgent" OR tag:"escalated")'
+
+# Search by assignee name (or "Unassigned")
+hs inbox conversations list --query '(assigned:"Jane Smith")'
+hs inbox conversations list --query '(assigned:"Unassigned")'
+
+# Search by mailbox name or ID
+hs inbox conversations list --query '(mailbox:"Support")'
+hs inbox conversations list --query '(mailboxid:12345)'
+
+# Search by conversation number or ID
+hs inbox conversations list --query '(number:23053)'
+hs inbox conversations list --query '(id:100200300)'
+
+# Search by customer ID
+hs inbox conversations list --query '(customerIds:500001)'
+
+# Search by replying user IDs
+hs inbox conversations list --query '(replyUserIds:(23 OR 45))'
+
+# Has attachments
+hs inbox conversations list --query '(attachments:true)'
+
+# Date ranges — createdAt and modifiedAt
+hs inbox conversations list --query '(createdAt:[2026-01-01T00:00:00Z TO *])'
+hs inbox conversations list --query '(createdAt:[2026-01-01T00:00:00Z TO 2026-01-31T23:59:59Z])'
+hs inbox conversations list --query '(modifiedAt:[NOW-1HOUR TO *])'
+hs inbox conversations list --query '(modifiedAt:[NOW-7DAY TO *])'
+hs inbox conversations list --query '(createdAt:2026-01)'              # month shorthand
+
+# Combine with AND (implicit) and OR
+hs inbox conversations list --query '(tag:"billing" AND status:"active")'
+hs inbox conversations list --query '(subject:"refund" OR subject:"cancel")'
+
+# Negate with NOT
+hs inbox conversations list --query '(NOT tag:"spam")'
+hs inbox conversations list --query '(subject:"order" AND NOT assigned:"Unassigned")'
+
+# Combine --query with other flags (ANDed together)
+hs inbox conversations list --mailbox 12345 --query '(tag:"vip")'
+hs inbox conversations list --status all --query '(email:"alice@example.com")'
+```
+
+**Query searchable fields:**
+
+| Field | Example | Notes |
+|-------|---------|-------|
+| _(free-text)_ | `"billing issue"` | Searches subject + body |
+| `subject` | `(subject:"reset password")` | Case-insensitive phrase match |
+| `body` | `(body:"error 500")` | Message body content |
+| `email` | `(email:"alice@example.com")` | Matches to/cc/bcc/customer emails |
+| `tag` | `(tag:"vip")` | Tag name |
+| `assigned` | `(assigned:"Jane")` | Assignee name, or `"Unassigned"` |
+| `mailbox` | `(mailbox:"Support")` | Mailbox name |
+| `mailboxid` | `(mailboxid:12345)` | Mailbox ID |
+| `number` | `(number:23053)` | Conversation number |
+| `id` | `(id:100200300)` | Conversation ID |
+| `customerIds` | `(customerIds:500001)` | Customer ID |
+| `replyUserIds` | `(replyUserIds:(23 OR 45))` | HelpScout user IDs who replied |
+| `attachments` | `(attachments:true)` | Has attachments |
+| `createdAt` | `(createdAt:[2026-01-01T00:00:00Z TO *])` | Date range or shorthand |
+| `modifiedAt` | `(modifiedAt:[NOW-1HOUR TO *])` | Date range with relative time |
+
+**Query operators:** `AND` (implicit default), `OR`, `NOT`, `[start TO end]` (date range, `*` = open-ended), relative dates (`NOW-1HOUR`, `NOW-7DAY`).
+
+**Note:** Special characters like `+` in email addresses must be URL-encoded when using the API directly. The CLI handles encoding automatically.
+
+```bash
+# Full example: complex search with output options
+hs inbox conversations list \
+  --status all \
+  --query '(email:"alice@example.com" AND createdAt:[2026-01-01T00:00:00Z TO *])' \
+  --sort-field modifiedAt --sort-order desc \
+  --embed threads \
+  --format json \
+  --no-paginate
 
 # Get conversation details
 hs inbox conversations get 67890
@@ -253,20 +368,23 @@ hs inbox conversations attachments delete 67890 555
 
 #### conversations list flags
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--status` | string | Filter: active, closed, pending, spam, all (default: active) |
-| `--mailbox` | string | Filter by mailbox ID |
-| `--folder` | string | Filter by folder ID |
-| `--tag` | string | Filter by tag |
-| `--assigned-to` | string | Filter by assigned user ID |
-| `--modified-since` | string | Filter by last-modified timestamp |
-| `--number` | string | Filter by conversation number |
-| `--sort-field` | string | Sort field (createdAt, modifiedAt, number, etc.) |
-| `--sort-order` | string | Sort direction: asc, desc |
-| `--custom-fields-by-ids` | string | Custom field filters (format: `id:value,id:value`) |
-| `--query` | string | Free-text search query |
-| `--embed` | string | Embed sub-resources (e.g. `threads`) |
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--status` | string | `active` | Filter: `active`, `closed`, `pending`, `spam`, `all` |
+| `--mailbox` | string | config default | Filter by mailbox ID (comma-separated for multiple) |
+| `--folder` | string | | Filter by folder ID |
+| `--tag` | string | | Filter by tag (comma-separated for multiple) |
+| `--assigned-to` | string | | Filter by assigned user ID |
+| `--modified-since` | string | | Filter: conversations modified after timestamp |
+| `--number` | string | | Look up by conversation number |
+| `--sort-field` | string | `createdAt` | Sort by: `createdAt`, `modifiedAt`, `number`, `subject`, `status`, `customerEmail`, `customerName`, `mailboxid`, `score`, `waitingSince` |
+| `--sort-order` | string | `desc` | Sort direction: `asc`, `desc` |
+| `--custom-fields-by-ids` | string | | Custom field filters (`id:value,id:value`); requires `--mailbox` |
+| `--query` | string | | Advanced search query (see query syntax above) |
+| `--embed` | string | | Embed sub-resources (`threads`) |
+| `--page` | int | `1` | Page number |
+| `--per-page` | int | `25` | Results per page |
+| `--no-paginate` | bool | `false` | Fetch all pages |
 
 #### conversations get flags
 
@@ -418,13 +536,20 @@ hs inbox conversations threads source-rfc822 67890 123
 hs inbox customers list
 hs inbox cust list               # alias
 
-# Search customers
+# Search customers by email
 hs inbox customers list --query "alice@example.com"
 
-# Advanced filters
+# Filter flags
 hs inbox customers list --mailbox 12345 --first-name Alice --last-name Smith
 hs inbox customers list --modified-since "2026-01-01T00:00:00Z"
 hs inbox customers list --sort-field firstName --sort-order asc
+
+# --query supports a mini query language (same operators as conversations, fewer fields)
+hs inbox customers list --query '(firstName:"John")'
+hs inbox customers list --query '(firstName:"John" AND lastName:"Appleseed")'
+hs inbox customers list --query '(firstName:"John" OR firstName:"Johnny")'
+hs inbox customers list --query '(email:"alice@example.com")'
+hs inbox customers list --query '(modifiedAt:[2026-01-01T00:00:00Z TO *])'
 
 # Get customer details
 hs inbox customers get 11111
@@ -464,7 +589,7 @@ hs inbox customers delete 11111 --async
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `--query` | string | Search query (e.g. email) |
+| `--query` | string | Search query — supports `firstName`, `lastName`, `email`, `modifiedAt` fields with `AND`/`OR` operators and `[TO]` date ranges |
 | `--mailbox` | string | Filter by mailbox ID |
 | `--first-name` | string | Filter by first name |
 | `--last-name` | string | Filter by last name |
@@ -666,7 +791,7 @@ hs inbox reports company --param "view=responses" --param "granularity=day"
 
 #### reports flags
 
-Shared across all report families.
+Shared across all report families. For the full set of available params per report family (views, granularity, tags, folders, etc.) see the [HelpScout Reports API docs](https://developer.helpscout.com/mailbox-api/endpoints/reports/).
 
 | Flag | Type | Description |
 |------|------|-------------|
@@ -674,7 +799,7 @@ Shared across all report families.
 | `--end` | string | Report end date/time |
 | `--mailbox` | string | Filter by mailbox ID |
 | `--view` | string | Report view filter |
-| `--param` | strings | Additional params as `key=value` (repeatable) |
+| `--param` | strings | Additional params as `key=value` (repeatable) — pass-through to the API |
 
 ### Workflows
 
