@@ -428,34 +428,195 @@ func conversationsCreateCmd() *cobra.Command {
 }
 
 func newConversationTagsCmd() *cobra.Command {
+	listCmd := &cobra.Command{
+		Use:   "list <conversation-id>",
+		Short: "List conversation tags",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tags, err := currentConversationTags(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			if isJSON() {
+				return output.PrintRaw(mustMarshal(map[string]any{"tags": tags}))
+			}
+			for _, tag := range tags {
+				fmt.Fprintln(output.Out, tag)
+			}
+			return nil
+		},
+	}
+	permission.Annotate(listCmd, "conversations", permission.OpRead)
+
 	setCmd := &cobra.Command{
 		Use:   "set <conversation-id>",
-		Short: "Set conversation tags",
+		Short: "Replace all conversation tags",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tags, _ := cmd.Flags().GetStringSlice("tag")
-			if len(tags) == 0 {
+			if !cmd.Flags().Changed("tag") {
 				return fmt.Errorf("at least one --tag is required")
 			}
+			tags = normalizeTagNames(tags)
 
-			body := map[string]any{"tags": tags}
-			if err := apiClient.UpdateConversationTags(context.Background(), args[0], body); err != nil {
+			if err := replaceConversationTags(context.Background(), args[0], tags); err != nil {
 				return err
 			}
-			fmt.Fprintf(output.Out, "Updated tags for conversation %s\n", args[0])
+			fmt.Fprintf(output.Out, "Replaced tags for conversation %s\n", args[0])
 			return nil
 		},
 	}
 	permission.Annotate(setCmd, "conversations", permission.OpWrite)
-	setCmd.Flags().StringSlice("tag", nil, "tag to apply (repeatable)")
+	setCmd.Flags().StringSlice("tag", nil, "tag to apply; replaces all existing tags (repeatable or comma-separated)")
 	setCmd.MarkFlagRequired("tag")
+
+	addCmd := &cobra.Command{
+		Use:   "add <conversation-id>",
+		Short: "Add conversation tags",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tags, _ := cmd.Flags().GetStringSlice("tag")
+			tags = normalizeTagNames(tags)
+			if len(tags) == 0 {
+				return fmt.Errorf("at least one --tag is required")
+			}
+
+			current, err := currentConversationTags(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			next := mergeTagNames(current, tags)
+			if err := replaceConversationTags(context.Background(), args[0], next); err != nil {
+				return err
+			}
+			fmt.Fprintf(output.Out, "Added tags for conversation %s\n", args[0])
+			return nil
+		},
+	}
+	permission.Annotate(addCmd, "conversations", permission.OpWrite)
+	addCmd.Flags().StringSlice("tag", nil, "tag to add while preserving existing tags (repeatable or comma-separated)")
+	addCmd.MarkFlagRequired("tag")
+
+	removeCmd := &cobra.Command{
+		Use:   "remove <conversation-id>",
+		Short: "Remove conversation tags",
+		Aliases: []string{
+			"rm",
+		},
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tags, _ := cmd.Flags().GetStringSlice("tag")
+			tags = normalizeTagNames(tags)
+			if len(tags) == 0 {
+				return fmt.Errorf("at least one --tag is required")
+			}
+
+			current, err := currentConversationTags(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			next := removeTagNames(current, tags)
+			if err := replaceConversationTags(context.Background(), args[0], next); err != nil {
+				return err
+			}
+			fmt.Fprintf(output.Out, "Removed tags for conversation %s\n", args[0])
+			return nil
+		},
+	}
+	permission.Annotate(removeCmd, "conversations", permission.OpWrite)
+	removeCmd.Flags().StringSlice("tag", nil, "tag to remove while preserving other tags (repeatable or comma-separated)")
+	removeCmd.MarkFlagRequired("tag")
+
+	clearCmd := &cobra.Command{
+		Use:   "clear <conversation-id>",
+		Short: "Remove all conversation tags",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := replaceConversationTags(context.Background(), args[0], []string{}); err != nil {
+				return err
+			}
+			fmt.Fprintf(output.Out, "Cleared tags for conversation %s\n", args[0])
+			return nil
+		},
+	}
+	permission.Annotate(clearCmd, "conversations", permission.OpWrite)
 
 	cmd := &cobra.Command{
 		Use:   "tags",
 		Short: "Manage conversation tags",
 	}
-	cmd.AddCommand(setCmd)
+	cmd.AddCommand(listCmd, setCmd, addCmd, removeCmd, clearCmd)
 	return cmd
+}
+
+func currentConversationTags(ctx context.Context, conversationID string) ([]string, error) {
+	data, err := apiClient.GetConversation(ctx, conversationID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var conversation types.Conversation
+	if err := json.Unmarshal(data, &conversation); err != nil {
+		return nil, fmt.Errorf("parsing conversation tags: %w", err)
+	}
+
+	tags := make([]string, 0, len(conversation.Tags))
+	for _, tag := range conversation.Tags {
+		name := strings.TrimSpace(tag.Name)
+		if name != "" {
+			tags = append(tags, name)
+		}
+	}
+	return tags, nil
+}
+
+func replaceConversationTags(ctx context.Context, conversationID string, tags []string) error {
+	return apiClient.UpdateConversationTags(ctx, conversationID, map[string]any{"tags": tags})
+}
+
+func normalizeTagNames(tags []string) []string {
+	seen := make(map[string]bool, len(tags))
+	normalized := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		normalized = append(normalized, tag)
+	}
+	return normalized
+}
+
+func mergeTagNames(current, added []string) []string {
+	next := append([]string{}, current...)
+	seen := make(map[string]bool, len(next)+len(added))
+	for _, tag := range next {
+		seen[tag] = true
+	}
+	for _, tag := range added {
+		if seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		next = append(next, tag)
+	}
+	return next
+}
+
+func removeTagNames(current, removed []string) []string {
+	remove := make(map[string]bool, len(removed))
+	for _, tag := range removed {
+		remove[tag] = true
+	}
+
+	next := make([]string, 0, len(current))
+	for _, tag := range current {
+		if !remove[tag] {
+			next = append(next, tag)
+		}
+	}
+	return next
 }
 
 func newConversationFieldsCmd() *cobra.Command {

@@ -349,8 +349,12 @@ hs inbox conversations update 67890 --status closed
 # Delete a conversation
 hs inbox conversations delete 67890
 
-# Set conversation tags
+# Manage conversation tags
+hs inbox conversations tags list 67890
+hs inbox conversations tags add 67890 --tag urgent
+hs inbox conversations tags remove 67890 --tag bug
 hs inbox conversations tags set 67890 --tag vip,bug
+hs inbox conversations tags clear 67890
 
 # Set conversation custom fields
 hs inbox conversations fields set 67890 --field "10=foo" --field "11=bar"
@@ -416,11 +420,23 @@ hs inbox conversations attachments delete 67890 555
 | `--subject` | string | New subject |
 | `--status` | string | New status |
 
-#### conversations tags set flags
+#### conversations tags commands
+
+| Command | Description |
+|---------|-------------|
+| `list <conversation-id>` | List current tags |
+| `add <conversation-id>` | Add tags while preserving existing tags |
+| `remove <conversation-id>` | Remove tags while preserving all other tags |
+| `set <conversation-id>` | Replace the full tag list |
+| `clear <conversation-id>` | Remove all tags |
+
+HelpScout's conversation tags endpoint replaces the entire tag list. Use `add` and `remove` for safe read-modify-write operations that preserve other tags. Use `set` only when you intend to replace every tag on the conversation. `set --tag ""` and `clear` both send an empty tag list, which removes all tags.
+
+#### conversations tags add/remove/set flags
 
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
-| `--tag` | strings | yes | Tags to apply (comma-separated) |
+| `--tag` | strings | yes | Tags to add, remove, or apply (repeatable or comma-separated) |
 
 #### conversations fields set flags
 

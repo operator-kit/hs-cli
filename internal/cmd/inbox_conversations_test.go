@@ -244,18 +244,103 @@ func TestConversationTagsSet(t *testing.T) {
 	mock := &mockClient{
 		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
 			assert.Equal(t, "42", id)
-			payload, ok := body.(map[string]any)
-			require.True(t, ok)
-			assert.Equal(t, []string{"vip", "bug"}, payload["tags"])
+			assertTagPayload(t, body, []string{"vip", "bug"})
 			return nil
 		},
 	}
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "tags", "set", "42", "--tag", "vip,bug"})
-	require.NoError(t, rootCmd.Execute())
-	assert.Contains(t, buf.String(), "Updated tags for conversation 42")
+	require.NoError(t, executeConversationTagsCommand("set", "42", "--tag", "vip,bug"))
+	assert.Contains(t, buf.String(), "Replaced tags for conversation 42")
+}
+
+func TestConversationTagsSetAllowsExplicitEmptyList(t *testing.T) {
+	mock := &mockClient{
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			assert.Equal(t, "42", id)
+			assertTagPayload(t, body, []string{})
+			return nil
+		},
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("set", "42", "--tag", ""))
+	assert.Contains(t, buf.String(), "Replaced tags for conversation 42")
+}
+
+func TestConversationTagsList(t *testing.T) {
+	mock := &mockClient{
+		GetConversationFn: conversationWithTags(t, "42", []string{"vip", "bug"}),
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("list", "42"))
+	assert.Equal(t, "vip\nbug\n", buf.String())
+}
+
+func TestConversationTagsAddPreservesExistingTags(t *testing.T) {
+	mock := &mockClient{
+		GetConversationFn: conversationWithTags(t, "42", []string{"vip", "bug"}),
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			assert.Equal(t, "42", id)
+			assertTagPayload(t, body, []string{"vip", "bug", "urgent"})
+			return nil
+		},
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("add", "42", "--tag", "bug,urgent"))
+	assert.Contains(t, buf.String(), "Added tags for conversation 42")
+}
+
+func TestConversationTagsAddDedupesRequestedTags(t *testing.T) {
+	mock := &mockClient{
+		GetConversationFn: conversationWithTags(t, "42", []string{"vip"}),
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			assert.Equal(t, "42", id)
+			assertTagPayload(t, body, []string{"vip", "bug"})
+			return nil
+		},
+	}
+	setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("add", "42", "--tag", "bug,bug", "--tag", "vip"))
+}
+
+func TestConversationTagsRemovePreservesRemainingTags(t *testing.T) {
+	mock := &mockClient{
+		GetConversationFn: conversationWithTags(t, "42", []string{"vip", "bug", "urgent"}),
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			assert.Equal(t, "42", id)
+			assertTagPayload(t, body, []string{"vip", "urgent"})
+			return nil
+		},
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("remove", "42", "--tag", "bug"))
+	assert.Contains(t, buf.String(), "Removed tags for conversation 42")
+}
+
+func TestConversationTagsClearSendsEmptyTagList(t *testing.T) {
+	mock := &mockClient{
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			assert.Equal(t, "42", id)
+			assertTagPayload(t, body, []string{})
+			return nil
+		},
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+
+	require.NoError(t, executeConversationTagsCommand("clear", "42"))
+	assert.Contains(t, buf.String(), "Cleared tags for conversation 42")
 }
 
 func TestConversationFieldsSet(t *testing.T) {
@@ -278,6 +363,37 @@ func TestConversationFieldsSet(t *testing.T) {
 	rootCmd.SetArgs([]string{"inbox", "conversations", "fields", "set", "42", "--field", "10=foo", "--field", "11=bar"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated custom fields for conversation 42")
+}
+
+func conversationWithTags(t *testing.T, wantID string, tags []string) func(context.Context, string, url.Values) (json.RawMessage, error) {
+	t.Helper()
+	return func(ctx context.Context, id string, params url.Values) (json.RawMessage, error) {
+		assert.Equal(t, wantID, id)
+		assert.Empty(t, params)
+		items := make([]map[string]string, len(tags))
+		for i, tag := range tags {
+			items[i] = map[string]string{"name": tag}
+		}
+		data, err := json.Marshal(map[string]any{
+			"id":   42,
+			"tags": items,
+		})
+		require.NoError(t, err)
+		return json.RawMessage(data), nil
+	}
+}
+
+func assertTagPayload(t *testing.T, body any, want []string) {
+	t.Helper()
+	payload, ok := body.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, want, payload["tags"])
+}
+
+func executeConversationTagsCommand(args ...string) error {
+	cmd := newConversationTagsCmd()
+	cmd.SetArgs(args)
+	return cmd.Execute()
 }
 
 func TestConversationSnoozeSetAndClear(t *testing.T) {

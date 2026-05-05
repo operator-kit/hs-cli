@@ -80,7 +80,13 @@ go build -ldflags "-X main.version=1.0.0 -X main.commit=$(git rev-parse --short 
 ## Run tests
 
 ```bash
-# All unit tests
+# All unit tests in Docker (recommended for local full-suite runs)
+bash ./scripts/test-docker.sh
+
+# Specific package in Docker
+bash ./scripts/test-docker.sh ./internal/cmd
+
+# Native all unit tests
 go test ./...
 
 # Verbose
@@ -96,6 +102,18 @@ go test -v ./internal/selfupdate/
 # Integration tests (requires real API credentials)
 HS_INBOX_APP_ID=xxx HS_INBOX_APP_SECRET=yyy go test -tags integration ./internal/api/
 ```
+
+On Windows, use the PowerShell wrapper:
+
+```powershell
+.\scripts\test-docker.ps1
+.\scripts\test-docker.ps1 ./internal/cmd -run TestConversationTags
+```
+
+The Docker wrappers set an isolated `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME`,
+`APPDATA`, `GOCACHE`, and `GOMODCACHE` inside the container. This keeps full
+test runs from reading or deleting credentials/config from the host dev
+environment while still reusing Docker volumes for Go module/build caches.
 
 ## Test architecture
 
