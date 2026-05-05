@@ -81,7 +81,7 @@ func TestConversationsGet(t *testing.T) {
 				"id":42,"number":200,"subject":"Detailed","status":"closed","type":"email",
 				"primaryCustomer":{"email":"bob@test.com"},
 				"assignee":{"first":"Jane","last":"Smith","email":"jane@test.com"},
-				"tags":[{"id":1,"name":"billing"}],
+				"tags":[{"id":1,"tag":"billing"}],
 				"preview":"Need help with invoice",
 				"createdAt":"2025-01-01","userUpdatedAt":"2025-01-02",
 				"source":{"type":"email","via":"customer"}
@@ -273,12 +273,32 @@ func TestConversationTagsSetAllowsExplicitEmptyList(t *testing.T) {
 func TestConversationTagsList(t *testing.T) {
 	mock := &mockClient{
 		GetConversationFn: conversationWithTags(t, "42", []string{"vip", "bug"}),
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			t.Fatalf("list must not update conversation tags")
+			return nil
+		},
 	}
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
 	require.NoError(t, executeConversationTagsCommand("list", "42"))
 	assert.Equal(t, "vip\nbug\n", buf.String())
+}
+
+func TestConversationTagsListJSONReadsHelpScoutTagField(t *testing.T) {
+	mock := &mockClient{
+		GetConversationFn: conversationWithTags(t, "42", []string{"vip", "bug"}),
+		UpdateConversationTagsFn: func(ctx context.Context, id string, body any) error {
+			t.Fatalf("list must not update conversation tags")
+			return nil
+		},
+	}
+	buf := setupTest(mock)
+	defer func() { output.Out = os.Stdout }()
+	format = "json"
+
+	require.NoError(t, executeConversationTagsCommand("list", "42"))
+	assert.JSONEq(t, `{"tags":["vip","bug"]}`, buf.String())
 }
 
 func TestConversationTagsAddPreservesExistingTags(t *testing.T) {
@@ -372,7 +392,7 @@ func conversationWithTags(t *testing.T, wantID string, tags []string) func(conte
 		assert.Empty(t, params)
 		items := make([]map[string]string, len(tags))
 		for i, tag := range tags {
-			items[i] = map[string]string{"name": tag}
+			items[i] = map[string]string{"tag": tag}
 		}
 		data, err := json.Marshal(map[string]any{
 			"id":   42,
