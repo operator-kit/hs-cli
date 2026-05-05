@@ -210,12 +210,7 @@ func (c *Client) UpdateConversationFields(ctx context.Context, id string, body a
 }
 
 func (c *Client) UpdateConversationTags(ctx context.Context, id string, body any) error {
-	resp, err := c.post(ctx, "conversations/"+id+"/tags", body)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	return nil
+	return c.put(ctx, "conversations/"+id+"/tags", body)
 }
 
 func (c *Client) UpdateConversationSnooze(ctx context.Context, id string, body any) error {
