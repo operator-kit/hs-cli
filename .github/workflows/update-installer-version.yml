@@ -1,0 +1,101 @@
+name: Update installer version
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-installer-version
+  cancel-in-progress: false
+
+jobs:
+  update-installer-version:
+    if: startsWith(github.event.release.tag_name, 'v') && github.event.release.prerelease == false && github.event.release.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Refusing to pin non-stable release tag: $TAG"
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          required_assets=(
+            "checksums.txt"
+            "hs_${version}_windows_amd64.zip"
+            "hs_${version}_windows_arm64.zip"
+          )
+
+          release_kind="$(gh release view "$TAG" --repo "$REPO" --json isDraft,isPrerelease --jq '
+            if .isDraft then "draft" elif .isPrerelease then "prerelease" else "stable" end
+          ')"
+
+          if [[ "$release_kind" != "stable" ]]; then
+            echo "Refusing to pin $release_kind release: $TAG"
+            exit 1
+          fi
+
+          asset_names="$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')"
+
+          for asset in "${required_assets[@]}"; do
+            if ! grep -Fxq "$asset" <<< "$asset_names"; then
+              echo "Missing required release asset: $asset"
+              exit 1
+            fi
+          done
+
+          checksums_dir="$RUNNER_TEMP/installer-version-check"
+          rm -rf "$checksums_dir"
+          mkdir -p "$checksums_dir"
+          gh release download "$TAG" --repo "$REPO" --pattern checksums.txt --dir "$checksums_dir"
+
+          for asset in "${required_assets[@]}"; do
+            if [[ "$asset" == "checksums.txt" ]]; then
+              continue
+            fi
+
+            if ! awk '{print $2}' "$checksums_dir/checksums.txt" | grep -Fxq "$asset"; then
+              echo "Missing checksum entry for release asset: $asset"
+              exit 1
+            fi
+          done
+
+      - name: Pin installer default version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          TAG="$TAG" perl -0pi -e 's/\$DefaultVersion = "v[^"]+"/\$DefaultVersion = "$ENV{TAG}"/' install.ps1
+          grep -q "\$DefaultVersion = \"$TAG\"" install.ps1
+
+      - name: Commit installer version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- install.ps1; then
+            echo "install.ps1 already pinned to $TAG"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install.ps1
+          git commit -m "chore: pin Windows installer to $TAG"
+          git push origin HEAD:main

@@ -3,23 +3,18 @@ $ErrorActionPreference = 'Stop'
 
 $Repo = "operator-kit/hs-cli"
 $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\bin" }
+# Updated by .github/workflows/update-installer-version.yml after a stable GitHub Release is published.
+$DefaultVersion = "v0.2.0"
 
 # Detect arch
 $Arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
-    'X64'  { 'amd64' }
+    'X64'   { 'amd64' }
+    'Arm64' { 'arm64' }
     default { Write-Error "Unsupported architecture: $_"; exit 1 }
 }
 
 # Resolve version
-$Version = $env:HS_VERSION
-if (-not $Version) {
-    $response = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue -UseBasicParsing
-    $Version = ($response.Headers.Location -split '/tag/')[-1]
-    if (-not $Version) {
-        Write-Error "Could not determine latest version. Set HS_VERSION manually."
-        exit 1
-    }
-}
+$Version = if ($env:HS_VERSION) { $env:HS_VERSION } else { $DefaultVersion }
 
 $VersionNum = $Version -replace '^v', ''
 $Archive = "hs_${VersionNum}_windows_${Arch}.zip"
