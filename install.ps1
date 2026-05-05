@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $Repo = "operator-kit/hs-cli"
 $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\bin" }
 # Updated by .github/workflows/update-installer-version.yml after a stable GitHub Release is published.
-$DefaultVersion = "v0.2.0"
+$DefaultVersion = "v0.2.1"
 
 # Detect arch
 $Arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
