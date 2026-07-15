@@ -25,8 +25,6 @@ declare -A ORT_URLS=(
   ["linux-arm64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-aarch64-${ORT_VERSION}.tgz"
   ["darwin-amd64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-osx-x86_64-${ORT_VERSION}.tgz"
   ["darwin-arm64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-osx-arm64-${ORT_VERSION}.tgz"
-  ["windows-amd64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-win-x64-${ORT_VERSION}.zip"
-  ["windows-arm64"]="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-win-arm64-${ORT_VERSION}.zip"
 )
 
 # Runtime lib filenames per platform (target name in bundle)
@@ -35,11 +33,9 @@ declare -A ORT_LIBS=(
   ["linux-arm64"]="libonnxruntime.so"
   ["darwin-amd64"]="libonnxruntime.dylib"
   ["darwin-arm64"]="libonnxruntime.dylib"
-  ["windows-amd64"]="onnxruntime.dll"
-  ["windows-arm64"]="onnxruntime.dll"
 )
 
-# Real (versioned) filenames inside ORT archives — avoids symlink issues on Windows.
+# Real (versioned) filenames inside ORT archives.
 # Linux/macOS tarballs ship symlinks (e.g. .so → .so.1 → .so.1.23.0); we extract
 # the versioned file directly and rename it to the canonical name.
 declare -A ORT_REAL_LIBS=(
@@ -47,8 +43,6 @@ declare -A ORT_REAL_LIBS=(
   ["linux-arm64"]="libonnxruntime.so.${ORT_VERSION}"
   ["darwin-amd64"]="libonnxruntime.${ORT_VERSION}.dylib"
   ["darwin-arm64"]="libonnxruntime.${ORT_VERSION}.dylib"
-  ["windows-amd64"]="onnxruntime.dll"
-  ["windows-arm64"]="onnxruntime.dll"
 )
 
 TMPDIR="$(mktemp -d)"
@@ -79,18 +73,13 @@ for platform in "${!ORT_URLS[@]}"; do
   mkdir -p "$bundledir"
   real_lib="${ORT_REAL_LIBS[$platform]}"
 
-  if [[ "$url" == *.zip ]]; then
-    unzip -q -j "$ort_file" "**/lib/${lib}" -d "$bundledir" 2>/dev/null || \
-    unzip -q -j "$ort_file" "**/${lib}" -d "$bundledir"
-  else
-    # Extract the real (versioned) file, not the symlink
-    ort_extract="$TMPDIR/ort-extract-${platform}"
-    mkdir -p "$ort_extract"
-    tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/lib/${real_lib}" 2>/dev/null || \
-    tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/${real_lib}"
-    find "$ort_extract" -name "$real_lib" -exec cp {} "$bundledir/${lib}" \;
-    rm -rf "$ort_extract"
-  fi
+  # Extract the real (versioned) file, not the symlink.
+  ort_extract="$TMPDIR/ort-extract-${platform}"
+  mkdir -p "$ort_extract"
+  tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/lib/${real_lib}" 2>/dev/null || \
+  tar xzf "$ort_file" -C "$ort_extract" --wildcards "**/${real_lib}"
+  find "$ort_extract" -name "$real_lib" -exec cp {} "$bundledir/${lib}" \;
+  rm -rf "$ort_extract"
 
   if [[ ! -f "$bundledir/${lib}" ]]; then
     echo "  ERROR: failed to extract ${lib} for ${platform}"

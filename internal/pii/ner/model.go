@@ -22,6 +22,33 @@ type Paths struct {
 	ConfigJSON    string // config.json
 }
 
+// ModelState describes whether the current platform can run the model and
+// whether a locally cached bundle is complete enough to use.
+type ModelState string
+
+const (
+	ModelUnsupported         ModelState = "unsupported"
+	ModelAbsent              ModelState = "absent"
+	ModelInstalledUnverified ModelState = "installed-unverified"
+	ModelCorrupt             ModelState = "corrupt"
+	ModelReady               ModelState = "ready"
+)
+
+// ModelStatus is the read-only result of inspecting the local model cache.
+type ModelStatus struct {
+	State    ModelState
+	Platform Platform
+	Dir      string
+	Present  bool
+	Reason   string
+}
+
+// Usable reports whether the current runtime may load this installation.
+// Legacy bundles remain usable during the migration to verified installs.
+func (s ModelStatus) Usable() bool {
+	return s.State == ModelInstalledUnverified || s.State == ModelReady
+}
+
 // baseURL is the GitHub release download URL template.
 const baseURL = "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v%s/pii-model-%s-%s-%s.tar.gz"
 
@@ -61,18 +88,62 @@ func CacheDir() (string, error) {
 	}
 }
 
-// IsModelReady checks whether the model bundle is present and matches
-// the expected version without downloading anything.
-func IsModelReady() bool {
+// Status inspects the local model cache without downloading anything.
+func Status() ModelStatus {
+	platform := CurrentPlatform()
 	dir, err := CacheDir()
 	if err != nil {
-		return false
+		return ModelStatus{State: ModelCorrupt, Platform: platform, Reason: err.Error()}
 	}
+	return statusAt(dir, platform)
+}
+
+func statusAt(dir string, platform Platform) ModelStatus {
+	status := ModelStatus{Platform: platform, Dir: dir}
+	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		status.Present = true
+	}
+	capability := RuntimeCapabilityFor(platform)
+	if !capability.Supported {
+		status.State = ModelUnsupported
+		status.Reason = capability.Reason
+		return status
+	}
+
 	data, err := os.ReadFile(filepath.Join(dir, ".version"))
-	if err != nil {
-		return false
+	if os.IsNotExist(err) {
+		status.State = ModelAbsent
+		return status
 	}
-	return strings.TrimSpace(string(data)) == ModelVersion
+	if err != nil {
+		status.State = ModelCorrupt
+		status.Reason = fmt.Sprintf("read version marker: %v", err)
+		return status
+	}
+	if strings.TrimSpace(string(data)) != ModelVersion {
+		status.State = ModelCorrupt
+		status.Reason = "installed model version does not match this hs version"
+		return status
+	}
+
+	paths := pathsAt(dir, platform)
+	for _, path := range []string{paths.RuntimeLib, paths.ModelONNX, paths.TokenizerJSON, paths.ConfigJSON} {
+		info, statErr := os.Stat(path)
+		if statErr != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			status.State = ModelCorrupt
+			status.Reason = fmt.Sprintf("missing or invalid model file %s", filepath.Base(path))
+			return status
+		}
+	}
+
+	status.State = ModelInstalledUnverified
+	status.Reason = "legacy installation has not been verified against a trusted manifest"
+	return status
+}
+
+// IsModelReady reports whether the model is usable on the current platform.
+func IsModelReady() bool {
+	return Status().Usable()
 }
 
 // ModelPaths returns resolved paths if the model is installed, or an error.
@@ -81,43 +152,51 @@ func ModelPaths() (*Paths, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !IsModelReady() {
-		return nil, fmt.Errorf("model not installed (run \"hs pii-model install\")")
+	status := statusAt(dir, CurrentPlatform())
+	if !status.Usable() {
+		if status.Reason != "" {
+			return nil, fmt.Errorf("PII model %s: %s", status.State, status.Reason)
+		}
+		return nil, fmt.Errorf("PII model %s (run \"hs pii-model install\")", status.State)
 	}
+	return pathsAt(dir, CurrentPlatform()), nil
+}
 
-	libName := runtimeLibName()
-	p := &Paths{
-		RuntimeLib:    filepath.Join(dir, libName),
+func pathsAt(dir string, platform Platform) *Paths {
+	return &Paths{
+		RuntimeLib:    filepath.Join(dir, runtimeLibNameFor(platform)),
 		ModelONNX:     filepath.Join(dir, "model_quantized.onnx"),
 		TokenizerJSON: filepath.Join(dir, "tokenizer.json"),
 		ConfigJSON:    filepath.Join(dir, "config.json"),
 	}
-
-	// Verify all files exist
-	for _, f := range []string{p.RuntimeLib, p.ModelONNX, p.TokenizerJSON, p.ConfigJSON} {
-		if _, err := os.Stat(f); err != nil {
-			return nil, fmt.Errorf("missing file %s: %w", filepath.Base(f), err)
-		}
-	}
-	return p, nil
 }
 
 // EnsureModel downloads and extracts the model bundle if not present.
 func EnsureModel(progress ProgressFunc) (*Paths, error) {
-	if IsModelReady() {
-		return ModelPaths()
-	}
-
 	dir, err := CacheDir()
 	if err != nil {
 		return nil, err
 	}
+	return ensureModelAt(CurrentPlatform(), dir, progress, downloadAndExtract)
+}
+
+type modelDownloader func(url, dir string, progress ProgressFunc) error
+
+func ensureModelAt(platform Platform, dir string, progress ProgressFunc, download modelDownloader) (*Paths, error) {
+	capability := RuntimeCapabilityFor(platform)
+	if !capability.Supported {
+		return nil, fmt.Errorf("PII model unsupported: %s", capability.Reason)
+	}
+	if status := statusAt(dir, platform); status.Usable() {
+		return pathsAt(dir, platform), nil
+	}
+
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating cache dir: %w", err)
 	}
 
-	url := bundleURL()
-	if err := downloadAndExtract(url, dir, progress); err != nil {
+	url := bundleURLFor(platform)
+	if err := download(url, dir, progress); err != nil {
 		return nil, fmt.Errorf("download: %w", err)
 	}
 
@@ -126,7 +205,11 @@ func EnsureModel(progress ProgressFunc) (*Paths, error) {
 		return nil, err
 	}
 
-	return ModelPaths()
+	status := statusAt(dir, platform)
+	if !status.Usable() {
+		return nil, fmt.Errorf("downloaded PII model is %s: %s", status.State, status.Reason)
+	}
+	return pathsAt(dir, platform), nil
 }
 
 // RemoveModel deletes the cached model bundle.
@@ -139,11 +222,19 @@ func RemoveModel() error {
 }
 
 func bundleURL() string {
-	return fmt.Sprintf(baseURL, ModelVersion, ModelVersion, runtime.GOOS, runtime.GOARCH)
+	return bundleURLFor(CurrentPlatform())
+}
+
+func bundleURLFor(platform Platform) string {
+	return fmt.Sprintf(baseURL, ModelVersion, ModelVersion, platform.OS, platform.Arch)
 }
 
 func runtimeLibName() string {
-	switch runtime.GOOS {
+	return runtimeLibNameFor(CurrentPlatform())
+}
+
+func runtimeLibNameFor(platform Platform) string {
+	switch platform.OS {
 	case "darwin":
 		return "libonnxruntime.dylib"
 	case "windows":

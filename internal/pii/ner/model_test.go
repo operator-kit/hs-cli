@@ -35,7 +35,7 @@ func TestIsModelReady_FalseByDefault(t *testing.T) {
 	}
 }
 
-func TestIsModelReady_TrueWhenVersionMatches(t *testing.T) {
+func TestIsModelReady_FalseWhenOnlyVersionMatches(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", tmpDir)
 	t.Setenv("LOCALAPPDATA", tmpDir)
@@ -50,8 +50,8 @@ func TestIsModelReady_TrueWhenVersionMatches(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".version"), []byte(ModelVersion), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !IsModelReady() {
-		t.Fatal("IsModelReady should be true when .version matches")
+	if IsModelReady() {
+		t.Fatal("IsModelReady should be false when only .version matches")
 	}
 }
 

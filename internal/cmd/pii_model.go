@@ -26,7 +26,11 @@ func piiModelInstallCmd() *cobra.Command {
 		Use:   "install",
 		Short: "Download PII redaction model for the current platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if ner.IsModelReady() {
+			status := ner.Status()
+			if status.State == ner.ModelUnsupported {
+				return fmt.Errorf("cannot install PII model: %s", status.Reason)
+			}
+			if status.Usable() {
 				fmt.Fprintln(cmd.OutOrStdout(), "PII model already installed.")
 				return nil
 			}
@@ -58,15 +62,29 @@ func piiModelStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show PII model installation status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !ner.IsModelReady() {
+			status := ner.Status()
+			switch status.State {
+			case ner.ModelUnsupported:
+				fmt.Fprintf(cmd.OutOrStdout(), "PII model: unsupported on %s\n", status.Platform.Key())
+				fmt.Fprintln(cmd.OutOrStdout(), status.Reason)
+				return nil
+			case ner.ModelAbsent:
 				fmt.Fprintln(cmd.OutOrStdout(), "PII model: not installed")
 				fmt.Fprintln(cmd.OutOrStdout(), "Run 'hs pii-model install' to download.")
 				return nil
+			case ner.ModelCorrupt:
+				fmt.Fprintln(cmd.OutOrStdout(), "PII model: corrupt or incomplete")
+				fmt.Fprintln(cmd.OutOrStdout(), status.Reason)
+				fmt.Fprintln(cmd.OutOrStdout(), "Run 'hs pii-model install' to replace it.")
+				return nil
+			case ner.ModelInstalledUnverified:
+				fmt.Fprintf(cmd.OutOrStdout(), "PII model: installed, unverified legacy bundle (v%s)\n", ner.ModelVersion)
+				fmt.Fprintln(cmd.OutOrStdout(), "The files predate trusted-manifest verification.")
+			case ner.ModelReady:
+				fmt.Fprintf(cmd.OutOrStdout(), "PII model: installed and verified (v%s)\n", ner.ModelVersion)
 			}
 
-			dir, _ := ner.CacheDir()
-			fmt.Fprintf(cmd.OutOrStdout(), "PII model: installed (v%s)\n", ner.ModelVersion)
-			fmt.Fprintf(cmd.OutOrStdout(), "Location: %s\n", dir)
+			fmt.Fprintf(cmd.OutOrStdout(), "Location: %s\n", status.Dir)
 			fmt.Fprintln(cmd.OutOrStdout(), "Model: distilbert-base-multilingual-cased-ner-hrl (INT8)")
 			fmt.Fprintln(cmd.OutOrStdout(), "Languages: Arabic, German, English, Spanish, French, Italian, Latvian, Dutch, Portuguese, Chinese")
 			return nil
@@ -79,18 +97,17 @@ func piiModelUninstallCmd() *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove cached PII model files",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !ner.IsModelReady() {
+			status := ner.Status()
+			if !status.Present {
 				fmt.Fprintln(cmd.OutOrStdout(), "PII model is not installed.")
 				return nil
 			}
 
-			dir, _ := ner.CacheDir()
 			if err := ner.RemoveModel(); err != nil {
 				return fmt.Errorf("uninstall failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed PII model from %s\n", dir)
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed PII model from %s\n", status.Dir)
 			return nil
 		},
 	}
 }
-
