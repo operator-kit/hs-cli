@@ -1,7 +1,9 @@
 package api
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"io"
 	"net/url"
 	"strings"
 	"unicode"
@@ -10,6 +12,7 @@ import (
 )
 
 const diagnosticRedacted = "[redacted]"
+const diagnosticSecretBytes = 32
 
 type diagnosticSanitizer interface {
 	sanitizeURL(*url.URL) string
@@ -22,10 +25,40 @@ type safeDiagnosticSanitizer struct {
 }
 
 func newSafeDiagnosticSanitizer() diagnosticSanitizer {
+	return newSafeDiagnosticSanitizerWithRandom(rand.Reader)
+}
+
+func newSafeDiagnosticSanitizerWithRandom(random io.Reader) diagnosticSanitizer {
 	// Diagnostics always use the strongest mode and deliberately omit NER.
 	// Free-form fields therefore collapse to RedactTextNotice rather than risk
 	// persisting a name the model did not inspect.
-	return &safeDiagnosticSanitizer{engine: pii.NewEngine(pii.ModeAll, "")}
+	raw := make([]byte, diagnosticSecretBytes)
+	if _, err := io.ReadFull(random, raw); err != nil {
+		return opaqueDiagnosticSanitizer{}
+	}
+	secret, err := pii.NewSecret(raw)
+	if err != nil {
+		return opaqueDiagnosticSanitizer{}
+	}
+	engine, err := pii.NewEngine(pii.ModeAll, secret)
+	if err != nil {
+		return opaqueDiagnosticSanitizer{}
+	}
+	return &safeDiagnosticSanitizer{engine: engine}
+}
+
+type opaqueDiagnosticSanitizer struct{}
+
+func (opaqueDiagnosticSanitizer) sanitizeURL(*url.URL) string {
+	return "[redacted URL]"
+}
+
+func (opaqueDiagnosticSanitizer) sanitizeHeader(string, []string) string {
+	return diagnosticRedacted
+}
+
+func (opaqueDiagnosticSanitizer) sanitizeBody([]byte) string {
+	return "[redacted diagnostic body]"
 }
 
 func (s *safeDiagnosticSanitizer) sanitizeURL(input *url.URL) string {

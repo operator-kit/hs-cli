@@ -103,7 +103,8 @@ func setupDebugLog(httpClient *http.Client) {
 	}
 	fmt.Fprintf(os.Stderr, "Debug log: %s\n", path)
 	httpClient.Transport = &debugTransport{
-		base: httpClient.Transport,
-		out:  f,
+		base:      httpClient.Transport,
+		out:       f,
+		sanitizer: newSafeDiagnosticSanitizer(),
 	}
 }

@@ -26,6 +26,10 @@ func (m Mode) String() string {
 	}
 }
 
+func (m Mode) Valid() bool {
+	return m == ModeOff || m == ModeCustomers || m == ModeAll
+}
+
 // ParseMode converts configured text into a validated policy mode.
 func ParseMode(v string) (Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(v)) {

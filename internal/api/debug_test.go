@@ -2,8 +2,10 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -153,4 +155,40 @@ func TestDebugTransport_LogsError(t *testing.T) {
 	_, err := dt.RoundTrip(req)
 	assert.Error(t, err)
 	assert.Contains(t, buf.String(), "error:")
+}
+
+func TestDiagnosticSanitizersUseIndependentEphemeralSecrets(t *testing.T) {
+	first := newSafeDiagnosticSanitizerWithRandom(bytes.NewReader(bytes.Repeat([]byte{0x11}, 32)))
+	second := newSafeDiagnosticSanitizerWithRandom(bytes.NewReader(bytes.Repeat([]byte{0x22}, 32)))
+	const body = `{"email":"alice.critical@example.com"}`
+
+	firstOutput := first.sanitizeBody([]byte(body))
+	secondOutput := second.sanitizeBody([]byte(body))
+	assert.NotContains(t, firstOutput, "alice.critical@example.com")
+	assert.NotContains(t, secondOutput, "alice.critical@example.com")
+	assert.NotEqual(t, firstOutput, secondOutput, "diagnostic identities must not correlate across sanitizers")
+}
+
+func TestDiagnosticSanitizerRandomFailureFallsBackToOpaqueOutput(t *testing.T) {
+	sanitizer := newSafeDiagnosticSanitizerWithRandom(failingReader{err: errors.New("entropy unavailable")})
+	const piiBody = `{"email":"alice.critical@example.com"}`
+
+	assert.NotContains(t, sanitizer.sanitizeBody([]byte(piiBody)), "alice.critical@example.com")
+	assert.Contains(t, sanitizer.sanitizeBody([]byte(piiBody)), "redacted")
+	assert.Equal(t, "[redacted URL]", sanitizer.sanitizeURL(mustURL(t, "https://api.helpscout.net/v2/customers/123")))
+}
+
+type failingReader struct {
+	err error
+}
+
+func (r failingReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func mustURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	parsed, err := url.Parse(raw)
+	require.NoError(t, err)
+	return parsed
 }

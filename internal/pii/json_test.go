@@ -7,7 +7,7 @@ import (
 )
 
 func TestRedactJSON_Disabled(t *testing.T) {
-	e := NewEngine(ModeOff, "")
+	e := mustTestEngine(ModeOff, "")
 	input := json.RawMessage(`{"subject":"Hello Alice","email":"alice@test.com"}`)
 	out, err := e.RedactJSON(input)
 	if err != nil {
@@ -19,7 +19,7 @@ func TestRedactJSON_Disabled(t *testing.T) {
 }
 
 func TestRedactJSON_EmptyInput(t *testing.T) {
-	e := NewEngine(ModeAll, "")
+	e := mustTestEngine(ModeAll, "")
 	out, err := e.RedactJSON(nil)
 	if err != nil {
 		t.Fatalf("RedactJSON error: %v", err)
@@ -30,7 +30,7 @@ func TestRedactJSON_EmptyInput(t *testing.T) {
 }
 
 func TestRedactJSON_InvalidJSON(t *testing.T) {
-	e := NewEngine(ModeAll, "")
+	e := mustTestEngine(ModeAll, "")
 	_, err := e.RedactJSON(json.RawMessage(`{invalid`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
@@ -38,7 +38,7 @@ func TestRedactJSON_InvalidJSON(t *testing.T) {
 }
 
 func TestRedactJSON_StructuredCustomerFields(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"primaryCustomer": {
 			"type": "customer",
@@ -58,7 +58,7 @@ func TestRedactJSON_StructuredCustomerFields(t *testing.T) {
 }
 
 func TestRedactJSON_StructuredUserFields(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"assignee": {
 			"type": "user",
@@ -78,7 +78,7 @@ func TestRedactJSON_StructuredUserFields(t *testing.T) {
 }
 
 func TestRedactJSON_CustomersMode_SkipsUser(t *testing.T) {
-	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	e := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"assignee": {
 			"type": "user",
@@ -99,7 +99,7 @@ func TestRedactJSON_CustomersMode_SkipsUser(t *testing.T) {
 }
 
 func TestRedactJSON_FirstNameLastNameVariant(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"customer": {
 			"type": "customer",
@@ -122,7 +122,7 @@ func TestRedactJSON_FirstNameLastNameVariant(t *testing.T) {
 func TestRedactJSONWithContext_TopLevelEntityPolicy(t *testing.T) {
 	input := json.RawMessage(`{"firstName":"Alice","lastName":"Smith","email":"alice@test.com"}`)
 
-	customerEngine := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	customerEngine := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	customer, err := customerEngine.RedactJSONWithContext(input, JSONContext{RootEntity: "customer", Resource: ResourceCustomer})
 	if err != nil {
 		t.Fatalf("customer context: %v", err)
@@ -131,7 +131,7 @@ func TestRedactJSONWithContext_TopLevelEntityPolicy(t *testing.T) {
 		t.Fatalf("explicit customer root should be redacted: %s", customer)
 	}
 
-	userEngine := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	userEngine := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	user, err := userEngine.RedactJSONWithContext(input, JSONContext{RootEntity: "user", Resource: ResourceUser})
 	if err != nil {
 		t.Fatalf("user context: %v", err)
@@ -142,7 +142,7 @@ func TestRedactJSONWithContext_TopLevelEntityPolicy(t *testing.T) {
 }
 
 func TestRedactJSONWithContext_PathAwareSensitiveValues(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"status": {"value": "active"},
 		"customFields": [{"name": "contact", "value": "alice@test.com"}],
@@ -167,7 +167,7 @@ func TestRedactJSONWithContext_PathAwareSensitiveValues(t *testing.T) {
 }
 
 func TestRedactJSON_SentinelPersonSkipped(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	// Sentinel: id=0 should be skipped
 	input := json.RawMessage(`{
 		"assignee": {
@@ -190,7 +190,7 @@ func TestRedactJSON_SentinelPersonSkipped(t *testing.T) {
 }
 
 func TestRedactJSON_EmailsArray(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"customer": {
 			"type": "customer",
@@ -210,7 +210,7 @@ func TestRedactJSON_EmailsArray(t *testing.T) {
 }
 
 func TestRedactJSON_PhonesArray(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"customer": {
 			"type": "customer",
@@ -231,7 +231,7 @@ func TestRedactJSON_PhonesArray(t *testing.T) {
 
 func TestRedactJSON_FreeformSubject(t *testing.T) {
 	d := nerWith(NameSpan{Text: "Alice Smith", Start: 11, End: 22, Score: 0.95})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	input := json.RawMessage(`{
 		"subject": "Email from Alice Smith",
 		"primaryCustomer": {"type":"customer","first":"Alice","last":"Smith","email":"alice@test.com"}
@@ -247,7 +247,7 @@ func TestRedactJSON_FreeformSubject(t *testing.T) {
 }
 
 func TestRedactJSON_NestedObjects(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"conversation": {
 			"threads": [{
@@ -272,7 +272,7 @@ func TestRedactJSON_NestedObjects(t *testing.T) {
 }
 
 func TestRedactJSON_ToCcBccArrays(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"to": ["alice@test.com", "bob@test.com"],
 		"cc": ["carol@test.com"],
@@ -291,7 +291,7 @@ func TestRedactJSON_ToCcBccArrays(t *testing.T) {
 }
 
 func TestRedactJSON_NonRedactableFieldPassthrough(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"id": 12345,
 		"status": "active",
@@ -309,7 +309,7 @@ func TestRedactJSON_NonRedactableFieldPassthrough(t *testing.T) {
 }
 
 func TestRedactJSON_InferEntityType_FromKey(t *testing.T) {
-	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	e := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	// No explicit "type" field — should infer from key "primaryCustomer"
 	input := json.RawMessage(`{
 		"primaryCustomer": {
@@ -329,7 +329,7 @@ func TestRedactJSON_InferEntityType_FromKey(t *testing.T) {
 }
 
 func TestRedactJSON_Deterministic(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	input := json.RawMessage(`{
 		"primaryCustomer": {"type":"customer","first":"Alice","last":"Smith","email":"alice@test.com"}
 	}`)
@@ -347,7 +347,7 @@ func TestRedactJSON_Deterministic(t *testing.T) {
 func TestRedactJSON_StructuredAndFreeformTogether(t *testing.T) {
 	// NER detects name in subject; structured fields also redacted
 	d := nerWith(NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.95})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	input := json.RawMessage(`{
 		"subject": "Alice Smith needs help",
 		"primaryCustomer": {"type":"customer","first":"Alice","last":"Smith","email":"alice@test.com"}

@@ -1,14 +1,18 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/operator-kit/hs-cli/internal/config"
 	"github.com/operator-kit/hs-cli/internal/output"
 	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/operator-kit/hs-cli/internal/pii/ner"
+	"github.com/operator-kit/hs-cli/internal/pii/secretstore"
+	piisetup "github.com/operator-kit/hs-cli/internal/pii/setup"
 	"github.com/operator-kit/hs-cli/internal/types"
 )
 
@@ -19,6 +23,11 @@ var (
 	ratingPIIContext       = pii.JSONContext{Resource: pii.ResourceRating}
 	reportPIIContext       = pii.JSONContext{Resource: pii.ResourceReport}
 	attachmentPIIContext   = pii.JSONContext{Resource: pii.ResourceAttachment}
+
+	resolvePIISecret      = defaultResolvePIISecret
+	invocationPIIPrepared bool
+	invocationPIIMode     pii.Mode
+	invocationPIISecret   pii.Secret
 )
 
 func effectivePIIMode() (pii.Mode, error) {
@@ -36,6 +45,10 @@ func newPIIEngine() (*pii.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	secret, err := secretForPIIMode(context.Background(), mode)
+	if err != nil {
+		return nil, err
+	}
 	var opts []pii.EngineOption
 	if ner.IsModelReady() {
 		d, nerErr := ner.NewDetector()
@@ -43,7 +56,56 @@ func newPIIEngine() (*pii.Engine, error) {
 			opts = append(opts, pii.WithNER(d))
 		}
 	}
-	return pii.NewEngine(mode, os.Getenv("HS_INBOX_PII_SECRET"), opts...), nil
+	engine, err := pii.NewEngine(mode, secret, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating PII engine: %w", err)
+	}
+	return engine, nil
+}
+
+func defaultResolvePIISecret(ctx context.Context, mode pii.Mode, configPath string) (pii.Secret, error) {
+	path := config.ResolvedPath(configPath)
+	resolver := &piisetup.SecretResolver{
+		Store: secretstore.NewKeyringStore(),
+		Lock:  secretstore.NewFileLock(filepath.Join(filepath.Dir(path), ".pii-secret.lock")),
+	}
+	return resolver.Resolve(ctx, mode)
+}
+
+func resetPIIInvocation() {
+	invocationPIIPrepared = false
+	invocationPIIMode = pii.ModeOff
+	invocationPIISecret = pii.Secret{}
+}
+
+func preflightPIISecret(ctx context.Context) error {
+	mode, err := effectivePIIMode()
+	if err != nil {
+		return err
+	}
+	_, err = secretForPIIMode(ctx, mode)
+	return err
+}
+
+func secretForPIIMode(ctx context.Context, mode pii.Mode) (pii.Secret, error) {
+	if invocationPIIPrepared && invocationPIIMode == mode {
+		return invocationPIISecret, nil
+	}
+	if !pii.IsEnabled(mode) {
+		invocationPIIPrepared = true
+		invocationPIIMode = mode
+		invocationPIISecret = pii.Secret{}
+		return pii.Secret{}, nil
+	}
+
+	secret, err := resolvePIISecret(ctx, mode, cfgPath)
+	if err != nil {
+		return pii.Secret{}, fmt.Errorf("resolving PII redaction secret: %w", err)
+	}
+	invocationPIIPrepared = true
+	invocationPIIMode = mode
+	invocationPIISecret = secret
+	return secret, nil
 }
 
 // redactRawWithPII is the mandatory presentation boundary for Inbox JSON. Once

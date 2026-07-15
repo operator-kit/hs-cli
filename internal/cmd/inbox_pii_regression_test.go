@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/operator-kit/hs-cli/internal/output"
+	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +31,7 @@ func executePIIFixtureCommand(
 	saveRestore(t)
 	buf := setupTest(mock)
 	t.Cleanup(func() { output.Out = previousOutput })
+	t.Setenv("HS_INBOX_PII_SECRET", "pii-regression-test-secret")
 
 	cfg.InboxPIIMode = piiMode
 	format = outputFormat
@@ -263,4 +266,36 @@ func TestPIIRegression_High06_InvalidModeDoesNotBlockVersion(t *testing.T) {
 	rootCmd.SetArgs([]string{"version"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "1.2.3")
+}
+
+func TestPIIRegression_High05_SecretFailureStopsBeforeInboxAPI(t *testing.T) {
+	home, buf := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: all\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+	t.Setenv("HS_INBOX_PII_SECRET", "")
+
+	apiCalled := false
+	apiClient = &mockClient{
+		ListMailboxesFn: func(context.Context, url.Values) (json.RawMessage, error) {
+			apiCalled = true
+			return json.RawMessage(`{"_embedded":{"mailboxes":[{"id":1,"name":"PII fixture"}]}}`), nil
+		},
+	}
+	previousOutput := output.Out
+	output.Out = buf
+	t.Cleanup(func() { output.Out = previousOutput })
+
+	originalResolver := resolvePIISecret
+	resolvePIISecret = func(context.Context, pii.Mode, string) (pii.Secret, error) {
+		return pii.Secret{}, errors.New("PII redaction secret unavailable; set HS_INBOX_PII_SECRET")
+	}
+	t.Cleanup(func() { resolvePIISecret = originalResolver })
+
+	rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HS_INBOX_PII_SECRET")
+	assert.False(t, apiCalled)
+	assert.NotContains(t, buf.String(), "PII fixture")
 }

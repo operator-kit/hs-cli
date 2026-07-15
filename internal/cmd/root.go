@@ -46,6 +46,8 @@ var rootCmd = &cobra.Command{
 	Use:   "hs",
 	Short: "HelpScout CLI — manage mailboxes, conversations, customers and more",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		resetPIIInvocation()
+
 		// Skip everything for config subcommands
 		for c := cmd; c != nil; c = c.Parent() {
 			if c == configCmd {
@@ -64,6 +66,11 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("invalid Inbox PII mode: %w", modeErr)
 			}
 			cfg.InboxPIIMode = mode.String()
+		}
+		if commandNeedsPIISecret(cmd) {
+			if err := preflightPIISecret(cmd.Context()); err != nil {
+				return err
+			}
 		}
 
 		startUpdateCheck(cmd)
@@ -267,6 +274,24 @@ func isUnderSubtree(cmd *cobra.Command, name string) bool {
 
 func commandUsesInboxPII(cmd *cobra.Command) bool {
 	return cmd.Name() == "mcp" || isUnderSubtree(cmd, "inbox")
+}
+
+func commandNeedsPIISecret(cmd *cobra.Command) bool {
+	if cmd.Name() == "mcp" {
+		return true
+	}
+	if !isUnderSubtree(cmd, "inbox") {
+		return false
+	}
+	for current := cmd; current != nil; current = current.Parent() {
+		if current == configCmd || current.Name() == "auth" {
+			return false
+		}
+	}
+	if cmd.Name() == "permissions" {
+		return false
+	}
+	return cmd.RunE != nil || cmd.Run != nil
 }
 
 func shouldShowUsageForError(err error) bool {

@@ -57,8 +57,13 @@ func saveRestore(t *testing.T) {
 	origSetFormat := setFormat
 	origSetPIIMode := setInboxPIIMode
 	origSetPIIAllowRaw := setInboxPIIAllow
+	origResolvePIISecret := resolvePIISecret
+	origInvocationPIIPrepared := invocationPIIPrepared
+	origInvocationPIIMode := invocationPIIMode
+	origInvocationPIISecret := invocationPIISecret
 
 	selfupdate.DirOverride = t.TempDir()
+	resetPIIInvocation()
 
 	t.Cleanup(func() {
 		cfg = origCfg
@@ -79,6 +84,10 @@ func saveRestore(t *testing.T) {
 		setFormat = origSetFormat
 		setInboxPIIMode = origSetPIIMode
 		setInboxPIIAllow = origSetPIIAllowRaw
+		resolvePIISecret = origResolvePIISecret
+		invocationPIIPrepared = origInvocationPIIPrepared
+		invocationPIIMode = origInvocationPIIMode
+		invocationPIISecret = origInvocationPIISecret
 		configSetCmd.Flags().VisitAll(func(f *pflag.Flag) {
 			f.Changed = false
 		})
@@ -91,6 +100,7 @@ func setupE2E(t *testing.T) (home string, buf *bytes.Buffer) {
 	t.Helper()
 	home = isolateHome(t)
 	saveRestore(t)
+	useTestPIISecretResolver()
 
 	// Prevent update check from hitting the network
 	versionStr = "dev"
@@ -196,10 +206,10 @@ func TestConfigFile_E2E(t *testing.T) {
 	// Write config
 	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
 	require.NoError(t, config.Save(cfgFile, &config.Config{
-		InboxAppID:       "file-id",
-		InboxAppSecret:   "file-secret",
+		InboxAppID:          "file-id",
+		InboxAppSecret:      "file-secret",
 		InboxDefaultMailbox: 12345,
-		Format:         "json",
+		Format:              "json",
 	}))
 
 	// Clear env vars so config file is used
@@ -223,7 +233,7 @@ func TestEnvOverridesConfig_E2E(t *testing.T) {
 	require.NoError(t, config.Save(cfgFile, &config.Config{
 		InboxAppID:     "file-id",
 		InboxAppSecret: "file-secret",
-		Format:       "table",
+		Format:         "table",
 	}))
 
 	// Env vars override

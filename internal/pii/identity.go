@@ -42,7 +42,7 @@ func WithNER(d NameDetector) EngineOption {
 
 type Engine struct {
 	mode   Mode
-	secret string
+	secret Secret
 	ner    NameDetector
 
 	mu      sync.RWMutex
@@ -56,7 +56,13 @@ type fakePerson struct {
 	Email string
 }
 
-func NewEngine(mode Mode, secret string, opts ...EngineOption) *Engine {
+func NewEngine(mode Mode, secret Secret, opts ...EngineOption) (*Engine, error) {
+	if !mode.Valid() {
+		return nil, fmt.Errorf("invalid PII engine mode")
+	}
+	if IsEnabled(mode) && secret.IsZero() {
+		return nil, fmt.Errorf("enabled PII engine requires a secret")
+	}
 	e := &Engine{
 		mode:    mode,
 		secret:  secret,
@@ -66,7 +72,7 @@ func NewEngine(mode Mode, secret string, opts ...EngineOption) *Engine {
 	for _, o := range opts {
 		o(e)
 	}
-	return e
+	return e, nil
 }
 
 func (e *Engine) Mode() Mode {
@@ -159,10 +165,7 @@ func (e *Engine) token(kind, raw string) string {
 }
 
 func (e *Engine) hashBytes(v string) [32]byte {
-	if strings.TrimSpace(e.secret) == "" {
-		return sha256.Sum256([]byte(v))
-	}
-	h := hmac.New(sha256.New, []byte(e.secret))
+	h := hmac.New(sha256.New, e.secret.bytes())
 	h.Write([]byte(v))
 	var out [32]byte
 	copy(out[:], h.Sum(nil))
