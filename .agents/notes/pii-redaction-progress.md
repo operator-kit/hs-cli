@@ -1,6 +1,6 @@
 # PII Redaction — Progress Report
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Executive status
 
@@ -20,15 +20,23 @@ Last updated: 2026-07-15
 - Latest verification:
   - `go test ./... -count=1 -timeout=5m`
   - `go vet ./...`
+  - digest-pinned Docker race suite via `scripts/test-race.ps1`
+  - native Windows race suite via `scripts/test-race-native-windows.ps1`
   - `go build -buildvcs=false ./...` for Linux and Darwin on amd64 and arm64
   - release-script syntax validation with Git Bash
   - embedded archive sizes and SHA-256 values checked against all four
     published `pii-model-v0.2.0` assets
 
-The local race run remains unavailable because this Windows environment has
-CGO disabled. The release workflow now requires a real runtime/model smoke test
-on each advertised Linux and Darwin target before publishing; those four jobs
-will produce execution evidence when the model-tag workflow next runs.
+Race verification is now complete. CGO was present but disabled, and the
+default GCC configured by Go was absent. The complete suite passes in the
+digest-pinned Docker test environment and natively on Windows with a compatible
+MinGW-w64 compiler, including the Windows-only PII secret-store lock tests.
+Docker is the canonical local dependency; a preflighted native Windows wrapper
+runs in CI for platform-specific coverage.
+
+The release workflow requires a real runtime/model smoke test on each
+advertised Linux and Darwin target before publishing; those four jobs will
+produce execution evidence when the model-tag workflow next runs.
 
 This document preserves the original 1–14 review numbering. The more detailed
 deferred register remains in `pii-redaction-follow-ups.md`. `PII-F01` was found

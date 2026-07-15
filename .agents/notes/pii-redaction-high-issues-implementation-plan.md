@@ -1,8 +1,12 @@
 # PII Redaction — High-Severity Implementation Handoff
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
-Status: design agreed; implementation not started
+Status: implemented and verified; retained as the design and decision record
+
+All four high-severity findings and the coupled transactional-installer work
+are complete. The full suite passes under the Docker/Linux and native Windows
+race detectors; see `pii-redaction-progress.md` for the live status register.
 
 ## Purpose
 

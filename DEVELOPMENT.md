@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - Go 1.25+
+- Docker Desktop or Docker Engine for recommended local unit and race-test runs
 
 ## Project structure
 
@@ -114,6 +115,41 @@ The Docker wrappers set an isolated `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME`,
 `APPDATA`, `GOCACHE`, and `GOMODCACHE` inside the container. This keeps full
 test runs from reading or deleting credentials/config from the host dev
 environment while still reusing Docker volumes for Go module/build caches.
+The wrappers use a digest-pinned `golang:1.25.9-bookworm` image.
+
+### Race detector
+
+The canonical local race suite runs in the same isolated Docker environment as
+the full unit suite. Developers do not need to install or configure CGO or a C
+compiler on the host:
+
+```bash
+bash ./scripts/test-race.sh
+bash ./scripts/test-race.sh ./internal/pii/... -count=1
+```
+
+```powershell
+.\scripts\test-race.ps1
+.\scripts\test-race.ps1 ./internal/pii/... -count=1
+```
+
+CI runs this Docker suite for broad concurrency coverage and a separate native
+Windows job for Windows-only files such as the PII secret-store lock. A
+developer changing Windows-specific code can run that job locally when a
+recent MinGW-w64 GCC is already available on `PATH`:
+
+```powershell
+.\scripts\test-race-native-windows.ps1
+```
+
+The native wrapper validates that GCC provides `libsynchronization.a`, enables
+CGO, and selects the compiler only for its own process. Native Windows tooling
+is optional for normal development because the authoritative Windows run is in
+CI.
+
+See the official Go documentation for the
+[race detector requirements](https://go.dev/doc/articles/race_detector) and
+[Go 1.25+ Windows CGO requirements](https://go.dev/wiki/MinimumRequirements).
 
 ## Test architecture
 
