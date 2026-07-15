@@ -2,34 +2,32 @@
 
 Last reviewed: 2026-07-15
 
-This local register tracks PII and privacy observations outside the agreed
-remediation of the four critical regressions:
+This local register tracks PII and privacy observations found outside the
+original remediation of the four critical regressions:
 
 1. top-level customer classification;
 2. the mandatory Inbox presentation boundary;
 3. safe HTTP diagnostics;
 4. Unicode-safe name replacement.
 
-Items needed to implement those four safely—fail-closed presentation,
-custom-field handling, opaque attachment suppression, NER error handling, and
-invocation-scoped detector cleanup—remain active scope and are not duplicated
-below.
+Completed follow-ups remain here as historical context; unresolved items stay
+available for later planning.
 
 ## Tracking summary
 
-| ID | Priority | Observation | Suggested follow-up |
-| --- | --- | --- | --- |
-| PII-F01 | High | One person can receive different pseudonyms when response shapes expose different identifiers. | Design and version a stable identity-key strategy. |
-| PII-F02 | High | An empty HS_INBOX_PII_SECRET uses unkeyed SHA-256. | Generate/store or require a private local secret. |
-| PII-F03 | High | Invalid PII modes silently normalize to off. | Reject invalid configuration at startup. |
-| PII-F04 | High | Windows can install a model bundle but cannot run the bundled NER runtime. | Implement Windows runtime support or block installation clearly. |
-| PII-F05 | High | Download hashes are generated after download and are not trust anchors. | Publish and verify a signed or pinned manifest. |
-| PII-F06 | Medium | Model installation is not atomic and lacks explicit size/time limits. | Stage, validate, and atomically promote bundles. |
-| PII-F07 | Medium | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Move sensitive inputs off argv and reduce MCP subprocess coupling. |
-| PII-F08 | Medium | Fake display names come from small lists and can collide visually. | Add deterministic display disambiguation. |
-| PII-F09 | Medium | Identity canonicalization does not normalize Unicode composition. | Define a versioned Unicode normalization policy. |
-| PII-F10 | Medium | Secret rotation changes every displayed identity with no migration/version marker. | Add key versioning and a rotation policy. |
-| PII-F11 | Medium | There is no measurable multilingual detection-quality corpus. | Build a privacy-focused evaluation suite. |
+| ID | Priority | Status | Observation | Suggested follow-up |
+| --- | --- | --- | --- | --- |
+| PII-F01 | High | Open | One person can receive different pseudonyms when response shapes expose different identifiers. | Design and version a stable identity-key strategy. |
+| PII-F02 | High | Complete | An empty HS_INBOX_PII_SECRET uses unkeyed SHA-256. | Resolved with a generated/keyring-backed private secret. |
+| PII-F03 | High | Complete | Invalid PII modes silently normalize to off. | Resolved with strict parsing and preflight validation. |
+| PII-F04 | High | Complete | Windows can install a model bundle but cannot run the bundled NER runtime. | Windows is now refused until a real runtime smoke test exists. |
+| PII-F05 | High | Complete | Download hashes are generated after download and are not trust anchors. | Resolved with an embedded pinned manifest and source lock. |
+| PII-F06 | Medium | Complete | Model installation is not atomic and lacks explicit size/time limits. | Resolved with the bounded transactional installer. |
+| PII-F07 | Medium | Open | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Move sensitive inputs off argv and reduce MCP subprocess coupling. |
+| PII-F08 | Medium | Open | Fake display names come from small lists and can collide visually. | Add deterministic display disambiguation. |
+| PII-F09 | Medium | Open | Identity canonicalization does not normalize Unicode composition. | Define a versioned Unicode normalization policy. |
+| PII-F10 | Medium | Open | Secret rotation changes every displayed identity with no migration/version marker. | Add key versioning and a rotation policy. |
+| PII-F11 | Medium | Open | There is no measurable multilingual detection-quality corpus. | Build a privacy-focused evaluation suite. |
 
 ## PII-F01 — Identity keys vary across payload shapes
 
@@ -57,65 +55,39 @@ Questions to resolve:
   one?
 - Is backwards-compatible display required after an upgrade?
 
-## PII-F02 — Empty secrets are deterministic but not private
+## PII-F02 — Empty secrets are deterministic but not private — complete
 
-When HS_INBOX_PII_SECRET is empty, identity and token derivation uses plain
-SHA-256. That provides stable output but permits cross-installation correlation
-and offline guessing of low-entropy names, phone numbers, and common emails.
+Resolved in `0cfa643`. Enabled engines can no longer use unkeyed SHA-256. An
+explicit secret remains supported for intentional cross-machine consistency;
+otherwise a random installation secret is initialized atomically in the OS
+keyring. Rotation/version policy remains separately tracked in PII-F10.
 
-Options:
+## PII-F03 — Invalid mode values fail open — complete
 
-- generate a random installation secret and store it in the OS keyring;
-- require an explicitly configured secret whenever PII mode is enabled;
-- support an organization-managed secret for intentional cross-machine
-  consistency.
+Resolved in `fce500b`. Modes use strict parsing and invalid file/environment
+values stop Inbox and MCP work before API access. File-only configuration
+loading preserves a safe repair path.
 
-Coordinate this with PII-F10 so rotation and key versioning are defined before
-changing defaults.
+## PII-F04 — Windows model/runtime mismatch — complete
 
-## PII-F03 — Invalid mode values fail open
+Resolved in `f304833` and `f4416c3`. Capability is explicit; unsupported
+Windows installs fail before network/cache mutation, status is truthful, and
+free-form content remains fail-closed. Windows can be reintroduced only after
+a real loader/model smoke job passes.
 
-NormalizeMode maps unknown values to off. A typo such as customer instead of
-customers therefore disables redaction without an error.
+## PII-F05 — Model provenance is not independently verified — complete
 
-Parse configuration into a strong mode type and reject unknown values before
-creating clients or running commands. Validate configuration before persisting
-it. Cover config files, environment variables, case/whitespace, and MCP child
-processes.
+Resolved in `f4416c3`. The binary embeds independently reviewed release and
+inner-file identities, while the release source lock pins upstream inputs.
+Downloaded sidecars remain useful operator artifacts but are not trusted by
+the installer.
 
-## PII-F04 — Windows model/runtime mismatch
+## PII-F06 — Model installation hardening — complete
 
-Model cache paths and bundle selection support Windows and onnxruntime.dll, but
-the runtime implementation is compiled only for Darwin, Linux, FreeBSD, and
-NetBSD. Windows receives the unsupported runtime stub.
-
-The model installer can therefore succeed and report the model ready while
-NewDetector can never run. Either implement and test Windows inference, or block
-installation and clearly document the fail-closed behavior.
-
-## PII-F05 — Model provenance is not independently verified
-
-The installer downloads a GitHub release tarball and calculates SHA-256 while
-extracting. The resulting .sha256 files only describe the bytes just received;
-they are not compared with an independently trusted digest or signature.
-
-Follow-up:
-
-- ship a pinned manifest with expected names, sizes, and SHA-256 values;
-- sign the manifest or release and verify it before extraction;
-- reject unexpected and duplicate archive members;
-- verify every file before marking the model ready;
-- retain the existing path-traversal tests.
-
-## PII-F06 — Model installation hardening
-
-Extraction writes directly into the live cache. Interrupted or corrupt
-downloads can leave partial files, and networking uses the default HTTP client
-without an explicit timeout or total download limit.
-
-Install into a private temporary directory, enforce compressed/extracted size
-limits, validate all files, then atomically rename the completed directory into
-place. Clean stale staging directories on the next attempt.
+Resolved in `f4416c3`. The installer is context-aware, size/hash bounded,
+strictly allowlisted, runtime-smoke-tested, staged privately, content-addressed,
+and atomically promoted. Failures preserve any prior trusted installation and
+stale installer-owned staging is cleaned within a bounded policy.
 
 ## PII-F07 — Sensitive values in argv and MCP subprocesses
 

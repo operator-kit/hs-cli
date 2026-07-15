@@ -6,11 +6,29 @@ Last updated: 2026-07-15
 
 - Original review findings: **14**
 - Critical findings: **4 of 4 complete**
-- Remaining original findings: **10 open**
+- High findings: **4 of 4 complete**
+- Original findings complete: **9 of 14**
+- Remaining original findings: **5 open**
 - Additional observations raised during remediation: **2 open**
 - Regression-test commit: `7eb27a9 test: reproduce critical PII redaction leaks`
-- Fix commit: `5a7ea63 fix: enforce PII redaction boundaries`
-- Latest verification: `go test ./... -count=1` passes across the repository.
+- Critical-fix commit: `5a7ea63 fix: enforce PII redaction boundaries`
+- High-fix commits:
+  - `fce500b fix: reject invalid PII modes before Inbox work`
+  - `0cfa643 fix: require private keys for PII pseudonyms`
+  - `f304833 fix: gate PII models by runtime capability`
+  - `f4416c3 fix: verify and atomically install PII models`
+- Latest verification:
+  - `go test ./... -count=1 -timeout=5m`
+  - `go vet ./...`
+  - `go build -buildvcs=false ./...` for Linux and Darwin on amd64 and arm64
+  - release-script syntax validation with Git Bash
+  - embedded archive sizes and SHA-256 values checked against all four
+    published `pii-model-v0.2.0` assets
+
+The local race run remains unavailable because this Windows environment has
+CGO disabled. The release workflow now requires a real runtime/model smoke test
+on each advertised Linux and Darwin target before publishing; those four jobs
+will produce execution evidence when the model-tag workflow next runs.
 
 This document preserves the original 1–14 review numbering. The more detailed
 deferred register remains in `pii-redaction-follow-ups.md`. `PII-F01` was found
@@ -18,7 +36,7 @@ during the remediation design discussion and was not part of the original
 numbered list, so it is tracked separately below rather than changing the
 historical numbering.
 
-The implementation-ready design for remaining high issues 5–8 is recorded in
+The implementation design used for high issues 5–8 is recorded in
 `pii-redaction-high-issues-implementation-plan.md`. It also includes issue 9
 because provenance verification and transactional installation must ship as
 one model-install boundary.
@@ -70,11 +88,11 @@ particular, `personKey` precedence and fake-person derivation were not changed.
 | 2 | Critical | The presentation boundary is opt-in, so commands and fields that call output directly can leak PII. | [x] Complete | Critical regression 02 |
 | 3 | Critical | HTTP debug logging persists raw URLs, headers, request bodies, and response bodies before output redaction. | [x] Complete | Critical regression 03 |
 | 4 | Critical | ASCII `\b` name replacement misses Unicode-script NER names and partial NER failures are not fail-closed. | [x] Complete | Critical regression 04 |
-| 5 | High | An empty `HS_INBOX_PII_SECRET` falls back to unkeyed SHA-256. | [ ] Open | `PII-F02` |
-| 6 | High | Invalid PII mode values silently normalize to `off`. | [ ] Open | `PII-F03` |
-| 7 | High | Windows can install a model bundle that the bundled runtime cannot execute. | [ ] Open | `PII-F04` |
-| 8 | High | Downloaded model hashes are generated after download and are not independent trust anchors. | [ ] Open | `PII-F05` |
-| 9 | Medium | Model installation is non-atomic and lacks explicit download size, extraction size, and timeout limits. | [ ] Open | `PII-F06` |
+| 5 | High | An empty `HS_INBOX_PII_SECRET` falls back to unkeyed SHA-256. | [x] Complete | `PII-F02` |
+| 6 | High | Invalid PII mode values silently normalize to `off`. | [x] Complete | `PII-F03` |
+| 7 | High | Windows can install a model bundle that the bundled runtime cannot execute. | [x] Complete | `PII-F04` |
+| 8 | High | Downloaded model hashes are generated after download and are not independent trust anchors. | [x] Complete | `PII-F05` |
+| 9 | Medium | Model installation is non-atomic and lacks explicit download size, extraction size, and timeout limits. | [x] Complete | `PII-F06` |
 | 10 | Medium | CLI and MCP arguments can expose PII through argv, shell history, process inspection, and echoed command errors. | [ ] Open | `PII-F07` |
 | 11 | Medium | The small fake-name lists permit visually identical pseudonyms for different people. | [ ] Open | `PII-F08` |
 | 12 | Medium | Identity canonicalization does not normalize Unicode composition or define broader Unicode case/space semantics. | [ ] Open | `PII-F09` |
@@ -218,40 +236,88 @@ Evidence:
 - Additional tests cover overlapping spans, known/NER overlap, protected staff
   names in customers-only mode, deterministic output, and detector failure.
 
+## Completed high-severity and model-installer work
+
+### 5. Private keyed display identities — complete
+
+- Enabled engines now require an opaque non-empty `pii.Secret` and always use
+  HMAC; the unkeyed SHA-256 branch no longer exists.
+- An explicit `HS_INBOX_PII_SECRET` retains its exact bytes and preserves the
+  baseline deterministic display identities.
+- When the environment variable is absent or blank, the application resolves
+  a generated 32-byte installation secret from the OS keyring.
+- Cross-process initialization locking makes concurrent first use converge on
+  one secret. Keyring, RNG, and lock failures stop protected work before API
+  access and never persist secret material in YAML or diagnostics.
+
+Evidence includes resolver precedence, keyring round-trip, concurrent
+initialization, lock, command preflight, failure-path, and golden identity
+tests. Implemented in `0cfa643`.
+
+### 6. Strict mode parsing — complete
+
+- PII modes are parsed into a strong type and unknown file or environment
+  values return an actionable error instead of becoming `off`.
+- Inbox and MCP paths validate before Help Scout API work.
+- Config repair remains possible through file-only loading, and environment
+  overrides are not accidentally written back to YAML.
+
+Implemented with regression coverage in `fce500b`.
+
+### 7. Truthful runtime capability — complete
+
+- Runtime capability is explicit and currently limited to Linux and Darwin on
+  amd64 and arm64.
+- Windows installation is rejected before HTTP or cache mutation, status
+  explains that free-form content remains hidden, and cached marker/files
+  cannot manufacture a ready state.
+- Legacy bundles are reported as unverified and are not loaded.
+- Release tooling publishes only supported targets and the model-tag workflow
+  now smoke-tests real inference on all four advertised runner targets before
+  release.
+
+Unit, command, fail-closed fallback, cross-build, release-matrix, and workflow
+coverage is in `f304833` and `f4416c3`. The four executing CI smoke results are
+pending the next model-tag workflow run.
+
+### 8. Independent model provenance — complete
+
+- The CLI embeds a schema-versioned trusted manifest for every supported
+  target, containing the immutable model revision, ONNX Runtime source
+  identity, archive URL/name/size/SHA-256, inner filenames/sizes/SHA-256 values,
+  runtime library name, and defensive limits.
+- The embedded archive identities match the four currently published release
+  assets. A downloaded sidecar is not treated as a trust anchor.
+- Manifest parsing rejects unknown schemas/fields, duplicates, missing target
+  coverage, unsupported targets, unsafe names, invalid hashes, and inconsistent
+  bounds.
+- The release source lock pins every upstream input; the builder verifies them,
+  creates deterministic archives, emits public checksums and a candidate
+  manifest, and CI requires the generated and reviewed manifests to match.
+
+Implemented with offline manifest/release regressions in `f4416c3`.
+
+### 9. Transactional and bounded model installation — complete
+
+- Downloads use a context-aware client with response-header, redirect, and
+  total-operation bounds; exact compressed size and SHA-256 are required.
+- Extraction accepts only the four manifest files and rejects traversal,
+  absolute/Windows paths, duplicates, unexpected entries, links, devices,
+  FIFOs, wrong sizes/hashes, expanded-size overflow, and truncated streams.
+- Files are installed into a private staging directory, synced, runtime/model
+  smoke-tested, marked ready only after success, and atomically promoted to an
+  immutable content-addressed directory.
+- Failures remove staging safely or leave a native validation timeout for
+  bounded stale cleanup. A prior trusted installation remains untouched.
+- Normal readiness validates trusted marker identity and exact regular-file
+  sizes without rehashing the large model on every invocation.
+
+Fixture-only regressions cover success/idempotence, progress, tampering,
+archive attacks, HTTP/cancellation/runtime failures, concurrency, stale
+cleanup, marker/file damage, and preservation of a previous install. Implemented
+in `f4416c3`.
+
 ## Open original findings
-
-### 5. Empty secrets use unkeyed hashing — open
-
-Without `HS_INBOX_PII_SECRET`, tokens are stable but globally correlatable and
-low-entropy values can be guessed offline. Decide whether to generate a private
-installation secret, require one whenever redaction is enabled, or support an
-organization-managed secret. Coordinate this with issue 13 before changing the
-identity contract.
-
-### 6. Invalid modes fail open — open
-
-Unknown values currently normalize to `off`, so a typo can silently disable
-redaction. Parse into a strong mode type and reject invalid config/environment
-values before API clients or MCP child processes run.
-
-### 7. Windows installer/runtime mismatch — open
-
-Windows cache and bundle handling recognize `onnxruntime.dll`, but the runtime
-implementation still resolves to the unsupported stub. Either implement and
-test Windows inference or refuse installation with a clear explanation of the
-fail-closed behavior.
-
-### 8. Model provenance is not independently verified — open
-
-Checksums produced from the bytes just downloaded do not prove provenance.
-Ship and verify a pinned or signed manifest containing expected filenames,
-sizes, and hashes before marking a model bundle ready.
-
-### 9. Model installation is not transactional or bounded — open
-
-Install into a private staging directory, enforce network and extraction
-limits, validate the complete bundle, and atomically promote it. Clean up stale
-staging directories after interrupted attempts.
 
 ### 10. Sensitive arguments cross process boundaries — open
 
@@ -305,12 +371,12 @@ engine/detector explicit ownership and deterministic cleanup.
 
 ## Suggested next sequence
 
-1. Fix issue 6 first because configuration typos currently disable protection.
-2. Design issues 5, 12, 13, and A1 together as one versioned identity-key and
-   secret-management contract.
-3. Resolve issue 7 before presenting model installation as supported on
-   Windows.
-4. Harden model provenance and installation transactionality in issues 8–9.
-5. Reduce argv/MCP exposure in issue 10 before expanding sensitive write tools.
-6. Build issue 14's evaluation corpus before changing model or normalization
+1. Reduce argv/MCP exposure in issue 10 before expanding sensitive write tools.
+2. Design issues 11–13 and A1 together as a versioned identity-key,
+   disambiguation, normalization, and secret-rotation contract.
+3. Build issue 14's evaluation corpus before changing model or normalization
    behavior, so privacy regressions become measurable.
+4. Give the NER detector explicit invocation-scoped ownership before moving
+   the CLI/MCP flow into a long-lived in-process service.
+5. Treat native Windows inference as a separate capability: add it only after
+   a real Windows loader/model smoke job passes.
