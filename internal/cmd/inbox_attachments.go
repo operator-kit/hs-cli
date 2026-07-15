@@ -79,14 +79,18 @@ func newConversationAttachmentsCmd() *cobra.Command {
 			}
 
 			if isJSON() {
-				return output.PrintRaw(mustMarshal(attachments))
+				return printRawWithPII(mustMarshal(attachments), attachmentPIIContext)
 			}
 
+			engine, err := newPIIEngine()
+			if err != nil {
+				return err
+			}
 			rows := make([]map[string]string, len(attachments))
 			for i, a := range attachments {
 				rows[i] = map[string]string{
 					"id":       strconv.Itoa(a.ID),
-					"filename": a.FileName,
+					"filename": redactTextWithPII(engine, a.FileName),
 					"mime":     a.MimeType,
 					"size":     strconv.FormatInt(a.Size, 10),
 				}
@@ -106,12 +110,16 @@ func newConversationAttachmentsCmd() *cobra.Command {
 			}
 
 			if isJSON() {
-				return output.PrintRaw(data)
+				return printRawWithPII(data, attachmentPIIContext)
 			}
 
 			var payload map[string]any
 			if err := json.Unmarshal(data, &payload); err != nil {
-				return output.PrintRaw(data)
+				return printRawWithPII(data, attachmentPIIContext)
+			}
+			engine, err := newPIIEngine()
+			if err != nil {
+				return err
 			}
 			dataLen := 0
 			if v, ok := payload["data"].(string); ok {
@@ -119,7 +127,7 @@ func newConversationAttachmentsCmd() *cobra.Command {
 			}
 			rows := []map[string]string{{
 				"id":         args[1],
-				"filename":   asString(payload["filename"]),
+				"filename":   redactTextWithPII(engine, asString(payload["filename"])),
 				"mime":       asString(payload["mimeType"]),
 				"data_bytes": strconv.Itoa(dataLen),
 			}}

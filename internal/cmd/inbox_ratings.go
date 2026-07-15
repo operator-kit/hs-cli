@@ -24,13 +24,18 @@ func newRatingsCmd() *cobra.Command {
 			}
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data, ratingPIIContext)
 				}
-				return output.PrintRaw(mustMarshal(cleanRawObject(data, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanMinimal)), ratingPIIContext)
 			}
 
 			var r types.Rating
 			json.Unmarshal(data, &r)
+			engine, err := newPIIEngine()
+			if err != nil {
+				return err
+			}
+			r.Comments = redactTextWithPII(engine, r.Comments)
 			return output.Print(getFormat(), []string{"id", "rating", "comments"}, []map[string]string{{
 				"id":       strconv.Itoa(r.ID),
 				"rating":   r.Rating,

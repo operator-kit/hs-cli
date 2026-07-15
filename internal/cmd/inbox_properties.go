@@ -107,12 +107,12 @@ func printPropertyList(data json.RawMessage, keys ...string) error {
 	items, err := extractEmbeddedWithCandidates(data, keys...)
 	if err != nil {
 		if isJSON() {
-			return output.PrintRaw(data)
+			return printRawWithPII(data)
 		}
 		return err
 	}
 	if isJSON() {
-		return output.PrintRaw(mustMarshal(items))
+		return printRawWithPII(mustMarshal(items))
 	}
 
 	props := make([]types.Property, 0, len(items))
@@ -134,7 +134,7 @@ func printPropertyList(data json.RawMessage, keys ...string) error {
 
 func printSingleProperty(data json.RawMessage) error {
 	if isJSON() {
-		return output.PrintRaw(data)
+		return printRawWithPII(data)
 	}
 	var p types.Property
 	if err := json.Unmarshal(data, &p); err != nil {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
@@ -9,6 +10,15 @@ import (
 	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/operator-kit/hs-cli/internal/pii/ner"
 	"github.com/operator-kit/hs-cli/internal/types"
+)
+
+var (
+	customerPIIContext     = pii.JSONContext{RootEntity: "customer", Resource: pii.ResourceCustomer}
+	userPIIContext         = pii.JSONContext{RootEntity: "user", Resource: pii.ResourceUser}
+	conversationPIIContext = pii.JSONContext{Resource: pii.ResourceConversation}
+	ratingPIIContext       = pii.JSONContext{Resource: pii.ResourceRating}
+	reportPIIContext       = pii.JSONContext{Resource: pii.ResourceReport}
+	attachmentPIIContext   = pii.JSONContext{Resource: pii.ResourceAttachment}
 )
 
 func effectivePIIMode() (string, error) {
@@ -36,18 +46,33 @@ func newPIIEngine() (*pii.Engine, error) {
 	return pii.NewEngine(mode, os.Getenv("HS_INBOX_PII_SECRET"), opts...), nil
 }
 
-func printRawWithPII(data json.RawMessage) error {
+// redactRawWithPII is the mandatory presentation boundary for Inbox JSON. Once
+// redaction is enabled it fails closed: malformed or uninspectable data is
+// never passed through unchanged.
+func redactRawWithPII(data json.RawMessage, contexts ...pii.JSONContext) (json.RawMessage, error) {
 	engine, err := newPIIEngine()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !engine.Enabled() {
-		return output.PrintRaw(data)
+		return data, nil
 	}
-	redacted, err := engine.RedactJSON(data)
+
+	ctx := pii.JSONContext{}
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
+	redacted, err := engine.RedactJSONWithContext(data, ctx)
 	if err != nil {
-		// Preserve existing behavior for non-JSON payloads.
-		return output.PrintRaw(data)
+		return nil, fmt.Errorf("redacting Inbox output: %w", err)
+	}
+	return redacted, nil
+}
+
+func printRawWithPII(data json.RawMessage, contexts ...pii.JSONContext) error {
+	redacted, err := redactRawWithPII(data, contexts...)
+	if err != nil {
+		return err
 	}
 	return output.PrintRaw(redacted)
 }

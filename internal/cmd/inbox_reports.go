@@ -70,11 +70,15 @@ func newReportFamilyCmd(name string, path string) *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return output.PrintRaw(data)
+				return printRawWithPII(data, reportPIIContext)
+			}
+			presented, err := redactRawWithPII(data, reportPIIContext)
+			if err != nil {
+				return err
 			}
 			return output.Print("table", []string{"report", "summary"}, []map[string]string{{
 				"report":  name,
-				"summary": truncate(string(data), 120),
+				"summary": truncate(string(presented), 120),
 			}})
 		},
 	}

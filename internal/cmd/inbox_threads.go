@@ -117,9 +117,9 @@ func threadsListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanThread)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanThread)), conversationPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, func(ctx context.Context, p url.Values) (json.RawMessage, error) {
@@ -366,7 +366,7 @@ func threadsSourceCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(data)
+				return printRawWithPII(data, conversationPIIContext)
 			}
 			engine, err := newPIIEngine()
 			if err != nil {

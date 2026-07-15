@@ -78,7 +78,9 @@ func (d *Detector) DetectNames(text string) ([]pii.NameSpan, error) {
 	for _, c := range chunks {
 		spans, err := d.runChunk(c.text)
 		if err != nil {
-			continue // skip failed chunks, detect what we can
+			// Partial NER results are unsafe: callers cannot distinguish a clean
+			// chunk from one that was never inspected.
+			return nil, fmt.Errorf("detecting names at byte %d: %w", c.offset, err)
 		}
 		// Adjust offsets back to the original text.
 		for i := range spans {

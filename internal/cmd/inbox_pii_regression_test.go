@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/operator-kit/hs-cli/internal/output"
@@ -31,6 +34,33 @@ func executePIIFixtureCommand(
 	format = outputFormat
 	require.NoError(t, execute())
 	return buf.String()
+}
+
+func TestPIIOutputBoundary_FailsClosedForInvalidJSON(t *testing.T) {
+	previousOutput := output.Out
+	saveRestore(t)
+	buf := setupTest(&mockClient{})
+	t.Cleanup(func() { output.Out = previousOutput })
+
+	cfg.InboxPIIMode = "all"
+	err := printRawWithPII(json.RawMessage(`alice.critical@example.com`))
+	require.Error(t, err)
+	assert.Empty(t, buf.String(), "invalid JSON must never fall back to raw output")
+}
+
+func TestPIIOutputBoundary_AllInboxJSONUsesPresenter(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "inbox_") || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == "inbox_pii_helpers.go" {
+			continue
+		}
+		contents, readErr := os.ReadFile(filepath.Clean(name))
+		require.NoError(t, readErr)
+		assert.NotContains(t, string(contents), "output.PrintRaw(", "%s bypasses the PII JSON presenter", name)
+	}
 }
 
 func TestPIIRegression_Critical01_CustomersModeRedactsTopLevelCustomerJSON(t *testing.T) {
@@ -90,52 +120,64 @@ func TestPIIRegression_Critical01_CustomersModeRedactsTopLevelCustomerJSON(t *te
 
 func TestPIIRegression_Critical02_PIIBearingCommandsCannotBypassRedaction(t *testing.T) {
 	t.Run("rating comments", func(t *testing.T) {
-		mock := &mockClient{
-			GetRatingFn: func(context.Context, string) (json.RawMessage, error) {
-				return json.RawMessage(`{
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetRatingFn: func(context.Context, string) (json.RawMessage, error) {
+						return json.RawMessage(`{
 					"id": 7,
 					"rating": "great",
 					"comments": "Please follow up with alice.critical@example.com"
 				}`), nil
-			},
-		}
-		command := newRatingsCmd()
-		command.SetArgs([]string{"get", "7"})
-		out := executePIIFixtureCommand(t, mock, "all", "json-full", command.Execute)
+					},
+				}
+				command := newRatingsCmd()
+				command.SetArgs([]string{"get", "7"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
 
-		assert.NotContains(t, out, criticalPIIEmail, "rating comments must pass through the PII output boundary")
+				assert.NotContains(t, out, criticalPIIEmail, "rating comments must pass through the PII output boundary")
+			})
+		}
 	})
 
 	t.Run("report payloads", func(t *testing.T) {
-		mock := &mockClient{
-			GetReportFn: func(context.Context, string, url.Values) (json.RawMessage, error) {
-				return json.RawMessage(`{
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetReportFn: func(context.Context, string, url.Values) (json.RawMessage, error) {
+						return json.RawMessage(`{
 					"customers": [{"id": 101, "email": "alice.critical@example.com"}]
 				}`), nil
-			},
-		}
-		command := newReportsCmd()
-		command.SetArgs([]string{"customers"})
-		out := executePIIFixtureCommand(t, mock, "all", "json-full", command.Execute)
+					},
+				}
+				command := newReportsCmd()
+				command.SetArgs([]string{"customers"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
 
-		assert.NotContains(t, out, criticalPIIEmail, "report payloads must pass through the PII output boundary")
+				assert.NotContains(t, out, criticalPIIEmail, "report payloads must pass through the PII output boundary")
+			})
+		}
 	})
 
 	t.Run("attachment metadata", func(t *testing.T) {
-		mock := &mockClient{
-			GetAttachmentDataFn: func(context.Context, string, string) (json.RawMessage, error) {
-				return json.RawMessage(`{
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetAttachmentDataFn: func(context.Context, string, string) (json.RawMessage, error) {
+						return json.RawMessage(`{
 					"filename": "alice.critical@example.com",
 					"mimeType": "text/plain",
 					"data": "c2Vuc2l0aXZl"
 				}`), nil
-			},
-		}
-		command := newConversationAttachmentsCmd()
-		command.SetArgs([]string{"get", "42", "9"})
-		out := executePIIFixtureCommand(t, mock, "all", "json-full", command.Execute)
+					},
+				}
+				command := newConversationAttachmentsCmd()
+				command.SetArgs([]string{"get", "42", "9"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
 
-		assert.NotContains(t, out, criticalPIIEmail, "attachment metadata must pass through the PII output boundary")
+				assert.NotContains(t, out, criticalPIIEmail, "attachment metadata must pass through the PII output boundary")
+			})
+		}
 	})
 
 	t.Run("conversation custom-field values", func(t *testing.T) {

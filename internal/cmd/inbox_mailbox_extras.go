@@ -30,12 +30,12 @@ func newMailboxFoldersCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "folders")
 			if err != nil {
 				if isJSON() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
 				return err
 			}
 			if isJSON() {
-				return output.PrintRaw(mustMarshal(items))
+				return printRawWithPII(mustMarshal(items))
 			}
 
 			rows := make([]map[string]string, len(items))
@@ -79,12 +79,12 @@ func newMailboxCustomFieldsCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "customFields", "fields")
 			if err != nil {
 				if isJSON() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
 				return err
 			}
 			if isJSON() {
-				return output.PrintRaw(mustMarshal(items))
+				return printRawWithPII(mustMarshal(items))
 			}
 
 			rows := make([]map[string]string, len(items))
@@ -122,7 +122,7 @@ func newMailboxRoutingCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return output.PrintRaw(data)
+				return printRawWithPII(data)
 			}
 			return output.Print("table", []string{"mailbox_id", "routing"}, []map[string]string{{
 				"mailbox_id": args[0],

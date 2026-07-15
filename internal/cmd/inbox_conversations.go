@@ -140,9 +140,9 @@ func conversationsListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)), conversationPIIContext)
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListConversations, params, "conversations", noPaginate)
@@ -223,9 +223,9 @@ func conversationsGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanConversation)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanConversation)), conversationPIIContext)
 			}
 
 			var c types.Conversation
@@ -438,7 +438,7 @@ func newConversationTagsCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return output.PrintRaw(mustMarshal(map[string]any{"tags": tags}))
+				return printRawWithPII(mustMarshal(map[string]any{"tags": tags}), conversationPIIContext)
 			}
 			for _, tag := range tags {
 				fmt.Fprintln(output.Out, tag)

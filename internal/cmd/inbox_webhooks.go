@@ -74,9 +74,9 @@ func webhooksListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return output.PrintRaw(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items))
 				}
-				return output.PrintRaw(mustMarshal(cleanRawItems(items, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanMinimal)))
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListWebhooks, params, "webhooks", noPaginate)
@@ -132,9 +132,9 @@ func webhooksGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
-				return output.PrintRaw(mustMarshal(cleanRawObject(data, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanMinimal)))
 			}
 
 			var w types.Webhook

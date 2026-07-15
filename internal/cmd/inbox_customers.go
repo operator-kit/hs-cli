@@ -158,9 +158,9 @@ func customersListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), customerPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)), customerPIIContext)
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListCustomers, params, "customers", noPaginate)
@@ -215,9 +215,9 @@ func customersGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, customerPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanCustomer)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanCustomer)), customerPIIContext)
 			}
 
 			var c types.Customer

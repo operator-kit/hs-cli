@@ -36,16 +36,16 @@ func newSavedRepliesCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "savedReplies", "saved-replies")
 			if err != nil {
 				if isJSON() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
 				return err
 			}
 
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items))
 				}
-				return output.PrintRaw(mustMarshal(cleanRawItems(items, cleanSavedReply)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanSavedReply)))
 			}
 
 			replies := make([]types.SavedReply, 0, len(items))
@@ -81,9 +81,9 @@ func newSavedRepliesCmd() *cobra.Command {
 			}
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
-				return output.PrintRaw(mustMarshal(cleanRawObject(data, cleanSavedReply)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanSavedReply)))
 			}
 
 			var r types.SavedReply

@@ -33,6 +33,8 @@ func TestDebugTransport_LogsRequestAndResponse(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "https://api.helpscout.net/v2/mailboxes", nil)
 	req.Header.Set("Authorization", "Bearer secret-token")
+	req.Header.Set("Cookie", "session=alice.critical@example.com")
+	req.Header.Set("X-Api-Key", "private-api-key")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := dt.RoundTrip(req)
@@ -43,6 +45,8 @@ func TestDebugTransport_LogsRequestAndResponse(t *testing.T) {
 	assert.Contains(t, log, "GET https://api.helpscout.net/v2/mailboxes")
 	assert.Contains(t, log, "[redacted]")
 	assert.NotContains(t, log, "secret-token")
+	assert.NotContains(t, log, "alice.critical@example.com")
+	assert.NotContains(t, log, "private-api-key")
 	assert.Contains(t, log, "200 OK")
 	assert.Contains(t, log, `{"id":1}`)
 
@@ -51,7 +55,7 @@ func TestDebugTransport_LogsRequestAndResponse(t *testing.T) {
 	assert.Equal(t, `{"id":1}`, string(body))
 }
 
-func TestDebugTransport_LogsRequestBody(t *testing.T) {
+func TestDebugTransport_PreservesRequestBodyAndSanitizesLog(t *testing.T) {
 	var buf bytes.Buffer
 	dt := &debugTransport{
 		base: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -74,7 +78,8 @@ func TestDebugTransport_LogsRequestBody(t *testing.T) {
 	require.NoError(t, err)
 
 	log := buf.String()
-	assert.Contains(t, log, `{"text":"hello"}`)
+	assert.NotContains(t, log, `{"text":"hello"}`)
+	assert.Contains(t, log, "redacted")
 }
 
 func TestPIIRegression_Critical03_DebugTransportDoesNotPersistPII(t *testing.T) {

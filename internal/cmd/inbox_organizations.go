@@ -188,9 +188,9 @@ func newOrganizationConversationsCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)), conversationPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, fetch, params, "conversations", noPaginate)
@@ -248,9 +248,9 @@ func newOrganizationCustomersCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), customerPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)), customerPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, fetch, params, "customers", noPaginate)

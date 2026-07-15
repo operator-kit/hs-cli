@@ -2,7 +2,10 @@ package pii
 
 import (
 	"regexp"
+	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 type textRule struct {
@@ -33,7 +36,7 @@ var (
 	addressMainRe    = regexp.MustCompile(`(?i)(\d+[-\s]?\w*|\d+-\d+-\d+)[\s,]+([A-Za-z\p{L}]+([\s'-][A-Za-z\p{L}]+)*[\s,]+)+(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Place|Pl|Boulevard|Blvd|Way|Plaza|Square|Sq|Court|Ct|Terrace|Ter|Circle|Cir|Alley|Row|Highway|Hwy|Parkway|Pkwy|Path|Trail|Tr|Crescent|Cres|Rue|Strasse|Straße|Calle|Via|Viale|Avenida|Carrer|Straat|Gasse|Weg|Camino|Ulica|Utca|Prospekt|Dori|Jalan|Marg|Dao|Jie|Lu|út|de la|del|di|van|von)\b`)
 	zipRe            = regexp.MustCompile(`\b\d{5}(?:[-\s]\d{4})?\b`)
 	poBoxRe          = regexp.MustCompile(`(?i)P\.? ?O\.? Box \d+`)
-	linkRe = regexp.MustCompile(`(?:(?:https?:\/\/)?(?:[a-z0-9.\-]+|www|[a-z0-9.\-])[.](?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?]))`)
+	linkRe           = regexp.MustCompile(`(?:(?:https?:\/\/)?(?:[a-z0-9.\-]+|www|[a-z0-9.\-])[.](?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?]))`)
 )
 
 var textRules = []textRule{
@@ -59,7 +62,8 @@ var textRules = []textRule{
 // RedactTextNotice is shown for freeform text when NER is not installed.
 const RedactTextNotice = `[redacted — run "hs pii-model install" for content]`
 
-// RedactText redacts free-form text using known identities followed by regex sweeps.
+// RedactText redacts free-form text using NER byte spans, known identities, and
+// regex sweeps.
 // When NER is available, names are detected via ML. Without NER, freeform text is
 // hidden entirely (structured field redaction still works).
 //
@@ -76,46 +80,50 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 		return RedactTextNotice
 	}
 
-	// Partition known identities: redact vs protect based on mode.
+	// Partition known identities: redact vs protect based on mode. Redactable
+	// known names are handled after NER so they retain their personKey-based
+	// deterministic display identity.
 	var toRedact []KnownIdentity
 	protected := map[string]bool{}
+	knownNames := map[string]bool{}
 	for _, id := range known {
 		if e.ShouldRedactType(id.Type) {
 			toRedact = append(toRedact, id)
+			protectIdentityNames(knownNames, id)
 		} else {
 			protectIdentityNames(protected, id)
 		}
 	}
 
-	// 1. Detect names via NER on ORIGINAL text (natural language, best accuracy)
-	nerNames, _ := e.ner.DetectNames(text)
+	// Detect names on the original text, where model offsets and natural-language
+	// context are still valid. A detector failure hides the field rather than
+	// returning partially inspected content.
+	nerNames, err := e.ner.DetectNames(text)
+	if err != nil {
+		return RedactTextNotice
+	}
 
-	// 2. Known identity replacement (only redactable types)
-	out, inserted := e.redactKnown(text, toRedact)
-
-	// 3. Replace NER-detected names not already handled and not protected
+	edits := make([]textEdit, 0, len(nerNames))
 	for _, span := range nerNames {
-		name := span.Text
-		if inserted[name] || protected[canonical(name)] {
-			continue
+		start, end, ok := resolveNameSpan(text, span)
+		if !ok {
+			return RedactTextNotice
 		}
-		skip := false
-		for _, w := range strings.Fields(name) {
-			if inserted[w] || protected[canonical(w)] {
-				skip = true
-				break
-			}
-		}
-		if skip {
+		name := text[start:end]
+		if identityNameMatches(name, protected) || identityNameMatches(name, knownNames) {
 			continue
 		}
 		fp := e.fakePersonForKey("name:" + canonical(name))
-		fakeFull := fp.First + " " + fp.Last
-		out = replaceWordInsensitive(out, name, fakeFull)
-		inserted[fakeFull] = true
+		edits = append(edits, textEdit{
+			start:       start,
+			end:         end,
+			replacement: fp.First + " " + fp.Last,
+		})
 	}
+	out := applyTextEdits(text, edits)
+	out, _ = e.redactKnown(out, toRedact)
 
-	// 4. Regex sweep — email, phone, SSN, address, etc. (no name regex)
+	// Regex sweep — email, phone, SSN, address, etc. (no name regex)
 	ssnContext := ssnContextRe.MatchString(out)
 	for _, rule := range textRules {
 		out = applyRegexWithContext(out, rule.re, func(match string, start, end int, full string) string {
@@ -131,6 +139,106 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 				return e.token(rule.kind, match)
 			}
 		})
+	}
+	return out
+}
+
+type textEdit struct {
+	start       int
+	end         int
+	replacement string
+}
+
+func resolveNameSpan(text string, span NameSpan) (int, int, bool) {
+	if validByteRange(text, span.Start, span.End) && (span.Text == "" || canonical(span.Text) == canonical(text[span.Start:span.End])) {
+		return span.Start, span.End, true
+	}
+	if strings.TrimSpace(span.Text) == "" {
+		return 0, 0, false
+	}
+
+	// Tokenizers occasionally report an offset adjacent to the source span.
+	// Recover only an exact literal occurrence, choosing the one closest to the
+	// reported position; otherwise fail closed.
+	re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(span.Text))
+	matches := re.FindAllStringIndex(text, -1)
+	if len(matches) == 0 {
+		return 0, 0, false
+	}
+	best := matches[0]
+	bestDistance := absoluteDistance(best[0], span.Start)
+	for _, match := range matches[1:] {
+		if distance := absoluteDistance(match[0], span.Start); distance < bestDistance {
+			best = match
+			bestDistance = distance
+		}
+	}
+	if !validByteRange(text, best[0], best[1]) {
+		return 0, 0, false
+	}
+	return best[0], best[1], true
+}
+
+func validByteRange(text string, start, end int) bool {
+	if start < 0 || end <= start || end > len(text) {
+		return false
+	}
+	if start > 0 && !utf8.RuneStart(text[start]) {
+		return false
+	}
+	if end < len(text) && !utf8.RuneStart(text[end]) {
+		return false
+	}
+	return utf8.ValidString(text[start:end])
+}
+
+func absoluteDistance(a, b int) int {
+	if a < b {
+		return b - a
+	}
+	return a - b
+}
+
+func identityNameMatches(name string, identities map[string]bool) bool {
+	if identities[canonical(name)] {
+		return true
+	}
+	for _, word := range strings.Fields(name) {
+		if identities[canonical(word)] {
+			return true
+		}
+	}
+	return false
+}
+
+// applyTextEdits applies byte-offset edits from right to left. Overlapping
+// model spans are coalesced so no uncovered suffix can leak.
+func applyTextEdits(text string, edits []textEdit) string {
+	if len(edits) == 0 {
+		return text
+	}
+	sort.SliceStable(edits, func(i, j int) bool {
+		if edits[i].start == edits[j].start {
+			return edits[i].end > edits[j].end
+		}
+		return edits[i].start < edits[j].start
+	})
+
+	filtered := edits[:0]
+	for _, edit := range edits {
+		if len(filtered) > 0 && edit.start < filtered[len(filtered)-1].end {
+			if edit.end > filtered[len(filtered)-1].end {
+				filtered[len(filtered)-1].end = edit.end
+			}
+			continue
+		}
+		filtered = append(filtered, edit)
+	}
+
+	out := text
+	for i := len(filtered) - 1; i >= 0; i-- {
+		edit := filtered[i]
+		out = out[:edit.start] + edit.replacement + out[edit.end:]
 	}
 	return out
 }
@@ -214,7 +322,6 @@ func (e *Engine) redactKnown(text string, known []KnownIdentity) (string, map[st
 	return out, inserted
 }
 
-
 func applyRegexWithContext(text string, re *regexp.Regexp, fn func(match string, start, end int, full string) string) string {
 	idxs := re.FindAllStringIndex(text, -1)
 	if len(idxs) == 0 {
@@ -251,6 +358,58 @@ func replaceWordInsensitive(text, literal, replacement string) string {
 	if literal == "" {
 		return text
 	}
-	re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(literal) + `\b`)
-	return re.ReplaceAllString(text, replacement)
+	re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(literal))
+	indices := re.FindAllStringIndex(text, -1)
+	if len(indices) == 0 {
+		return text
+	}
+
+	requireBoundaries := !containsBoundarylessScript(literal)
+	var b strings.Builder
+	last := 0
+	for _, idx := range indices {
+		start, end := idx[0], idx[1]
+		if requireBoundaries && (!hasLeftWordBoundary(text, start) || !hasRightWordBoundary(text, end)) {
+			continue
+		}
+		b.WriteString(text[last:start])
+		b.WriteString(replacement)
+		last = end
+	}
+	if last == 0 {
+		return text
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+func hasLeftWordBoundary(text string, index int) bool {
+	if index == 0 {
+		return true
+	}
+	r, _ := utf8.DecodeLastRuneInString(text[:index])
+	return !isWordRune(r)
+}
+
+func hasRightWordBoundary(text string, index int) bool {
+	if index == len(text) {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(text[index:])
+	return !isWordRune(r)
+}
+
+func isWordRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsMark(r)
+}
+
+// These scripts commonly omit whitespace between words, so a literal NER or
+// known-identity match must not depend on surrounding Unicode word boundaries.
+func containsBoundarylessScript(value string) bool {
+	for _, r := range value {
+		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul, unicode.Thai, unicode.Lao, unicode.Khmer, unicode.Myanmar) {
+			return true
+		}
+	}
+	return false
 }

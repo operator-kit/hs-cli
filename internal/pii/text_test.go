@@ -1,6 +1,7 @@
 package pii
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -114,6 +115,18 @@ func TestRedactText_MultipleNERSpans(t *testing.T) {
 	out := e.RedactText("Alice Smith met Bob Jones today", nil)
 	if strings.Contains(out, "Alice Smith") || strings.Contains(out, "Bob Jones") {
 		t.Fatalf("both NER names should be redacted: %q", out)
+	}
+}
+
+func TestRedactText_OverlappingNERSpansCoverUnion(t *testing.T) {
+	d := nerWith(
+		NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.95},
+		NameSpan{Text: "Smith-Jones", Start: 6, End: 17, Score: 0.90},
+	)
+	e := NewEngine(ModeAll, "", WithNER(d))
+	out := e.RedactText("Alice Smith-Jones replied", nil)
+	if strings.Contains(out, "Alice") || strings.Contains(out, "Smith") || strings.Contains(out, "Jones") {
+		t.Fatalf("overlapping NER spans should redact their full union: %q", out)
 	}
 }
 
@@ -289,6 +302,19 @@ func TestRedactText_PlainTextNoNames(t *testing.T) {
 	out := e.RedactText(text, nil)
 	if out != text {
 		t.Fatalf("no-PII text should pass through, got: %q", out)
+	}
+}
+
+type failingNameDetector struct{}
+
+func (failingNameDetector) DetectNames(string) ([]NameSpan, error) {
+	return nil, errors.New("inference failed")
+}
+
+func TestRedactText_NERFailureFailsClosed(t *testing.T) {
+	e := NewEngine(ModeAll, "", WithNER(failingNameDetector{}))
+	if out := e.RedactText("Alice Smith needs help", nil); out != RedactTextNotice {
+		t.Fatalf("detector failure must hide the field, got %q", out)
 	}
 }
 

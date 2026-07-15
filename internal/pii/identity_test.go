@@ -30,6 +30,22 @@ func TestRedactPersonDeterministic(t *testing.T) {
 	}
 }
 
+func TestRedactPerson_DisplayIdentityCompatibility(t *testing.T) {
+	// Pin the public display identity contract: canonical email remains the
+	// identity key and a stable secret produces the same pseudonym across runs.
+	e := NewEngine(ModeAll, "stable-secret")
+	first, last, email := e.RedactPerson("Alice", "Smith", "ALICE@example.com ")
+	if first != "Jordan" || last != "Mitchell" || email != "jordan.mitchell-19f9@anon.local" {
+		t.Fatalf("display identity changed: got %q %q <%s>", first, last, email)
+	}
+
+	e2 := NewEngine(ModeAll, "stable-secret")
+	first2, last2, email2 := e2.RedactPerson("Different", "Name", "alice@example.com")
+	if first2 != first || last2 != last || email2 != email {
+		t.Fatalf("canonical email should retain the same display identity across engines")
+	}
+}
+
 func TestRedactText_WithoutNER_ReturnsNotice(t *testing.T) {
 	e := NewEngine(ModeAll, "")
 	out := e.RedactText("Hello from Alice Smith", nil)

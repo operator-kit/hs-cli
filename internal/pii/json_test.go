@@ -119,6 +119,53 @@ func TestRedactJSON_FirstNameLastNameVariant(t *testing.T) {
 	}
 }
 
+func TestRedactJSONWithContext_TopLevelEntityPolicy(t *testing.T) {
+	input := json.RawMessage(`{"firstName":"Alice","lastName":"Smith","email":"alice@test.com"}`)
+
+	customerEngine := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	customer, err := customerEngine.RedactJSONWithContext(input, JSONContext{RootEntity: "customer", Resource: ResourceCustomer})
+	if err != nil {
+		t.Fatalf("customer context: %v", err)
+	}
+	if strings.Contains(string(customer), "alice@test.com") {
+		t.Fatalf("explicit customer root should be redacted: %s", customer)
+	}
+
+	userEngine := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	user, err := userEngine.RedactJSONWithContext(input, JSONContext{RootEntity: "user", Resource: ResourceUser})
+	if err != nil {
+		t.Fatalf("user context: %v", err)
+	}
+	if !strings.Contains(string(user), "alice@test.com") {
+		t.Fatalf("explicit user root should be preserved in customers mode: %s", user)
+	}
+}
+
+func TestRedactJSONWithContext_PathAwareSensitiveValues(t *testing.T) {
+	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	input := json.RawMessage(`{
+		"status": {"value": "active"},
+		"customFields": [{"name": "contact", "value": "alice@test.com"}],
+		"attachments": [{"filename": "alice@test.com", "data": "c2VjcmV0"}]
+	}`)
+	out, err := e.RedactJSONWithContext(input, JSONContext{Resource: ResourceConversation})
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, `"value":"active"`) {
+		t.Fatalf("ordinary value fields must retain semantics: %s", s)
+	}
+	for _, sensitive := range []string{"alice@test.com", "c2VjcmV0"} {
+		if strings.Contains(s, sensitive) {
+			t.Fatalf("sensitive value %q was not redacted: %s", sensitive, s)
+		}
+	}
+	if !strings.Contains(s, RedactedOpaqueData) {
+		t.Fatalf("attachment data should be replaced with an opaque marker: %s", s)
+	}
+}
+
 func TestRedactJSON_SentinelPersonSkipped(t *testing.T) {
 	e := NewEngine(ModeAll, "", WithNER(noNER()))
 	// Sentinel: id=0 should be skipped
@@ -340,6 +387,13 @@ func TestInferEntityType_FromMap(t *testing.T) {
 	m := map[string]any{"type": "customer", "first": "Alice"}
 	if got := inferEntityType(m, "person", ""); got != "customer" {
 		t.Fatalf("expected customer from map type, got %q", got)
+	}
+}
+
+func TestInferEntityType_ExplicitKeyPrecedesShapeDefault(t *testing.T) {
+	m := map[string]any{"firstName": "Ross", "lastName": "M"}
+	if got := inferEntityType(m, "assignee", ""); got != "user" {
+		t.Fatalf("expected assignee key to classify user-shaped map, got %q", got)
 	}
 }
 

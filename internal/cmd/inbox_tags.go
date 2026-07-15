@@ -45,7 +45,7 @@ func tagsListCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return output.PrintRaw(mustMarshal(items))
+				return printRawWithPII(mustMarshal(items))
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListTags, params, "tags", noPaginate)
@@ -93,7 +93,7 @@ func tagsGetCmd() *cobra.Command {
 			}
 
 			if isJSON() {
-				return output.PrintRaw(data)
+				return printRawWithPII(data)
 			}
 
 			var t types.Tag

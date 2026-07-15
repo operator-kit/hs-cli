@@ -66,9 +66,9 @@ func usersListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)), userPIIContext)
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListUsers, params, "users", noPaginate)
@@ -123,9 +123,9 @@ func usersGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)), userPIIContext)
 			}
 
 			var u types.User
@@ -161,9 +161,9 @@ func usersMeCmd() *cobra.Command {
 			}
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)), userPIIContext)
 			}
 
 			var u types.User
@@ -215,12 +215,12 @@ func newUsersStatusCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "statuses", "userStatuses", "status")
 			if err != nil {
 				if isJSON() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(mustMarshal(items))
+				return printRawWithPII(mustMarshal(items), userPIIContext)
 			}
 
 			rows := make([]map[string]string, len(items))
@@ -247,7 +247,7 @@ func newUsersStatusCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(data)
+				return printRawWithPII(data, userPIIContext)
 			}
 			return output.Print("table", []string{"user_id", "status"}, []map[string]string{{
 				"user_id": args[0],
