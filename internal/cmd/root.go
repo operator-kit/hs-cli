@@ -12,6 +12,7 @@ import (
 	"github.com/operator-kit/hs-cli/internal/auth"
 	"github.com/operator-kit/hs-cli/internal/config"
 	"github.com/operator-kit/hs-cli/internal/permission"
+	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/operator-kit/hs-cli/internal/selfupdate"
 )
 
@@ -52,13 +53,20 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		startUpdateCheck(cmd)
-
 		var err error
 		cfg, err = config.Load(cfgPath)
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
 		}
+		if commandUsesInboxPII(cmd) {
+			mode, modeErr := pii.ParseMode(cfg.InboxPIIMode)
+			if modeErr != nil {
+				return fmt.Errorf("invalid Inbox PII mode: %w", modeErr)
+			}
+			cfg.InboxPIIMode = mode.String()
+		}
+
+		startUpdateCheck(cmd)
 		// Flag overrides config
 		if cmd.Flags().Changed("format") {
 			cfg.Format = format
@@ -255,6 +263,10 @@ func isUnderSubtree(cmd *cobra.Command, name string) bool {
 		}
 	}
 	return false
+}
+
+func commandUsesInboxPII(cmd *cobra.Command) bool {
+	return cmd.Name() == "mcp" || isUnderSubtree(cmd, "inbox")
 }
 
 func shouldShowUsageForError(err error) bool {

@@ -233,13 +233,11 @@ func TestRedactText_EmailInText_StaysRedacted(t *testing.T) {
 
 func TestEngineMode(t *testing.T) {
 	tests := []struct {
-		mode, want string
+		mode, want Mode
 	}{
-		{"all", ModeAll},
-		{"customers", ModeCustomers},
-		{"off", ModeOff},
-		{"", ModeOff},
-		{"unknown", ModeOff},
+		{ModeAll, ModeAll},
+		{ModeCustomers, ModeCustomers},
+		{ModeOff, ModeOff},
 	}
 	for _, tt := range tests {
 		e := NewEngine(tt.mode, "")

@@ -21,8 +21,8 @@ var (
 	attachmentPIIContext   = pii.JSONContext{Resource: pii.ResourceAttachment}
 )
 
-func effectivePIIMode() (string, error) {
-	mode := pii.ModeOff
+func effectivePIIMode() (pii.Mode, error) {
+	mode := ""
 	allowUnredacted := false
 	if cfg != nil {
 		mode = cfg.InboxPIIMode

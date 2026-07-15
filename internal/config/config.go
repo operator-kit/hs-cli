@@ -33,6 +33,18 @@ func ResolvedPath(path string) string {
 }
 
 func Load(path string) (*Config, error) {
+	cfg, err := LoadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	applyEnv(cfg)
+	return cfg, nil
+}
+
+// LoadFile reads only persisted configuration. Environment overrides are
+// deliberately excluded so callers that mutate configuration cannot persist
+// process-local credentials or policy values by accident.
+func LoadFile(path string) (*Config, error) {
 	if path == "" {
 		path = DefaultPath()
 	}
@@ -41,7 +53,6 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			applyEnv(cfg)
 			return cfg, nil
 		}
 		return nil, err
@@ -49,7 +60,6 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
-	applyEnv(cfg)
 	return cfg, nil
 }
 

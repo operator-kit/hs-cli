@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -223,4 +224,67 @@ func TestConfigSet_InvalidPIIMode(t *testing.T) {
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid --inbox-pii-mode")
+}
+
+func TestConfigSet_RepairsInvalidPIIModeAndPreservesFileFields(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte(`inbox_app_id: original-id
+inbox_app_secret: original-secret
+inbox_default_mailbox: 42
+inbox_pii_mode: typo
+format: json
+`), 0o600))
+	t.Setenv("HS_INBOX_APP_ID", "environment-id")
+	t.Setenv("HS_INBOX_APP_SECRET", "environment-secret")
+	t.Setenv("HS_INBOX_PII_MODE", "all")
+
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", " Customers "})
+	require.NoError(t, rootCmd.Execute())
+
+	stored, err := config.LoadFile(cfgPath)
+	require.NoError(t, err)
+	assert.Equal(t, "original-id", stored.InboxAppID)
+	assert.Equal(t, "original-secret", stored.InboxAppSecret)
+	assert.Equal(t, 42, stored.InboxDefaultMailbox)
+	assert.Equal(t, "json", stored.Format)
+	assert.Equal(t, "customers", stored.InboxPIIMode)
+}
+
+func TestConfigSet_InvalidStoredModeRequiresModeRepair(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte("inbox_app_id: original\ninbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+
+	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "replacement"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inbox_pii_mode")
+
+	stored, readErr := os.ReadFile(cfgPath)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(stored), "inbox_app_id: original")
+}
+
+func TestConfigSet_MalformedYAMLIsNotOverwritten(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	const malformed = "{{{invalid"
+	require.NoError(t, os.WriteFile(cfgPath, []byte(malformed), 0o600))
+
+	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", "all"})
+	require.Error(t, rootCmd.Execute())
+
+	stored, err := os.ReadFile(cfgPath)
+	require.NoError(t, err)
+	assert.Equal(t, malformed, string(stored))
 }

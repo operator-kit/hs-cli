@@ -202,3 +202,65 @@ func TestPIIRegression_Critical02_PIIBearingCommandsCannotBypassRedaction(t *tes
 		assert.NotContains(t, out, criticalPIIEmail, "custom-field values must be scanned for PII")
 	})
 }
+
+func TestPIIRegression_High06_InvalidModeStopsBeforeInboxAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileMode string
+		envMode  string
+	}{
+		{name: "file", fileMode: "typo"},
+		{name: "environment", fileMode: "customers", envMode: "typo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home, buf := setupE2E(t)
+			cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+			require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: "+tt.fileMode+"\n"), 0o600))
+			t.Setenv("HS_INBOX_PII_MODE", tt.envMode)
+
+			apiCalled := false
+			apiClient = &mockClient{
+				ListMailboxesFn: func(context.Context, url.Values) (json.RawMessage, error) {
+					apiCalled = true
+					return json.RawMessage(`{"_embedded":{"mailboxes":[{"id":1,"name":"PII fixture"}]}}`), nil
+				},
+			}
+			previousOutput := output.Out
+			output.Out = buf
+			t.Cleanup(func() { output.Out = previousOutput })
+
+			rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+			err := rootCmd.Execute()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "PII mode")
+			assert.False(t, apiCalled)
+			assert.NotContains(t, buf.String(), "PII fixture")
+		})
+	}
+}
+
+func TestPIIRegression_High06_InvalidModeStopsMCPStartup(t *testing.T) {
+	home, _ := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+
+	rootCmd.SetArgs([]string{"mcp"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PII mode")
+}
+
+func TestPIIRegression_High06_InvalidModeDoesNotBlockVersion(t *testing.T) {
+	home, buf := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+	SetVersion("1.2.3", "abc123", "2026-07-15")
+
+	rootCmd.SetArgs([]string{"version"})
+	require.NoError(t, rootCmd.Execute())
+	assert.Contains(t, buf.String(), "1.2.3")
+}

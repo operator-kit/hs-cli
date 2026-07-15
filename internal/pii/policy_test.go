@@ -1,55 +1,59 @@
 package pii
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-func TestNormalizeMode(t *testing.T) {
+func TestParseMode(t *testing.T) {
 	tests := []struct {
+		name string
 		in   string
-		want string
+		want Mode
 	}{
-		{in: "", want: ModeOff},
-		{in: "off", want: ModeOff},
-		{in: "customers", want: ModeCustomers},
-		{in: "all", want: ModeAll},
-		{in: "unknown", want: ModeOff},
+		{name: "empty defaults off", in: "", want: ModeOff},
+		{name: "off", in: "off", want: ModeOff},
+		{name: "customers", in: "customers", want: ModeCustomers},
+		{name: "all", in: "all", want: ModeAll},
+		{name: "case and whitespace", in: "  Customers ", want: ModeCustomers},
 	}
 	for _, tt := range tests {
-		if got := NormalizeMode(tt.in); got != tt.want {
-			t.Fatalf("NormalizeMode(%q) = %q, want %q", tt.in, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseMode(tt.in)
+			if err != nil {
+				t.Fatalf("ParseMode(%q) returned error: %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Fatalf("ParseMode(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 
-func TestIsValidMode(t *testing.T) {
-	valid := []string{"off", "customers", "all"}
-	for _, v := range valid {
-		if !IsValidMode(v) {
-			t.Fatalf("IsValidMode(%q) = false, want true", v)
-		}
-	}
-	for _, v := range []string{"foo", "none", "partial"} {
-		if IsValidMode(v) {
-			t.Fatalf("IsValidMode(%q) = true, want false", v)
-		}
-	}
-	// Case+whitespace normalization means these ARE valid
-	for _, v := range []string{"ALL", "Customers", " all ", " OFF"} {
-		if !IsValidMode(v) {
-			t.Fatalf("IsValidMode(%q) = false, want true (normalized)", v)
-		}
+func TestParseModeRejectsUnknownValues(t *testing.T) {
+	for _, raw := range []string{"unknown", "none", "partial"} {
+		t.Run(raw, func(t *testing.T) {
+			_, err := ParseMode(raw)
+			if err == nil {
+				t.Fatalf("ParseMode(%q) returned no error", raw)
+			}
+			for _, want := range []string{raw, "off", "customers", "all"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("ParseMode(%q) error %q does not contain %q", raw, err, want)
+				}
+			}
+		})
 	}
 }
 
 func TestIsEnabled(t *testing.T) {
 	tests := []struct {
-		mode string
+		mode Mode
 		want bool
 	}{
-		{"off", false},
-		{"", false},
-		{"customers", true},
-		{"all", true},
-		{"unknown", false},
+		{ModeOff, false},
+		{ModeCustomers, true},
+		{ModeAll, true},
 	}
 	for _, tt := range tests {
 		if got := IsEnabled(tt.mode); got != tt.want {
@@ -60,20 +64,21 @@ func TestIsEnabled(t *testing.T) {
 
 func TestShouldRedactType(t *testing.T) {
 	tests := []struct {
-		mode, entity string
-		want         bool
+		mode   Mode
+		entity string
+		want   bool
 	}{
-		{"off", "customer", false},
-		{"off", "user", false},
-		{"customers", "customer", true},
-		{"customers", "Customer", true}, // case-insensitive
-		{"customers", "user", false},
-		{"customers", "unknown", false},
-		{"customers", "", false},
-		{"all", "customer", true},
-		{"all", "user", true},
-		{"all", "unknown", true},
-		{"all", "", true},
+		{ModeOff, "customer", false},
+		{ModeOff, "user", false},
+		{ModeCustomers, "customer", true},
+		{ModeCustomers, "Customer", true}, // case-insensitive
+		{ModeCustomers, "user", false},
+		{ModeCustomers, "unknown", false},
+		{ModeCustomers, "", false},
+		{ModeAll, "customer", true},
+		{ModeAll, "user", true},
+		{ModeAll, "unknown", true},
+		{ModeAll, "", true},
 	}
 	for _, tt := range tests {
 		if got := ShouldRedactType(tt.mode, tt.entity); got != tt.want {
@@ -83,24 +88,29 @@ func TestShouldRedactType(t *testing.T) {
 }
 
 func TestEffectiveMode(t *testing.T) {
-	mode, err := EffectiveMode(ModeCustomers, false, false)
+	mode, err := EffectiveMode("customers", false, false)
 	if err != nil || mode != ModeCustomers {
 		t.Fatalf("expected customers mode, got mode=%q err=%v", mode, err)
 	}
 
-	mode, err = EffectiveMode(ModeCustomers, true, true)
+	mode, err = EffectiveMode("customers", true, true)
 	if err != nil || mode != ModeOff {
 		t.Fatalf("expected off override, got mode=%q err=%v", mode, err)
 	}
 
-	_, err = EffectiveMode(ModeCustomers, false, true)
+	_, err = EffectiveMode("customers", false, true)
 	if err == nil {
 		t.Fatalf("expected error when override disallowed")
 	}
 
-	mode, err = EffectiveMode(ModeOff, false, true)
+	mode, err = EffectiveMode("off", false, true)
 	if err != nil || mode != ModeOff {
 		t.Fatalf("expected off no-op override, got mode=%q err=%v", mode, err)
 	}
 }
 
+func TestEffectiveModeRejectsInvalidConfiguredMode(t *testing.T) {
+	if _, err := EffectiveMode("typo", true, true); err == nil {
+		t.Fatal("invalid configured mode must fail before applying an override")
+	}
+}

@@ -41,7 +41,7 @@ func WithNER(d NameDetector) EngineOption {
 }
 
 type Engine struct {
-	mode   string
+	mode   Mode
 	secret string
 	ner    NameDetector
 
@@ -56,9 +56,9 @@ type fakePerson struct {
 	Email string
 }
 
-func NewEngine(mode, secret string, opts ...EngineOption) *Engine {
+func NewEngine(mode Mode, secret string, opts ...EngineOption) *Engine {
 	e := &Engine{
-		mode:    NormalizeMode(mode),
+		mode:    mode,
 		secret:  secret,
 		people:  map[string]fakePerson{},
 		replace: map[string]string{},
@@ -69,7 +69,7 @@ func NewEngine(mode, secret string, opts ...EngineOption) *Engine {
 	return e
 }
 
-func (e *Engine) Mode() string {
+func (e *Engine) Mode() Mode {
 	return e.mode
 }
 
@@ -247,4 +247,3 @@ var lastNames = []string{
 	"Lewis", "Long", "Lopez", "Martin", "Miller", "Mitchell", "Moore", "Morgan", "Morris", "Nelson",
 	"Parker", "Perry", "Price", "Reed", "Rivera", "Roberts", "Russell", "Stewart", "Taylor", "Ward",
 }
-
