@@ -77,6 +77,42 @@ func TestDebugTransport_LogsRequestBody(t *testing.T) {
 	assert.Contains(t, log, `{"text":"hello"}`)
 }
 
+func TestPIIRegression_Critical03_DebugTransportDoesNotPersistPII(t *testing.T) {
+	var buf bytes.Buffer
+	const responseBody = `{"comments":"Call Alice at 415-555-0199 or email alice.critical@example.com"}`
+	dt := &debugTransport{
+		base: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Status:     "200 OK",
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(responseBody)),
+			}, nil
+		}),
+		out: &buf,
+	}
+
+	req, err := http.NewRequest(
+		"POST",
+		"https://api.helpscout.net/v2/customers?query=alice.critical%40example.com",
+		strings.NewReader(`{"email":"alice.critical@example.com"}`),
+	)
+	require.NoError(t, err)
+
+	resp, err := dt.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	log := buf.String()
+	assert.NotContains(t, log, "alice.critical%40example.com", "debug logs must sanitize PII in request URLs")
+	assert.NotContains(t, log, "alice.critical@example.com", "debug logs must sanitize PII in request and response bodies")
+	assert.NotContains(t, log, "415-555-0199", "debug logs must sanitize PII in response bodies")
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, responseBody, string(body), "sanitizing logs must not alter the response returned to the caller")
+}
+
 func TestDebugTransport_SkipsAuthRequests(t *testing.T) {
 	var buf bytes.Buffer
 	dt := &debugTransport{

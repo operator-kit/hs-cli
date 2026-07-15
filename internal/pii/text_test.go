@@ -117,6 +117,37 @@ func TestRedactText_MultipleNERSpans(t *testing.T) {
 	}
 }
 
+func TestPIIRegression_Critical04_NERNamesWithUnicodeBoundariesAreRedacted(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		pii  string
+	}{
+		{name: "Arabic", text: "تواصل مع أحمد علي اليوم", pii: "أحمد علي"},
+		{name: "Chinese", text: "客户张伟需要帮助", pii: "张伟"},
+		{name: "accented Latin", text: "Élodie Martin requested help", pii: "Élodie Martin"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			start := strings.Index(tt.text, tt.pii)
+			d := nerWith(NameSpan{
+				Text:  tt.pii,
+				Start: start,
+				End:   start + len(tt.pii),
+				Score: 0.99,
+			})
+			e := NewEngine(ModeAll, "", WithNER(d))
+
+			out := e.RedactText(tt.text, nil)
+			if strings.Contains(out, tt.pii) {
+				t.Fatalf("Unicode name %q should be redacted, got %q", tt.pii, out)
+			}
+		})
+	}
+}
+
 func TestRedactText_NERAndKnownOverlap(t *testing.T) {
 	// NER detects "Alice Smith", known identity also has Alice Smith
 	// Should not double-redact
