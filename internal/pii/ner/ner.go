@@ -8,6 +8,7 @@
 package ner
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -41,7 +42,10 @@ func NewDetector() (*Detector, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ner model not ready: %w", err)
 	}
+	return newDetectorFromPaths(paths)
+}
 
+func newDetectorFromPaths(paths *Paths) (*Detector, error) {
 	rt, err := NewRuntime(paths)
 	if err != nil {
 		return nil, fmt.Errorf("loading onnx runtime: %w", err)
@@ -64,6 +68,28 @@ func NewDetector() (*Detector, error) {
 		tokenizer: tok,
 		labels:    labels,
 	}, nil
+}
+
+func validateRuntimeBundle(ctx context.Context, paths *Paths) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	detector, err := newDetectorFromPaths(paths)
+	if err != nil {
+		return err
+	}
+	defer detector.Close()
+	spans, err := detector.DetectNames("Alice Smith contacted support.")
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(spans) == 0 {
+		return fmt.Errorf("smoke inference did not detect the expected person entity")
+	}
+	return nil
 }
 
 // DetectNames returns person name spans found in text.

@@ -318,6 +318,13 @@ func TestRedactText_NERFailureFailsClosed(t *testing.T) {
 	}
 }
 
+func TestPIIRegression_High07_UnusableRuntimeKeepsFreeTextFailClosed(t *testing.T) {
+	e := mustTestEngine(ModeAll, "")
+	if out := e.RedactText("Alice Smith needs help", nil); out != RedactTextNotice {
+		t.Fatalf("engine without a usable runtime emitted free-form text: %q", out)
+	}
+}
+
 func TestRedactText_NERDeterministicAcrossEngines(t *testing.T) {
 	// Same secret, same NER spans → same output
 	d1 := nerWith(NameSpan{Text: "John Doe", Start: 0, End: 8, Score: 0.95})

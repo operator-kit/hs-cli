@@ -1,6 +1,9 @@
 package ner
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,8 +67,8 @@ func TestModelStatusDistinguishesAbsentAndInstalledUnverified(t *testing.T) {
 	if status.State != ModelInstalledUnverified {
 		t.Fatalf("installed status = %s, want %s", status.State, ModelInstalledUnverified)
 	}
-	if !status.Usable() {
-		t.Fatal("supported legacy bundle should remain usable until trusted migration is installed")
+	if status.Usable() {
+		t.Fatal("unverified legacy bundle reported usable")
 	}
 }
 
@@ -73,15 +76,15 @@ func TestEnsureModelUnsupportedPlatformDoesNotDownloadOrMutateCache(t *testing.T
 	cacheParent := t.TempDir()
 	cacheDir := filepath.Join(cacheParent, "pii-model")
 	downloadCalls := 0
-	_, err := ensureModelAt(
-		Platform{OS: "windows", Arch: "amd64"},
-		cacheDir,
-		nil,
-		func(string, string, ProgressFunc) error {
+	installer := &BundleInstaller{
+		CacheRoot: cacheDir,
+		Platform:  Platform{OS: "windows", Arch: "amd64"},
+		Client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			downloadCalls++
-			return nil
-		},
-	)
+			return nil, errors.New("unexpected request")
+		})},
+	}
+	_, err := installer.Install(context.Background(), nil)
 	if err == nil {
 		t.Fatal("unsupported install returned no error")
 	}

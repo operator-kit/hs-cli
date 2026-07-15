@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "bundle_version": "0.2.0",
+  "model": {
+    "repository": "Xenova/distilbert-base-multilingual-cased-ner-hrl",
+    "revision": "c2a4dbf593c57f47004c5bc2d3770d311aee9c43",
+    "files": [
+      {
+        "source_path": "onnx/model_quantized.onnx",
+        "name": "model_quantized.onnx",
+        "sha256": "24a0b98f4dd4cd92842f5a541272f86f760225a64a29928eddef14bdb2edb986",
+        "size": 135359829
+      },
+      {
+        "source_path": "tokenizer.json",
+        "name": "tokenizer.json",
+        "sha256": "bf1b59b7b11c95f194f51708d918eea378e09d05f84c0e1656dc5180e8117088",
+        "size": 2919362
+      },
+      {
+        "source_path": "config.json",
+        "name": "config.json",
+        "sha256": "38847be4dc6699b1218a749ed69f888c2ccc7b4deba98e3c4a1cac8cb34d54c8",
+        "size": 927
+      }
+    ]
+  },
+  "onnx_runtime": {
+    "version": "1.23.0",
+    "platforms": [
+      {
+        "goos": "darwin",
+        "goarch": "amd64",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-osx-x86_64-1.23.0.tgz",
+        "sha256": "a8e43edcaa349cbfc51578a7fc61ea2b88793ccf077b4bc65aca58999d20cf0f",
+        "size": 11621905,
+        "library_glob": "*/lib/libonnxruntime.1.23.0.dylib",
+        "library_name": "libonnxruntime.dylib"
+      },
+      {
+        "goos": "darwin",
+        "goarch": "arm64",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-osx-arm64-1.23.0.tgz",
+        "sha256": "8182db0ebb5caa21036a3c78178f17fabb98a7916bdab454467c8f4cf34bcfdf",
+        "size": 9962096,
+        "library_glob": "*/lib/libonnxruntime.1.23.0.dylib",
+        "library_name": "libonnxruntime.dylib"
+      },
+      {
+        "goos": "linux",
+        "goarch": "amd64",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-linux-x64-1.23.0.tgz",
+        "sha256": "b6deea7f2e22c10c043019f294a0ea4d2a6c0ae52a009c34847640db75ec5580",
+        "size": 8257032,
+        "library_glob": "*/lib/libonnxruntime.so.1.23.0",
+        "library_name": "libonnxruntime.so"
+      },
+      {
+        "goos": "linux",
+        "goarch": "arm64",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-linux-aarch64-1.23.0.tgz",
+        "sha256": "0b9f47d140411d938e47915824d8daaa424df95a88b5f1fc843172a75168f7a0",
+        "size": 7216713,
+        "library_glob": "*/lib/libonnxruntime.so.1.23.0",
+        "library_name": "libonnxruntime.so"
+      }
+    ]
+  },
+  "limits": {
+    "max_archive_size": 115343360,
+    "max_expanded_size": 188743680
+  }
+}
+
