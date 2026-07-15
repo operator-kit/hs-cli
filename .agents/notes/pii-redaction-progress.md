@@ -18,6 +18,11 @@ during the remediation design discussion and was not part of the original
 numbered list, so it is tracked separately below rather than changing the
 historical numbering.
 
+The implementation-ready design for remaining high issues 5–8 is recorded in
+`pii-redaction-high-issues-implementation-plan.md`. It also includes issue 9
+because provenance verification and transactional installation must ship as
+one model-install boundary.
+
 ## What was already good
 
 The original review found real architectural strengths worth preserving:
