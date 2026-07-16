@@ -1,6 +1,6 @@
 # PII Redaction — Deferred Observations
 
-Last reviewed: 2026-07-15
+Last reviewed: 2026-07-16
 
 This local register tracks PII and privacy observations found outside the
 original remediation of the four critical regressions:
@@ -23,11 +23,11 @@ available for later planning.
 | PII-F04 | High | Complete | Windows can install a model bundle but cannot run the bundled NER runtime. | Windows is now refused until a real runtime smoke test exists. |
 | PII-F05 | High | Complete | Download hashes are generated after download and are not trust anchors. | Resolved with an embedded pinned manifest and source lock. |
 | PII-F06 | Medium | Complete | Model installation is not atomic and lacks explicit size/time limits. | Resolved with the bounded transactional installer. |
-| PII-F07 | Medium | Open | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Move sensitive inputs off argv and reduce MCP subprocess coupling. |
-| PII-F08 | Medium | Open | Fake display names come from small lists and can collide visually. | Add deterministic display disambiguation. |
-| PII-F09 | Medium | Open | Identity canonicalization does not normalize Unicode composition. | Define a versioned Unicode normalization policy. |
-| PII-F10 | Medium | Open | Secret rotation changes every displayed identity with no migration/version marker. | Add key versioning and a rotation policy. |
-| PII-F11 | Medium | Open | There is no measurable multilingual detection-quality corpus. | Build a privacy-focused evaluation suite. |
+| PII-F07 | Medium | Open — reproduced | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Move sensitive inputs off argv and reduce MCP subprocess coupling. |
+| PII-F08 | Medium | Open — reproduced | Fake display names come from small lists and can collide visually. | Add deterministic display disambiguation. |
+| PII-F09 | Medium | Open — reproduced | Identity canonicalization does not normalize Unicode composition. | Define a versioned Unicode normalization policy. |
+| PII-F10 | Medium | Open — reproduced | Secret rotation changes every displayed identity with no migration/version marker. | Add key versioning and a rotation policy. |
+| PII-F11 | Medium | Open — reproduced | There is no measurable multilingual detection-quality corpus. | Build a privacy-focused evaluation suite. |
 
 ## PII-F01 — Identity keys vary across payload shapes
 
@@ -104,6 +104,10 @@ Shorter-term mitigations:
 - mark sensitive tool arguments and omit them from reconstructed errors;
 - never include raw argument values in diagnostic command lines.
 
+Regression: `TestPIIRegression_Medium10_SensitiveMCPInputsStayOffProcessBoundaries`
+currently fails because synthetic sensitive values occur in child argv and MCP
+error output.
+
 ## PII-F08 — Visual pseudonym collisions
 
 Fake first and last names come from small fixed lists. Different identities can
@@ -113,6 +117,9 @@ email suffix.
 Consider a short deterministic display suffix or another collision-resolution
 strategy that remains readable and reveals no source identifier.
 
+Regression: `TestPIIRegression_Medium11_DisplayNamesDisambiguateDistinctPeople`
+currently fails on a deterministic `Casey Stewart` collision.
+
 ## PII-F09 — Unicode normalization of identity keys
 
 Canonicalization lowercases and trims but does not normalize Unicode. Visually
@@ -121,6 +128,9 @@ case-folding and whitespace semantics also need definition.
 
 Any normalization change affects deterministic output and should use a
 versioned key schema with compatibility fixtures.
+
+Regression: `TestPIIRegression_Medium12_IdentityKeysNormalizeUnicodeComposition`
+currently fails for equivalent NFC and NFD name fixtures.
 
 ## PII-F10 — Secret rotation and pseudonym versioning
 
@@ -133,6 +143,9 @@ Define:
 - whether old keys remain available for historical correlation;
 - how operators intentionally reset all pseudonyms;
 - how future cached aliases are migrated or discarded.
+
+Regression: `TestPIIRegression_Medium13_SecretRotationHasAnExplicitKeyIdentifier`
+currently fails because the pseudonym boundary has no opaque rotation-key ID.
 
 ## PII-F11 — Detection quality and observability
 
@@ -149,3 +162,6 @@ Build a synthetic, non-production corpus tracking:
 - performance and memory limits for large conversations and attachments.
 
 Never log raw production samples to build this corpus.
+
+Regression: `TestPIIRegression_Medium14_MultilingualPrivacyCorpusIsMaintained`
+currently fails because the required synthetic, schema-checked corpus is absent.

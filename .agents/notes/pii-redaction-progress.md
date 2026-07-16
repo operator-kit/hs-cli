@@ -7,6 +7,7 @@ Last updated: 2026-07-16
 - Original review findings: **14**
 - Critical findings: **4 of 4 complete**
 - High findings: **4 of 4 complete**
+- Remaining medium findings: **5 of 5 regression-reproduced; 0 fixed**
 - Original findings complete: **9 of 14**
 - Remaining original findings: **5 open**
 - Additional observations raised during remediation: **2 open**
@@ -17,7 +18,7 @@ Last updated: 2026-07-16
   - `0cfa643 fix: require private keys for PII pseudonyms`
   - `f304833 fix: gate PII models by runtime capability`
   - `f4416c3 fix: verify and atomically install PII models`
-- Latest verification:
+- Last green baseline before the intentionally failing medium regressions:
   - `go test ./... -count=1 -timeout=5m`
   - `go vet ./...`
   - digest-pinned Docker race suite via `scripts/test-race.ps1`
@@ -26,6 +27,11 @@ Last updated: 2026-07-16
   - release-script syntax validation with Git Bash
   - embedded archive sizes and SHA-256 values checked against all four
     published `pii-model-v0.2.0` assets
+- Current medium regression verification:
+  - expected failure: `go test ./internal/cmd -run '^TestPIIRegression_Medium10_' -count=1 -v`
+  - expected failure: `go test ./internal/pii -run '^TestPIIRegression_Medium(11|12|13|14)_' -count=1 -v`
+  - green control: `go test ./... -skip '^TestPIIRegression_Medium' -count=1 -timeout=5m`
+  - green static check: `go vet ./...`
 
 Race verification is now complete. CGO was present but disabled, and the
 default GCC configured by Go was absent. The complete suite passes in the
@@ -33,6 +39,10 @@ digest-pinned Docker test environment and natively on Windows with a compatible
 MinGW-w64 compiler, including the Windows-only PII secret-store lock tests.
 Docker is the canonical local dependency; a preflighted native Windows wrapper
 runs in CI for platform-specific coverage.
+
+The medium regression batch deliberately leaves the focused tests red, matching
+the earlier critical workflow. Production fixes for findings 10–14 have not
+started; the rest of the repository remains green when those tests are skipped.
 
 The release workflow requires a real runtime/model smoke test on each
 advertised Linux and Darwin target before publishing; those four jobs will
@@ -101,11 +111,11 @@ particular, `personKey` precedence and fake-person derivation were not changed.
 | 7 | High | Windows can install a model bundle that the bundled runtime cannot execute. | [x] Complete | `PII-F04` |
 | 8 | High | Downloaded model hashes are generated after download and are not independent trust anchors. | [x] Complete | `PII-F05` |
 | 9 | Medium | Model installation is non-atomic and lacks explicit download size, extraction size, and timeout limits. | [x] Complete | `PII-F06` |
-| 10 | Medium | CLI and MCP arguments can expose PII through argv, shell history, process inspection, and echoed command errors. | [ ] Open | `PII-F07` |
-| 11 | Medium | The small fake-name lists permit visually identical pseudonyms for different people. | [ ] Open | `PII-F08` |
-| 12 | Medium | Identity canonicalization does not normalize Unicode composition or define broader Unicode case/space semantics. | [ ] Open | `PII-F09` |
-| 13 | Medium | Secret rotation changes every identity without a key version or migration policy. | [ ] Open | `PII-F10` |
-| 14 | Medium | There is no maintained multilingual privacy corpus measuring false negatives and false positives. | [ ] Open | `PII-F11` |
+| 10 | Medium | CLI and MCP arguments can expose PII through argv, shell history, process inspection, and echoed command errors. | [ ] Reproduced; fix pending | `PII-F07` |
+| 11 | Medium | The small fake-name lists permit visually identical pseudonyms for different people. | [ ] Reproduced; fix pending | `PII-F08` |
+| 12 | Medium | Identity canonicalization does not normalize Unicode composition or define broader Unicode case/space semantics. | [ ] Reproduced; fix pending | `PII-F09` |
+| 13 | Medium | Secret rotation changes every identity without a key version or migration policy. | [ ] Reproduced; fix pending | `PII-F10` |
+| 14 | Medium | There is no maintained multilingual privacy corpus measuring false negatives and false positives. | [ ] Reproduced; fix pending | `PII-F11` |
 
 ## Completed critical work
 
@@ -327,6 +337,10 @@ in `f4416c3`.
 
 ## Open original findings
 
+The focused contracts below are intentionally failing until their production
+fixes land. They use synthetic values and local process fixtures only; no Help
+Scout API calls or production content are involved.
+
 ### 10. Sensitive arguments cross process boundaries — open
 
 Emails, search terms, message bodies, and custom-field values can enter argv.
@@ -334,11 +348,19 @@ The MCP runner also reconstructs command lines in errors. Prefer stdin or
 protected files for sensitive input, redact reconstructed errors, and
 eventually let MCP call application services without a CLI subprocess.
 
+Regression evidence: `TestPIIRegression_Medium10_SensitiveMCPInputsStayOffProcessBoundaries`
+shows the fixture email and body in child argv, reconstructed command text, and
+returned MCP errors.
+
 ### 11. Visual pseudonym collisions — open
 
 Different identities can receive the same fake first/last name because table
 views may omit the generated email suffix. Add a readable deterministic
 disambiguator without exposing a source identifier.
+
+Regression evidence: `TestPIIRegression_Medium11_DisplayNamesDisambiguateDistinctPeople`
+shows two distinct fixture identities rendering as `Casey Stewart`, despite
+their generated emails being distinct.
 
 ### 12. Unicode identity canonicalization is incomplete — open
 
@@ -346,11 +368,18 @@ NFC and NFD spellings can derive different person keys despite appearing
 identical. Define normalization, case-folding, and whitespace rules as a
 versioned identity-key schema before changing current output.
 
+Regression evidence: `TestPIIRegression_Medium12_IdentityKeysNormalizeUnicodeComposition`
+shows visually identical NFC and NFD spellings producing different keys.
+
 ### 13. Secret rotation is unversioned — open
 
 Changing the secret intentionally changes every display identity, but output
 has no key identifier and there is no migration or historical-correlation
 policy. Design rotation together with issues 5 and 12.
+
+Regression evidence: `TestPIIRegression_Medium13_SecretRotationHasAnExplicitKeyIdentifier`
+confirms rotation changes the fixture pseudonym and that the engine exposes no
+opaque key identifier for callers to distinguish rotations.
 
 ### 14. No multilingual quality corpus — open
 
@@ -358,6 +387,11 @@ Build a synthetic, non-production evaluation corpus measuring privacy recall,
 false positives, customer/staff separation, long-content behavior, and
 performance across supported languages and scripts. Never use raw production
 content to construct it.
+
+Regression evidence: `TestPIIRegression_Medium14_MultilingualPrivacyCorpusIsMaintained`
+requires a schema-checked synthetic corpus covering Latin, Arabic, and Han
+scripts; redact and preserve outcomes; and the originally identified quality
+dimensions. The fixture is currently absent.
 
 ## Additional observations raised during remediation
 
