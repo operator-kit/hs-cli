@@ -35,6 +35,7 @@ var (
 	addressLabelRe   = regexp.MustCompile(`(?i)(:\s+|at\s+|@\s+)(\d+[-\s]?\w*|\d+-\d+-\d+)[\s,]+([A-Za-z\p{L}]+([\s'-][A-Za-z\p{L}]+)*[\s,]+)+(Road|Rd|Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Lane|Ln|Place|Pl|Rue|Via|Viale|Strasse|Straße|Calle|Avenida)`)
 	addressMainRe    = regexp.MustCompile(`(?i)(\d+[-\s]?\w*|\d+-\d+-\d+)[\s,]+([A-Za-z\p{L}]+([\s'-][A-Za-z\p{L}]+)*[\s,]+)+(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Place|Pl|Boulevard|Blvd|Way|Plaza|Square|Sq|Court|Ct|Terrace|Ter|Circle|Cir|Alley|Row|Highway|Hwy|Parkway|Pkwy|Path|Trail|Tr|Crescent|Cres|Rue|Strasse|Straße|Calle|Via|Viale|Avenida|Carrer|Straat|Gasse|Weg|Camino|Ulica|Utca|Prospekt|Dori|Jalan|Marg|Dao|Jie|Lu|út|de la|del|di|van|von)\b`)
 	zipRe            = regexp.MustCompile(`\b\d{5}(?:[-\s]\d{4})?\b`)
+	zipContextRe     = regexp.MustCompile(`(?i)\b(?:zip(?:\s+code)?|postal\s+code|postcode)\b`)
 	poBoxRe          = regexp.MustCompile(`(?i)P\.? ?O\.? Box \d+`)
 	linkRe           = regexp.MustCompile(`(?:(?:https?:\/\/)?(?:[a-z0-9.\-]+|www|[a-z0-9.\-])[.](?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?]))`)
 )
@@ -54,8 +55,8 @@ var textRules = []textRule{
 	{kind: "address", re: addressContextRe},
 	{kind: "address", re: addressLabelRe},
 	{kind: "address", re: addressMainRe},
-	{kind: "zip", re: zipRe},
 	{kind: "po_box", re: poBoxRe},
+	{kind: "zip", re: zipRe},
 	{kind: "url", re: linkRe},
 }
 
@@ -135,12 +136,37 @@ func (e *Engine) RedactText(text string, known []KnownIdentity) string {
 					return match
 				}
 				return e.token(rule.kind, rawDigits)
+			case "zip":
+				if !shouldRedactZIP(match, start, end, full) {
+					return match
+				}
+				return e.token(rule.kind, match)
 			default:
 				return e.token(rule.kind, match)
 			}
 		})
 	}
 	return out
+}
+
+func shouldRedactZIP(match string, start, end int, text string) bool {
+	// ZIP+4 is specific enough to redact without additional prose context.
+	if strings.ContainsAny(match, "- ") && len(onlyDigits(match)) == 9 {
+		return true
+	}
+
+	windowStart := max(0, start-80)
+	windowEnd := min(len(text), end+80)
+	for windowStart < start && !utf8.RuneStart(text[windowStart]) {
+		windowStart++
+	}
+	for windowEnd < len(text) && !utf8.RuneStart(text[windowEnd]) {
+		windowEnd++
+	}
+	context := text[windowStart:windowEnd]
+	return zipContextRe.MatchString(context) ||
+		strings.Contains(context, "[[address_") ||
+		strings.Contains(context, "[[po_box_")
 }
 
 type textEdit struct {

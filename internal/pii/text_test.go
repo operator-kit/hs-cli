@@ -98,9 +98,23 @@ func TestRedactText_POBox(t *testing.T) {
 
 func TestRedactText_ZipCode(t *testing.T) {
 	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
-	out := e.RedactText("Zip code is 90210-1234", nil)
-	if strings.Contains(out, "90210-1234") {
-		t.Fatalf("zip code should be redacted: %q", out)
+	for _, text := range []string{
+		"Zip code is 90210",
+		"Zip code is 90210-1234",
+		"Send to P.O. Box 1234, 90210",
+	} {
+		out := e.RedactText(text, nil)
+		if strings.Contains(out, "90210") {
+			t.Fatalf("zip code should be redacted: %q", out)
+		}
+	}
+}
+
+func TestRedactText_FiveDigitOperationalNumberIsPreserved(t *testing.T) {
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
+	text := "Order 12345 is ready for dispatch"
+	if out := e.RedactText(text, nil); out != text {
+		t.Fatalf("operational number should not be treated as a ZIP code: %q", out)
 	}
 }
 

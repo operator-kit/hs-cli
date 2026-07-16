@@ -65,6 +65,7 @@ func newConversationAttachmentsCmd() *cobra.Command {
 	uploadCmd.Flags().String("file", "", "path to file (required)")
 	uploadCmd.Flags().String("filename", "", "attachment filename override")
 	uploadCmd.Flags().String("mime-type", "", "attachment MIME type")
+	markProtectedFlags(uploadCmd, "file", "filename")
 	uploadCmd.MarkFlagRequired("thread-id")
 	uploadCmd.MarkFlagRequired("file")
 

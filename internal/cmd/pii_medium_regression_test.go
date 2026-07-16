@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/operator-kit/hs-cli/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,8 +24,8 @@ func mediumSensitiveMCPFixture() (mcpToolSpec, map[string]json.RawMessage) {
 			{Name: "conversation-id", Property: "conversation_id", Required: true},
 		},
 		Flags: []mcpFlagSpec{
-			{Name: "customer", Property: "customer", Type: "string", Required: true},
-			{Name: "body", Property: "body", Type: "string", Required: true},
+			{Name: "customer", Property: "customer", Type: "string", Required: true, Protected: true},
+			{Name: "body", Property: "body", Type: "string", Required: true, Protected: true},
 		},
 	}
 	args := map[string]json.RawMessage{
@@ -69,5 +70,29 @@ func TestPIIRegression_Medium10_SensitiveMCPInputsStayOffProcessBoundaries(t *te
 			assert.NotContains(t, rendered.String(), value,
 				"MCP failures must not echo sensitive tool arguments")
 		}
+	})
+
+	t.Run("direct CLI requires protected transport", func(t *testing.T) {
+		previousOutput := output.Out
+		saveRestore(t)
+		apiCalled := false
+		setupTest(&mockClient{CreateReplyFn: func(context.Context, string, any) error {
+			apiCalled = true
+			return nil
+		}})
+		t.Cleanup(func() { output.Out = previousOutput })
+		resetChangedFlags(rootCmd)
+		rootCmd.SetArgs([]string{
+			"inbox", "conversations", "threads", "reply", "42",
+			"--customer", mediumSensitiveEmail,
+			"--body", mediumSensitiveBody,
+		})
+
+		err := rootCmd.Execute()
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), mediumSensitiveBody)
+		assert.NotContains(t, err.Error(), mediumSensitiveEmail)
+		assert.Contains(t, err.Error(), "--protected-input")
+		assert.False(t, apiCalled, "unprotected PII must be rejected before API work")
 	})
 }

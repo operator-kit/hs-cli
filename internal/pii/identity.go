@@ -3,12 +3,16 @@ package pii
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base32"
 	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
 	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/unicode/norm"
 )
 
 type KnownIdentity struct {
@@ -41,9 +45,9 @@ func WithNER(d NameDetector) EngineOption {
 }
 
 type Engine struct {
-	mode   Mode
-	secret Secret
-	ner    NameDetector
+	mode      Mode
+	pseudonym PseudonymContext
+	ner       NameDetector
 
 	mu      sync.RWMutex
 	people  map[string]fakePerson
@@ -56,23 +60,39 @@ type fakePerson struct {
 	Email string
 }
 
-func NewEngine(mode Mode, secret Secret, opts ...EngineOption) (*Engine, error) {
+func NewEngine(mode Mode, pseudonym PseudonymContext, opts ...EngineOption) (*Engine, error) {
 	if !mode.Valid() {
 		return nil, fmt.Errorf("invalid PII engine mode")
 	}
-	if IsEnabled(mode) && secret.IsZero() {
-		return nil, fmt.Errorf("enabled PII engine requires a secret")
+	if IsEnabled(mode) && pseudonym.IsZero() {
+		return nil, fmt.Errorf("enabled PII engine requires a pseudonym context")
+	}
+	if IsEnabled(mode) {
+		if pseudonym.secret.IsZero() || pseudonym.schema != IdentitySchemaV2 {
+			return nil, fmt.Errorf("enabled PII engine requires a valid pseudonym context")
+		}
+		if err := validatePseudonymKeyID(pseudonym.keyID); err != nil {
+			return nil, err
+		}
 	}
 	e := &Engine{
-		mode:    mode,
-		secret:  secret,
-		people:  map[string]fakePerson{},
-		replace: map[string]string{},
+		mode:      mode,
+		pseudonym: pseudonym,
+		people:    map[string]fakePerson{},
+		replace:   map[string]string{},
 	}
 	for _, o := range opts {
 		o(e)
 	}
 	return e, nil
+}
+
+func (e *Engine) PseudonymKeyID() string {
+	return e.pseudonym.KeyID()
+}
+
+func (e *Engine) IdentitySchema() IdentitySchema {
+	return e.pseudonym.Schema()
 }
 
 func (e *Engine) Mode() Mode {
@@ -165,7 +185,7 @@ func (e *Engine) token(kind, raw string) string {
 }
 
 func (e *Engine) hashBytes(v string) [32]byte {
-	h := hmac.New(sha256.New, e.secret.bytes())
+	h := hmac.New(sha256.New, e.pseudonym.secret.bytes())
 	h.Write([]byte(v))
 	var out [32]byte
 	copy(out[:], h.Sum(nil))
@@ -182,9 +202,11 @@ func (e *Engine) fakePersonForKey(key string) fakePerson {
 
 	sum := e.hashBytes("person|" + key)
 	first := firstNames[int(sum[0])%len(firstNames)]
-	last := lastNames[int(sum[1])%len(lastNames)]
+	baseLast := lastNames[int(sum[1])%len(lastNames)]
 	suffix := hex.EncodeToString(sum[2:4])
-	email := fmt.Sprintf("%s.%s-%s@anon.local", slugPart(first), slugPart(last), suffix)
+	email := fmt.Sprintf("%s.%s-%s@anon.local", slugPart(first), slugPart(baseLast), suffix)
+	disambiguator := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(sum[4:9])
+	last := fmt.Sprintf("%s [%s-%s]", baseLast, e.pseudonym.keyID, disambiguator)
 
 	fp := fakePerson{
 		First: first,
@@ -210,11 +232,20 @@ func personKey(first, last, email string) string {
 }
 
 func canonical(v string) string {
-	return strings.ToLower(strings.TrimSpace(v))
+	return canonicalName(v)
 }
 
 func canonicalEmail(v string) string {
-	return canonical(v)
+	return strings.ToLower(strings.TrimSpace(norm.NFC.String(v)))
+}
+
+var unicodeCaseFolder = cases.Fold()
+
+func canonicalName(v string) string {
+	v = norm.NFC.String(v)
+	v = unicodeCaseFolder.String(v)
+	v = norm.NFC.String(v)
+	return strings.Join(strings.Fields(v), " ")
 }
 
 var nonDigitRe = regexp.MustCompile(`\D+`)

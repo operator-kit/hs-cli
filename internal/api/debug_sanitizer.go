@@ -40,7 +40,11 @@ func newSafeDiagnosticSanitizerWithRandom(random io.Reader) diagnosticSanitizer 
 	if err != nil {
 		return opaqueDiagnosticSanitizer{}
 	}
-	engine, err := pii.NewEngine(pii.ModeAll, secret)
+	pseudonym, err := pii.NewPseudonymContext(secret, "diagnostic")
+	if err != nil {
+		return opaqueDiagnosticSanitizer{}
+	}
+	engine, err := pii.NewEngine(pii.ModeAll, pseudonym)
 	if err != nil {
 		return opaqueDiagnosticSanitizer{}
 	}

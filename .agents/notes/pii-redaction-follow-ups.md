@@ -23,11 +23,13 @@ available for later planning.
 | PII-F04 | High | Complete | Windows can install a model bundle but cannot run the bundled NER runtime. | Windows is now refused until a real runtime smoke test exists. |
 | PII-F05 | High | Complete | Download hashes are generated after download and are not trust anchors. | Resolved with an embedded pinned manifest and source lock. |
 | PII-F06 | Medium | Complete | Model installation is not atomic and lacks explicit size/time limits. | Resolved with the bounded transactional installer. |
-| PII-F07 | Medium | Open — reproduced | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Move sensitive inputs off argv and reduce MCP subprocess coupling. |
-| PII-F08 | Medium | Open — reproduced | Fake display names come from small lists and can collide visually. | Add deterministic display disambiguation. |
-| PII-F09 | Medium | Open — reproduced | Identity canonicalization does not normalize Unicode composition. | Define a versioned Unicode normalization policy. |
-| PII-F10 | Medium | Open — reproduced | Secret rotation changes every displayed identity with no migration/version marker. | Add key versioning and a rotation policy. |
-| PII-F11 | Medium | Open — reproduced | There is no measurable multilingual detection-quality corpus. | Build a privacy-focused evaluation suite. |
+| PII-F07 | Medium | Complete | MCP and CLI arguments can expose PII through argv, shell history, and echoed errors. | Resolved with protected stdin/private-file envelopes and safe MCP errors. |
+| PII-F08 | Medium | Complete | Fake display names come from small lists and can collide visually. | Resolved with deterministic keyed display disambiguation. |
+| PII-F09 | Medium | Complete | Identity canonicalization does not normalize Unicode composition. | Resolved by versioned Unicode canonicalization schema v2. |
+| PII-F10 | Medium | Complete | Secret rotation changes every displayed identity with no migration/version marker. | Resolved with explicit key IDs and locked legacy-record migration. |
+| PII-F11 | Medium | Complete | There is no measurable multilingual detection-quality corpus. | Resolved with hermetic and real-model corpus evaluators. |
+| PII-F12 | Medium | Open | Disabled low-level identity methods still pseudonymize when called directly. | Enforce mode at each public identity-redaction boundary. |
+| PII-F13 | Medium | Open | The compatibility-preserved generated-email namespace can collide at scale. | Version any email-format expansion and define migration expectations. |
 
 ## PII-F01 — Identity keys vary across payload shapes
 
@@ -89,7 +91,7 @@ strictly allowlisted, runtime-smoke-tested, staged privately, content-addressed,
 and atomically promoted. Failures preserve any prior trusted installation and
 stale installer-owned staging is cleaned within a bounded policy.
 
-## PII-F07 — Sensitive values in argv and MCP subprocesses
+## PII-F07 — Sensitive values in argv and MCP subprocesses — complete
 
 CLI flags can contain customer emails, search terms, message bodies, and custom
 field values. Shell history and process listings can retain those values.
@@ -98,56 +100,41 @@ The MCP runner also converts tool arguments into child-process argv and includes
 the reconstructed command line in failures. A future application-service API
 would let MCP invoke use cases directly instead of shelling out through the CLI.
 
-Shorter-term mitigations:
+Resolved with a strict, bounded protected-input envelope. Annotated direct CLI
+flags require stdin or private regular files, MCP supplies the envelope
+automatically, and safe error displays never reconstruct protected values. The
+focused regression also proves raw direct input stops before API work.
 
-- accept sensitive bodies through stdin or protected temporary files;
-- mark sensitive tool arguments and omit them from reconstructed errors;
-- never include raw argument values in diagnostic command lines.
-
-Regression: `TestPIIRegression_Medium10_SensitiveMCPInputsStayOffProcessBoundaries`
-currently fails because synthetic sensitive values occur in child argv and MCP
-error output.
-
-## PII-F08 — Visual pseudonym collisions
+## PII-F08 — Visual pseudonym collisions — complete
 
 Fake first and last names come from small fixed lists. Different identities can
 display the same full name, especially in table views that omit the generated
 email suffix.
 
-Consider a short deterministic display suffix or another collision-resolution
-strategy that remains readable and reveals no source identifier.
+A short HMAC-derived display suffix plus public key ID now disambiguates the
+former deterministic `Casey Stewart` collision without exposing source IDs.
 
-Regression: `TestPIIRegression_Medium11_DisplayNamesDisambiguateDistinctPeople`
-currently fails on a deterministic `Casey Stewart` collision.
-
-## PII-F09 — Unicode normalization of identity keys
+## PII-F09 — Unicode normalization of identity keys — complete
 
 Canonicalization lowercases and trims but does not normalize Unicode. Visually
 identical NFC and NFD names can therefore hash to different identities. Broader
 case-folding and whitespace semantics also need definition.
 
-Any normalization change affects deterministic output and should use a
-versioned key schema with compatibility fixtures.
+Schema v2 defines NFC, Unicode case folding, NFC recomposition, and Unicode
+whitespace collapse for names; emails add NFC while retaining established
+trim/lowercase behavior. Compatibility fixtures pin legacy canonical outputs.
 
-Regression: `TestPIIRegression_Medium12_IdentityKeysNormalizeUnicodeComposition`
-currently fails for equivalent NFC and NFD name fixtures.
-
-## PII-F10 — Secret rotation and pseudonym versioning
+## PII-F10 — Secret rotation and pseudonym versioning — complete
 
 Changing HS_INBOX_PII_SECRET intentionally changes every token and identity, but
 output has no key-version marker and there is no rotation workflow.
 
-Define:
+Every enabled engine now receives a versioned pseudonym context with explicit
+public key ID. Keyring records migrate atomically while preserving legacy
+secret bytes. Explicit operators set and rotate the secret and ID together;
+the current stateless design retains no old key or alias cache to migrate.
 
-- a key identifier/version;
-- whether old keys remain available for historical correlation;
-- how operators intentionally reset all pseudonyms;
-- how future cached aliases are migrated or discarded.
-
-Regression: `TestPIIRegression_Medium13_SecretRotationHasAnExplicitKeyIdentifier`
-currently fails because the pseudonym boundary has no opaque rotation-key ID.
-
-## PII-F11 — Detection quality and observability
+## PII-F11 — Detection quality and observability — complete
 
 There is no maintained multilingual privacy corpus measuring false negatives
 and false positives across names, addresses, identifiers, HTML, custom fields,
@@ -161,7 +148,32 @@ Build a synthetic, non-production corpus tracking:
 - behavior with and without the NER model;
 - performance and memory limits for large conversations and attachments.
 
-Never log raw production samples to build this corpus.
+The checked-in corpus is entirely synthetic. Hermetic tests cover policy and
+redaction mechanics; the real model release smoke measures full expected-name
+coverage, unexpected person spans, chunked long content, and runtime budget.
 
-Regression: `TestPIIRegression_Medium14_MultilingualPrivacyCorpusIsMaintained`
-currently fails because the required synthetic, schema-checked corpus is absent.
+## PII-F12 — Disabled low-level identity methods bypass the mode invariant
+
+`RedactJSONWithContext` and `RedactText` return input unchanged when the engine
+is disabled, but `RedactPerson`, `RedactEmail`, and `RedactPhone` do not check
+the mode themselves. Supported command paths currently enter through guarded
+presentation methods, so this is not a known CLI leak. It is nevertheless a
+fragile public API contract: a future direct caller can pseudonymize with the
+zero context accepted by `NewEngine(ModeOff, ...)`.
+
+Add direct `ModeOff` pass-through tests for all three methods, then put the
+guard at those lowest public boundaries. Keep the higher-level guards as cheap
+early exits.
+
+## PII-F13 — Legacy generated-email namespace can collide at scale
+
+The issue-11 fix adds a 40-bit keyed disambiguator and public key ID to display
+names while intentionally preserving the established generated email format.
+That format has 50 first-name choices, 50 last-name choices, and a 16-bit
+suffix: roughly 164 million possible values, so birthday collisions become
+plausible at tens of thousands of identities.
+
+This is not a regression in `v2`, and the strengthened full name remains
+deterministic and visually distinct. A future display schema should consider a
+longer email suffix or key-ID component, with compatibility fixtures and an
+explicit decision about whether already displayed pseudonym emails may change.

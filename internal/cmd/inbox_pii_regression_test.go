@@ -234,7 +234,7 @@ func TestPIIRegression_High06_InvalidModeStopsBeforeInboxAPI(t *testing.T) {
 			output.Out = buf
 			t.Cleanup(func() { output.Out = previousOutput })
 
-			rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+			setRootArgs(t, []string{"inbox", "mailboxes", "list"})
 			err := rootCmd.Execute()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "PII mode")
@@ -250,7 +250,7 @@ func TestPIIRegression_High06_InvalidModeStopsMCPStartup(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: typo\n"), 0o600))
 	t.Setenv("HS_INBOX_PII_MODE", "")
 
-	rootCmd.SetArgs([]string{"mcp"})
+	setRootArgs(t, []string{"mcp"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PII mode")
@@ -263,7 +263,7 @@ func TestPIIRegression_High06_InvalidModeDoesNotBlockVersion(t *testing.T) {
 	t.Setenv("HS_INBOX_PII_MODE", "")
 	SetVersion("1.2.3", "abc123", "2026-07-15")
 
-	rootCmd.SetArgs([]string{"version"})
+	setRootArgs(t, []string{"version"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "1.2.3")
 }
@@ -286,13 +286,13 @@ func TestPIIRegression_High05_SecretFailureStopsBeforeInboxAPI(t *testing.T) {
 	output.Out = buf
 	t.Cleanup(func() { output.Out = previousOutput })
 
-	originalResolver := resolvePIISecret
-	resolvePIISecret = func(context.Context, pii.Mode, string) (pii.Secret, error) {
-		return pii.Secret{}, errors.New("PII redaction secret unavailable; set HS_INBOX_PII_SECRET")
+	originalResolver := resolvePIIContext
+	resolvePIIContext = func(context.Context, pii.Mode, string) (pii.PseudonymContext, error) {
+		return pii.PseudonymContext{}, errors.New("PII redaction key unavailable; set HS_INBOX_PII_SECRET")
 	}
-	t.Cleanup(func() { resolvePIISecret = originalResolver })
+	t.Cleanup(func() { resolvePIIContext = originalResolver })
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "list"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "HS_INBOX_PII_SECRET")

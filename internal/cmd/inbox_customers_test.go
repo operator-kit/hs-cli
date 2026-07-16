@@ -23,7 +23,7 @@ func TestCustomersList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "list"})
+	setRootArgs(t, []string{"inbox", "customers", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -48,7 +48,7 @@ func TestCustomersListAdvancedFilters(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "customers", "list",
 		"--mailbox", "12",
 		"--first-name", "Alice",
@@ -73,7 +73,7 @@ func TestCustomersGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "get", "5"})
+	setRootArgs(t, []string{"inbox", "customers", "get", "5"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -93,7 +93,7 @@ func TestCustomersCreate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "create", "--first-name", "Carol"})
+	setRootArgs(t, []string{"inbox", "customers", "create", "--first-name", "Carol"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Created customer 77")
@@ -117,7 +117,7 @@ func TestCustomersCreateWithExtraFlags(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "customers", "create",
 		"--first-name", "Carol",
 		"--job-title", "Engineer",
@@ -146,7 +146,7 @@ func TestCustomersCreateWithJSON(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "customers", "create",
 		"--json", `{"firstName":"Test","emails":[{"type":"work","value":"test@example.com"}]}`,
 	})
@@ -173,7 +173,7 @@ func TestCustomersUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "update", "5", "--first-name", "Updated"})
+	setRootArgs(t, []string{"inbox", "customers", "update", "5", "--first-name", "Updated"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Updated customer 5")
@@ -192,7 +192,7 @@ func TestCustomersOverwrite(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "overwrite", "5", "--first-name", "Updated"})
+	setRootArgs(t, []string{"inbox", "customers", "overwrite", "5", "--first-name", "Updated"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Overwrote customer 5")
@@ -209,7 +209,7 @@ func TestCustomersDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "delete", "5"})
+	setRootArgs(t, []string{"inbox", "customers", "delete", "5"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Deleted customer 5")
@@ -226,7 +226,7 @@ func TestCustomersDeleteAsync(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "delete", "10", "--async"})
+	setRootArgs(t, []string{"inbox", "customers", "delete", "10", "--async"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Deleted customer 10")

@@ -24,7 +24,7 @@ func TestInboxNamespaceConversationsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "list"})
+	setRootArgs(t, []string{"inbox", "conversations", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()

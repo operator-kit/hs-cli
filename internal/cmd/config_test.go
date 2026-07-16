@@ -28,7 +28,7 @@ func TestConfigSet(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-app-secret", "mysecret", "--inbox-default-mailbox", "42", "--format", "json", "--inbox-pii-mode", "customers", "--inbox-pii-allow-unredacted"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-app-secret", "mysecret", "--inbox-default-mailbox", "42", "--format", "json", "--inbox-pii-mode", "customers", "--inbox-pii-allow-unredacted"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Config saved")
@@ -67,7 +67,7 @@ func TestConfigSet_Partial(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "new-id"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "new-id"})
 	require.NoError(t, rootCmd.Execute())
 
 	loaded, err := config.Load(cfgFile)
@@ -95,7 +95,7 @@ func TestConfigSet_MutualFields(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-default-mailbox", "99"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-default-mailbox", "99"})
 	require.NoError(t, rootCmd.Execute())
 
 	loaded, err := config.Load(cfgFile)
@@ -129,7 +129,7 @@ func TestConfigGet(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get"})
+	setRootArgs(t, []string{"inbox", "config", "get"})
 	require.NoError(t, rootCmd.Execute())
 
 	output := buf.String()
@@ -163,7 +163,7 @@ func TestConfigGet_SingleKey(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "inbox-app-id"})
+	setRootArgs(t, []string{"inbox", "config", "get", "inbox-app-id"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, "myid\n", buf.String())
@@ -178,7 +178,7 @@ func TestConfigPath(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "path"})
+	setRootArgs(t, []string{"inbox", "config", "path"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, cfgFile+"\n", buf.String())
@@ -204,7 +204,7 @@ func TestConfigGet_SinglePIIModeKey(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "inbox-pii-mode"})
+	setRootArgs(t, []string{"inbox", "config", "get", "inbox-pii-mode"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, "customers\n", buf.String())
@@ -220,7 +220,7 @@ func TestConfigSet_InvalidPIIMode(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", "bad"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", "bad"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid --inbox-pii-mode")
@@ -243,7 +243,7 @@ format: json
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", " Customers "})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", " Customers "})
 	require.NoError(t, rootCmd.Execute())
 
 	stored, err := config.LoadFile(cfgPath)
@@ -263,7 +263,7 @@ func TestConfigSet_InvalidStoredModeRequiresModeRepair(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgPath, []byte("inbox_app_id: original\ninbox_pii_mode: typo\n"), 0o600))
 	t.Setenv("HS_INBOX_PII_MODE", "")
 
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "replacement"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "replacement"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "inbox_pii_mode")
@@ -281,7 +281,7 @@ func TestConfigSet_MalformedYAMLIsNotOverwritten(t *testing.T) {
 	const malformed = "{{{invalid"
 	require.NoError(t, os.WriteFile(cfgPath, []byte(malformed), 0o600))
 
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", "all"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", "all"})
 	require.Error(t, rootCmd.Execute())
 
 	stored, err := os.ReadFile(cfgPath)

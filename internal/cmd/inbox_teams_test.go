@@ -23,7 +23,7 @@ func TestTeamsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "teams", "list"})
+	setRootArgs(t, []string{"inbox", "teams", "list"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Support")
 }
@@ -40,7 +40,7 @@ func TestTeamsMembers(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "teams", "members", "1"})
+	setRootArgs(t, []string{"inbox", "teams", "members", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "agent@test.com")
 }

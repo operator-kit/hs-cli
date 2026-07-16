@@ -3,20 +3,28 @@ package pii
 import "strings"
 
 func mustTestEngine(mode Mode, rawSecret string, opts ...EngineOption) *Engine {
-	var secret Secret
+	var pseudonym PseudonymContext
 	if IsEnabled(mode) {
 		if strings.TrimSpace(rawSecret) == "" {
 			rawSecret = "unit-test-only-secret"
 		}
-		var err error
-		secret, err = NewSecretString(rawSecret)
-		if err != nil {
-			panic(err)
-		}
+		pseudonym = mustTestPseudonym(rawSecret, "test-v2")
 	}
-	engine, err := NewEngine(mode, secret, opts...)
+	engine, err := NewEngine(mode, pseudonym, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return engine
+}
+
+func mustTestPseudonym(rawSecret, keyID string) PseudonymContext {
+	secret, err := NewSecretString(rawSecret)
+	if err != nil {
+		panic(err)
+	}
+	pseudonym, err := NewPseudonymContext(secret, keyID)
+	if err != nil {
+		panic(err)
+	}
+	return pseudonym
 }

@@ -35,7 +35,7 @@ func TestRedactPerson_DisplayIdentityCompatibility(t *testing.T) {
 	// identity key and a stable secret produces the same pseudonym across runs.
 	e := mustTestEngine(ModeAll, "stable-secret")
 	first, last, email := e.RedactPerson("Alice", "Smith", "ALICE@example.com ")
-	if first != "Jordan" || last != "Mitchell" || email != "jordan.mitchell-19f9@anon.local" {
+	if first != "Jordan" || last != "Mitchell [test-v2-QBZHOQUA]" || email != "jordan.mitchell-19f9@anon.local" {
 		t.Fatalf("display identity changed: got %q %q <%s>", first, last, email)
 	}
 
@@ -43,6 +43,30 @@ func TestRedactPerson_DisplayIdentityCompatibility(t *testing.T) {
 	first2, last2, email2 := e2.RedactPerson("Different", "Name", "alice@example.com")
 	if first2 != first || last2 != last || email2 != email {
 		t.Fatalf("canonical email should retain the same display identity across engines")
+	}
+}
+
+func TestIdentityCanonicalizationV2FoldsUnicodeCaseAndWhitespace(t *testing.T) {
+	left := personKey("  STRAẞE\u00a0", "  İpek\tYILMAZ ", "")
+	right := personKey("strasse", "i̇pek yilmaz", "")
+	if left != right {
+		t.Fatalf("v2 canonical names differ:\n left: %q\nright: %q", left, right)
+	}
+
+	composedEmail := personKey("ignored", "name", "JOSÉ@EXAMPLE.TEST ")
+	decomposedEmail := personKey("different", "person", "jose\u0301@example.test")
+	if composedEmail != decomposedEmail {
+		t.Fatalf("canonical emails differ: %q != %q", composedEmail, decomposedEmail)
+	}
+}
+
+func TestEngineExposesVersionedPseudonymMetadata(t *testing.T) {
+	engine := mustTestEngine(ModeAll, "metadata-secret")
+	if engine.PseudonymKeyID() != "test-v2" {
+		t.Fatalf("key ID = %q", engine.PseudonymKeyID())
+	}
+	if engine.IdentitySchema() != IdentitySchemaV2 {
+		t.Fatalf("identity schema = %q", engine.IdentitySchema())
 	}
 }
 

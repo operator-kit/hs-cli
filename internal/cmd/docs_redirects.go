@@ -30,6 +30,7 @@ func newDocsRedirectsCmd() *cobra.Command {
 	permission.Annotate(findCmd, "redirects", permission.OpRead)
 	findCmd.Flags().String("site", "", "site ID (required)")
 	findCmd.Flags().String("url", "", "URL to find redirect for (required)")
+	markProtectedFlags(findCmd, "url")
 	findCmd.MarkFlagRequired("site")
 	findCmd.MarkFlagRequired("url")
 
@@ -38,6 +39,7 @@ func newDocsRedirectsCmd() *cobra.Command {
 	createCmd.Flags().String("site", "", "site ID (required)")
 	createCmd.Flags().String("url-mapping", "", "source URL path (required)")
 	createCmd.Flags().String("redirect", "", "destination URL path (required)")
+	markProtectedFlags(createCmd, "url-mapping", "redirect")
 	createCmd.MarkFlagRequired("site")
 	createCmd.MarkFlagRequired("url-mapping")
 	createCmd.MarkFlagRequired("redirect")
@@ -46,6 +48,7 @@ func newDocsRedirectsCmd() *cobra.Command {
 	permission.Annotate(updateCmd, "redirects", permission.OpWrite)
 	updateCmd.Flags().String("url-mapping", "", "source URL path")
 	updateCmd.Flags().String("redirect", "", "destination URL path")
+	markProtectedFlags(updateCmd, "url-mapping", "redirect")
 
 	deleteCmd := docsRedirectsDeleteCmd()
 	permission.Annotate(deleteCmd, "redirects", permission.OpDelete)

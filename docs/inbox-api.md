@@ -43,7 +43,8 @@ hs inbox auth logout
 | `HS_FORMAT` | Output format (overrides `format`) |
 | `HS_INBOX_PII_MODE` | PII redaction mode (overrides `inbox_pii_mode`) |
 | `HS_INBOX_PII_ALLOW_UNREDACTED` | Allow `--unredacted` bypass (overrides `inbox_pii_allow_unredacted`) |
-| `HS_INBOX_PII_SECRET` | Optional secret salt for deterministic pseudonyms |
+| `HS_INBOX_PII_SECRET` | Optional explicit private HMAC key; requires `HS_INBOX_PII_KEY_ID` |
+| `HS_INBOX_PII_KEY_ID` | Public rotation ID paired with an explicit PII secret |
 | `HS_INBOX_PERMISSIONS` | Inbox permission policy |
 | `HS_NO_UPDATE_CHECK` | Disable daily update check (`1`) |
 
@@ -74,6 +75,53 @@ HS_INBOX_PERMISSIONS="*:*"
 **Operations**: `read` (list/get), `write` (create/update/reply/note/run), `delete`
 
 **Source priority**: `HS_INBOX_PERMISSIONS` env var > `inbox_permissions` in config.yaml > unrestricted default
+
+## Protected command input
+
+Flags whose values can contain PII, authored content, credentials, or local
+paths are marked `protected input only` in command help. The CLI rejects those
+values on argv. Do not type a rejected value into a shell first—the shell may
+already have recorded it. Supply values in a schema-1 envelope over stdin or in
+a private regular file instead:
+
+```bash
+hs --protected-input - inbox conversations list --status all
+```
+
+After the process starts, paste the envelope into stdin and signal EOF
+(`Ctrl-D` on Unix; `Ctrl-Z`, then Enter, in a Windows terminal):
+
+```json
+{
+  "schema": 1,
+  "command": ["inbox", "conversations", "list"],
+  "flags": {"query": "(email:\"alice@example.com\")"}
+}
+```
+
+For a reply:
+
+```bash
+hs --protected-input - inbox conversations threads reply 67890
+```
+
+```json
+{
+  "schema": 1,
+  "command": ["inbox", "conversations", "threads", "reply"],
+  "flags": {
+    "customer": "user@example.com",
+    "body": "Thanks for reaching out!",
+    "to": ["recipient@example.com"]
+  }
+}
+```
+
+The command path must match exactly. Envelopes are limited to 4 MiB; Unix
+files must not grant group/other access. MCP applies this transport
+automatically. To keep the API catalogue compact, later examples that show a
+protected flag inline illustrate its logical API value; move that flag/value
+into the envelope before running the command.
 
 ### MCP / LLM setup
 
@@ -116,7 +164,7 @@ To allow, add conversations:write to HS_INBOX_PERMISSIONS
 
 ```bash
 # Set one or more config values
-hs inbox config set --inbox-app-id xxx --inbox-app-secret yyy
+hs inbox config set --inbox-app-id xxx
 hs inbox config set --inbox-default-mailbox 12345
 hs inbox config set --format json
 hs inbox config set --inbox-pii-mode customers

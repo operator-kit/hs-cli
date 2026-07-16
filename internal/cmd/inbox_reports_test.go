@@ -27,7 +27,7 @@ func TestReportsCompany(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "reports", "company",
 		"--start", "2026-01-01",
 		"--end", "2026-01-31",
@@ -37,6 +37,18 @@ func TestReportsCompany(t *testing.T) {
 	})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "company")
+}
+
+func TestReportsInvalidProtectedParamDoesNotEchoValue(t *testing.T) {
+	setupTest(&mockClient{})
+	defer func() { output.Out = os.Stdout }()
+	sensitive := "customer_email@example.test"
+
+	setRootArgs(t, []string{"inbox", "reports", "company", "--param", sensitive})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), sensitive)
+	assert.Contains(t, err.Error(), "expected key=value")
 }
 
 func TestReportsEmailPathMapping(t *testing.T) {
@@ -49,7 +61,7 @@ func TestReportsEmailPathMapping(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "reports", "email"})
+	setRootArgs(t, []string{"inbox", "reports", "email"})
 	require.NoError(t, rootCmd.Execute())
 }
 
@@ -63,7 +75,7 @@ func TestReportsRatingsPathMapping(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "reports", "ratings"})
+	setRootArgs(t, []string{"inbox", "reports", "ratings"})
 	require.NoError(t, rootCmd.Execute())
 }
 
@@ -77,7 +89,7 @@ func TestReportsUsersPathMapping(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "reports", "users"})
+	setRootArgs(t, []string{"inbox", "reports", "users"})
 	require.NoError(t, rootCmd.Execute())
 }
 

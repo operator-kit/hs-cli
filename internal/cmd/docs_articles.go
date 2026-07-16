@@ -35,6 +35,7 @@ func newDocsArticlesCmd() *cobra.Command {
 	searchCmd.Flags().String("site", "", "filter by site ID")
 	searchCmd.Flags().String("status", "", "filter by status")
 	searchCmd.Flags().String("visibility", "", "filter by visibility")
+	markProtectedFlags(searchCmd, "query")
 	searchCmd.MarkFlagRequired("query")
 
 	getCmd := docsArticlesGetCmd()
@@ -54,6 +55,7 @@ func newDocsArticlesCmd() *cobra.Command {
 	createCmd.Flags().StringSlice("categories", nil, "category IDs")
 	createCmd.Flags().StringSlice("related", nil, "related article IDs")
 	createCmd.Flags().StringSlice("keywords", nil, "SEO keywords")
+	markProtectedFlags(createCmd, "name", "text", "keywords")
 	createCmd.MarkFlagRequired("collection")
 	createCmd.MarkFlagRequired("name")
 	createCmd.MarkFlagRequired("text")
@@ -67,6 +69,7 @@ func newDocsArticlesCmd() *cobra.Command {
 	updateCmd.Flags().StringSlice("categories", nil, "category IDs")
 	updateCmd.Flags().StringSlice("related", nil, "related article IDs")
 	updateCmd.Flags().StringSlice("keywords", nil, "SEO keywords")
+	markProtectedFlags(updateCmd, "name", "text", "keywords")
 
 	deleteCmd := docsArticlesDeleteCmd()
 	permission.Annotate(deleteCmd, "articles", permission.OpDelete)
@@ -74,6 +77,7 @@ func newDocsArticlesCmd() *cobra.Command {
 	uploadCmd := docsArticlesUploadCmd()
 	permission.Annotate(uploadCmd, "articles", permission.OpWrite)
 	uploadCmd.Flags().String("file", "", "file path to upload (required)")
+	markProtectedFlags(uploadCmd, "file")
 	uploadCmd.MarkFlagRequired("file")
 
 	viewsCmd := docsArticlesViewsUpdateCmd()
@@ -85,6 +89,7 @@ func newDocsArticlesCmd() *cobra.Command {
 	draftSaveCmd := docsArticlesDraftSaveCmd()
 	permission.Annotate(draftSaveCmd, "articles", permission.OpWrite)
 	draftSaveCmd.Flags().String("text", "", "draft body HTML (required)")
+	markProtectedFlags(draftSaveCmd, "text")
 	draftSaveCmd.MarkFlagRequired("text")
 
 	draftDeleteCmd := docsArticlesDraftDeleteCmd()

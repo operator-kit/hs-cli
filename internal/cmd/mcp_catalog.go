@@ -26,11 +26,12 @@ type mcpPositionalArgSpec struct {
 }
 
 type mcpFlagSpec struct {
-	Name     string
-	Property string
-	Usage    string
-	Type     string
-	Required bool
+	Name      string
+	Property  string
+	Usage     string
+	Type      string
+	Required  bool
+	Protected bool
 }
 
 func discoverMCPTools() ([]mcpToolSpec, error) {
@@ -202,11 +203,12 @@ func collectMCPFlags(cmd *cobra.Command) []mcpFlagSpec {
 		seen[flag.Name] = struct{}{}
 
 		flags = append(flags, mcpFlagSpec{
-			Name:     flag.Name,
-			Property: sanitizeMCPPropertyName(flag.Name),
-			Usage:    flag.Usage,
-			Type:     flag.Value.Type(),
-			Required: required,
+			Name:      flag.Name,
+			Property:  sanitizeMCPPropertyName(flag.Name),
+			Usage:     flag.Usage,
+			Type:      flag.Value.Type(),
+			Required:  required,
+			Protected: flag.Annotations != nil && len(flag.Annotations[protectedFlagAnnotation]) > 0,
 		})
 	}
 

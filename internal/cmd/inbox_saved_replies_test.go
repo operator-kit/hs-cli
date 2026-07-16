@@ -24,7 +24,7 @@ func TestSavedRepliesList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "saved-replies", "list", "--mailbox-id", "10", "--query", "welcome"})
+	setRootArgs(t, []string{"inbox", "saved-replies", "list", "--mailbox-id", "10", "--query", "welcome"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Welcome")
 }
@@ -40,7 +40,7 @@ func TestSavedRepliesGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "saved-replies", "get", "1"})
+	setRootArgs(t, []string{"inbox", "saved-replies", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Hi there")
 }
@@ -61,7 +61,7 @@ func TestSavedRepliesCreate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "saved-replies", "create",
 		"--mailbox-id", "10",
 		"--name", "Welcome",
@@ -86,7 +86,7 @@ func TestSavedRepliesUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "saved-replies", "update", "55", "--name", "Updated"})
+	setRootArgs(t, []string{"inbox", "saved-replies", "update", "55", "--name", "Updated"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated saved reply 55")
 }
@@ -102,7 +102,7 @@ func TestSavedRepliesDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "saved-replies", "delete", "55"})
+	setRootArgs(t, []string{"inbox", "saved-replies", "delete", "55"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Deleted saved reply 55")
 }

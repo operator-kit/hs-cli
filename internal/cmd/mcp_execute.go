@@ -30,6 +30,13 @@ type mcpCommandRunner struct {
 	debug             bool
 }
 
+type mcpInvocation struct {
+	Args            []string
+	Stdin           []byte
+	SafeDisplay     string
+	ProtectedValues []string
+}
+
 func newMCPCommandRunner(defaultOutputMode, configPath string, debug bool) (*mcpCommandRunner, error) {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -44,13 +51,14 @@ func newMCPCommandRunner(defaultOutputMode, configPath string, debug bool) (*mcp
 }
 
 func (r *mcpCommandRunner) execute(ctx context.Context, spec mcpToolSpec, args map[string]json.RawMessage) mcpToolCallResult {
-	argv, commandLine, err := r.buildInvocation(spec, args)
+	invocation, err := r.buildExecutionInvocation(spec, args)
 	if err != nil {
 		return mcpErrorResult(err.Error())
 	}
 
-	command := exec.CommandContext(ctx, r.executablePath, argv...)
+	command := exec.CommandContext(ctx, r.executablePath, invocation.Args...)
 	command.Env = setEnvVar(os.Environ(), "HS_NO_UPDATE_CHECK", "1")
+	command.Stdin = bytes.NewReader(invocation.Stdin)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -58,16 +66,17 @@ func (r *mcpCommandRunner) execute(ctx context.Context, spec mcpToolSpec, args m
 	command.Stderr = &stderr
 
 	runErr := command.Run()
-	stdoutText := strings.TrimSpace(stdout.String())
-	stderrText := strings.TrimSpace(stderr.String())
+	stdoutText := strings.TrimSpace(redactProtectedValues(stdout.String(), invocation.ProtectedValues))
+	stderrText := strings.TrimSpace(redactProtectedValues(stderr.String(), invocation.ProtectedValues))
 
 	if runErr != nil {
-		msg := fmt.Sprintf("command failed: %s\n%s", commandLine, strings.TrimSpace(stderrText))
-		if msg == fmt.Sprintf("command failed: %s\n", commandLine) && stdoutText != "" {
-			msg = fmt.Sprintf("command failed: %s\n%s", commandLine, stdoutText)
+		msg := fmt.Sprintf("command failed: %s\n%s", invocation.SafeDisplay, strings.TrimSpace(stderrText))
+		if msg == fmt.Sprintf("command failed: %s\n", invocation.SafeDisplay) && stdoutText != "" {
+			msg = fmt.Sprintf("command failed: %s\n%s", invocation.SafeDisplay, stdoutText)
 		}
-		if msg == fmt.Sprintf("command failed: %s\n", commandLine) {
-			msg = fmt.Sprintf("command failed: %s\n%s", commandLine, runErr.Error())
+		if msg == fmt.Sprintf("command failed: %s\n", invocation.SafeDisplay) {
+			msg = fmt.Sprintf("command failed: %s\n%s", invocation.SafeDisplay,
+				redactProtectedValues(runErr.Error(), invocation.ProtectedValues))
 		}
 		return mcpErrorResult(msg)
 	}
@@ -87,14 +96,29 @@ func (r *mcpCommandRunner) execute(ctx context.Context, spec mcpToolSpec, args m
 }
 
 func (r *mcpCommandRunner) buildInvocation(spec mcpToolSpec, args map[string]json.RawMessage) ([]string, string, error) {
-	argv := make([]string, 0, len(spec.CommandPath)+8)
+	invocation, err := r.buildExecutionInvocation(spec, args)
+	if err != nil {
+		return nil, "", err
+	}
+	return invocation.Args, invocation.SafeDisplay, nil
+}
+
+func (r *mcpCommandRunner) buildExecutionInvocation(spec mcpToolSpec, args map[string]json.RawMessage) (mcpInvocation, error) {
+	globalArgs := make([]string, 0, 4)
 	if r.configPath != "" {
-		argv = append(argv, "--config", r.configPath)
+		globalArgs = append(globalArgs, "--config", r.configPath)
 	}
 	if r.debug {
-		argv = append(argv, "--debug=true")
+		globalArgs = append(globalArgs, "--debug=true")
 	}
-	argv = append(argv, spec.CommandPath...)
+	commandArgs := append([]string{}, spec.CommandPath...)
+	safeArgs := append([]string{}, spec.CommandPath...)
+	envelope := protectedInputEnvelope{
+		Schema:  protectedInputSchema,
+		Command: append([]string{}, spec.CommandPath...),
+		Flags:   map[string]json.RawMessage{},
+	}
+	protectedValues := make([]string, 0, len(args))
 
 	allowed := map[string]struct{}{
 		"output_mode": {},
@@ -114,30 +138,34 @@ func (r *mcpCommandRunner) buildInvocation(spec mcpToolSpec, args map[string]jso
 	}
 	if len(unknown) > 0 {
 		sort.Strings(unknown)
-		return nil, "", fmt.Errorf("unknown arguments: %s", strings.Join(unknown, ", "))
+		return mcpInvocation{}, fmt.Errorf("unknown arguments: %s", strings.Join(unknown, ", "))
 	}
 
 	for _, arg := range spec.PositionalArgs {
 		raw, ok := args[arg.Property]
 		if !ok {
 			if arg.Required {
-				return nil, "", fmt.Errorf("missing required argument: %s", arg.Property)
+				return mcpInvocation{}, fmt.Errorf("missing required argument: %s", arg.Property)
 			}
 			continue
 		}
 
 		value, err := mcpStringFromRaw(raw)
 		if err != nil {
-			return nil, "", fmt.Errorf("invalid %s: %w", arg.Property, err)
+			return mcpInvocation{}, fmt.Errorf("invalid %s: %w", arg.Property, err)
 		}
 		value = strings.TrimSpace(value)
 		if value == "" {
 			if arg.Required {
-				return nil, "", fmt.Errorf("missing required argument: %s", arg.Property)
+				return mcpInvocation{}, fmt.Errorf("missing required argument: %s", arg.Property)
 			}
 			continue
 		}
-		argv = append(argv, value)
+		position := len(commandArgs) - len(spec.CommandPath)
+		placeholder := protectedArgumentPlaceholder(position)
+		commandArgs = append(commandArgs, placeholder)
+		safeArgs = append(safeArgs, "[protected]")
+		envelope.Positionals = append(envelope.Positionals, protectedPositionalInput{Index: position, Value: value})
 	}
 
 	for _, flag := range spec.Flags {
@@ -150,29 +178,47 @@ func (r *mcpCommandRunner) buildInvocation(spec mcpToolSpec, args map[string]jso
 		case "bool":
 			v, err := mcpBoolFromRaw(raw)
 			if err != nil {
-				return nil, "", fmt.Errorf("invalid %s: %w", flag.Property, err)
+				return mcpInvocation{}, fmt.Errorf("invalid %s: %w", flag.Property, err)
 			}
-			argv = append(argv, fmt.Sprintf("--%s=%t", flag.Name, v))
+			value := fmt.Sprintf("--%s=%t", flag.Name, v)
+			commandArgs = append(commandArgs, value)
+			safeArgs = append(safeArgs, value)
 		case "int", "int64", "uint", "uint64":
 			v, err := mcpIntFromRaw(raw)
 			if err != nil {
-				return nil, "", fmt.Errorf("invalid %s: %w", flag.Property, err)
+				return mcpInvocation{}, fmt.Errorf("invalid %s: %w", flag.Property, err)
 			}
-			argv = append(argv, "--"+flag.Name, strconv.FormatInt(v, 10))
+			value := strconv.FormatInt(v, 10)
+			commandArgs = append(commandArgs, "--"+flag.Name, value)
+			safeArgs = append(safeArgs, "--"+flag.Name, value)
 		case "stringSlice", "stringArray":
 			values, err := mcpStringSliceFromRaw(raw)
 			if err != nil {
-				return nil, "", fmt.Errorf("invalid %s: %w", flag.Property, err)
+				return mcpInvocation{}, fmt.Errorf("invalid %s: %w", flag.Property, err)
 			}
-			for _, value := range values {
-				argv = append(argv, "--"+flag.Name, value)
+			normalized, marshalErr := json.Marshal(values)
+			if marshalErr != nil {
+				return mcpInvocation{}, fmt.Errorf("encode %s: %w", flag.Property, marshalErr)
 			}
+			envelope.Flags[flag.Name] = normalized
+			if flag.Protected {
+				protectedValues = append(protectedValues, values...)
+			}
+			safeArgs = append(safeArgs, "--"+flag.Name, "[protected]")
 		default:
 			v, err := mcpStringFromRaw(raw)
 			if err != nil {
-				return nil, "", fmt.Errorf("invalid %s: %w", flag.Property, err)
+				return mcpInvocation{}, fmt.Errorf("invalid %s: %w", flag.Property, err)
 			}
-			argv = append(argv, "--"+flag.Name, v)
+			normalized, marshalErr := json.Marshal(v)
+			if marshalErr != nil {
+				return mcpInvocation{}, fmt.Errorf("encode %s: %w", flag.Property, marshalErr)
+			}
+			envelope.Flags[flag.Name] = normalized
+			if flag.Protected {
+				protectedValues = append(protectedValues, v)
+			}
+			safeArgs = append(safeArgs, "--"+flag.Name, "[protected]")
 		}
 	}
 
@@ -180,14 +226,14 @@ func (r *mcpCommandRunner) buildInvocation(spec mcpToolSpec, args map[string]jso
 	if raw, ok := args["output_mode"]; ok {
 		mode, err := mcpStringFromRaw(raw)
 		if err != nil {
-			return nil, "", fmt.Errorf("invalid output_mode: %w", err)
+			return mcpInvocation{}, fmt.Errorf("invalid output_mode: %w", err)
 		}
 		mode = strings.ToLower(strings.TrimSpace(mode))
 		if mode == "json-full" {
 			mode = mcpOutputJSONFull
 		}
 		if !isValidMCPOutputMode(mode) {
-			return nil, "", fmt.Errorf("invalid output_mode: %q (expected json|json_full)", mode)
+			return mcpInvocation{}, fmt.Errorf("invalid output_mode: %q (expected json|json_full)", mode)
 		}
 		outputMode = mode
 	}
@@ -196,10 +242,26 @@ func (r *mcpCommandRunner) buildInvocation(spec mcpToolSpec, args map[string]jso
 	if outputMode == mcpOutputJSONFull {
 		formatFlag = "json-full"
 	}
-	argv = append(argv, "--format", formatFlag)
+	commandArgs = append(commandArgs, "--format", formatFlag)
+	safeArgs = append(safeArgs, "--format", formatFlag)
 
-	commandLine := "hs " + strings.Join(argv, " ")
-	return argv, commandLine, nil
+	argv := append([]string{}, globalArgs...)
+	var stdin []byte
+	if len(envelope.Positionals) > 0 || len(envelope.Flags) > 0 {
+		var err error
+		stdin, err = json.Marshal(envelope)
+		if err != nil {
+			return mcpInvocation{}, fmt.Errorf("encode protected invocation: %w", err)
+		}
+		argv = append(argv, "--"+protectedInputFlagName, "-")
+	}
+	argv = append(argv, commandArgs...)
+	return mcpInvocation{
+		Args:            argv,
+		Stdin:           stdin,
+		SafeDisplay:     "hs " + strings.Join(safeArgs, " "),
+		ProtectedValues: compactProtectedValues(protectedValues),
+	}, nil
 }
 
 func mcpErrorResult(message string) mcpToolCallResult {

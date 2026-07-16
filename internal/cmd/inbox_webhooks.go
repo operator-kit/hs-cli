@@ -31,6 +31,7 @@ func newWebhooksCmd() *cobra.Command {
 	createCmd.Flags().IntSlice("mailbox-ids", nil, "mailbox IDs to scope the webhook")
 	createCmd.Flags().Bool("notification", false, "send lightweight notification payloads")
 	createCmd.Flags().String("label", "", "human-readable webhook label")
+	markProtectedFlags(createCmd, "url", "secret", "label")
 	createCmd.MarkFlagRequired("url")
 	createCmd.MarkFlagRequired("events")
 	createCmd.MarkFlagRequired("secret")
@@ -44,6 +45,7 @@ func newWebhooksCmd() *cobra.Command {
 	updateCmd.Flags().IntSlice("mailbox-ids", nil, "mailbox IDs to scope the webhook")
 	updateCmd.Flags().Bool("notification", false, "send lightweight notification payloads")
 	updateCmd.Flags().String("label", "", "human-readable webhook label")
+	markProtectedFlags(updateCmd, "url", "secret", "label")
 
 	listCmd := webhooksListCmd()
 	permission.Annotate(listCmd, "webhooks", permission.OpRead)

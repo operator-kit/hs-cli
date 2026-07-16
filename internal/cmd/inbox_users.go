@@ -24,6 +24,7 @@ func newUsersCmd() *cobra.Command {
 	permission.Annotate(listCmd, "users", permission.OpRead)
 	listCmd.Flags().String("email", "", "filter by email")
 	listCmd.Flags().String("mailbox", "", "filter by mailbox ID")
+	markProtectedFlags(listCmd, "email")
 
 	getCmd := usersGetCmd()
 	permission.Annotate(getCmd, "users", permission.OpRead)
@@ -287,6 +288,7 @@ func newUsersStatusCmd() *cobra.Command {
 	}
 	setCmd.Flags().String("status", "", "status value")
 	setCmd.Flags().String("json", "", "full status payload as JSON object")
+	markProtectedFlags(setCmd, "json")
 
 	permission.Annotate(listCmd, "users", permission.OpRead)
 	permission.Annotate(getCmd, "users", permission.OpRead)

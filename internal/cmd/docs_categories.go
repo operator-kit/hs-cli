@@ -34,6 +34,7 @@ func newDocsCategoriesCmd() *cobra.Command {
 	createCmd.Flags().String("visibility", "", "visibility (public|private)")
 	createCmd.Flags().Int("order", 0, "display order")
 	createCmd.Flags().String("default-sort", "", "default sort (name|number|popularity|manual)")
+	markProtectedFlags(createCmd, "name")
 	createCmd.MarkFlagRequired("collection")
 	createCmd.MarkFlagRequired("name")
 
@@ -44,6 +45,7 @@ func newDocsCategoriesCmd() *cobra.Command {
 	updateCmd.Flags().String("visibility", "", "visibility (public|private)")
 	updateCmd.Flags().Int("order", 0, "display order")
 	updateCmd.Flags().String("default-sort", "", "default sort (name|number|popularity|manual)")
+	markProtectedFlags(updateCmd, "name")
 
 	reorderCmd := docsCategoriesReorderCmd()
 	permission.Annotate(reorderCmd, "categories", permission.OpWrite)

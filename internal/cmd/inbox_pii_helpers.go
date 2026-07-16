@@ -24,10 +24,10 @@ var (
 	reportPIIContext       = pii.JSONContext{Resource: pii.ResourceReport}
 	attachmentPIIContext   = pii.JSONContext{Resource: pii.ResourceAttachment}
 
-	resolvePIISecret      = defaultResolvePIISecret
+	resolvePIIContext     = defaultResolvePIIContext
 	invocationPIIPrepared bool
 	invocationPIIMode     pii.Mode
-	invocationPIISecret   pii.Secret
+	invocationPIIContext  pii.PseudonymContext
 )
 
 func effectivePIIMode() (pii.Mode, error) {
@@ -45,7 +45,7 @@ func newPIIEngine() (*pii.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	secret, err := secretForPIIMode(context.Background(), mode)
+	pseudonym, err := contextForPIIMode(context.Background(), mode)
 	if err != nil {
 		return nil, err
 	}
@@ -56,26 +56,26 @@ func newPIIEngine() (*pii.Engine, error) {
 			opts = append(opts, pii.WithNER(d))
 		}
 	}
-	engine, err := pii.NewEngine(mode, secret, opts...)
+	engine, err := pii.NewEngine(mode, pseudonym, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating PII engine: %w", err)
 	}
 	return engine, nil
 }
 
-func defaultResolvePIISecret(ctx context.Context, mode pii.Mode, configPath string) (pii.Secret, error) {
+func defaultResolvePIIContext(ctx context.Context, mode pii.Mode, configPath string) (pii.PseudonymContext, error) {
 	path := config.ResolvedPath(configPath)
 	resolver := &piisetup.SecretResolver{
 		Store: secretstore.NewKeyringStore(),
 		Lock:  secretstore.NewFileLock(filepath.Join(filepath.Dir(path), ".pii-secret.lock")),
 	}
-	return resolver.Resolve(ctx, mode)
+	return resolver.ResolveContext(ctx, mode)
 }
 
 func resetPIIInvocation() {
 	invocationPIIPrepared = false
 	invocationPIIMode = pii.ModeOff
-	invocationPIISecret = pii.Secret{}
+	invocationPIIContext = pii.PseudonymContext{}
 }
 
 func preflightPIISecret(ctx context.Context) error {
@@ -83,29 +83,29 @@ func preflightPIISecret(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = secretForPIIMode(ctx, mode)
+	_, err = contextForPIIMode(ctx, mode)
 	return err
 }
 
-func secretForPIIMode(ctx context.Context, mode pii.Mode) (pii.Secret, error) {
+func contextForPIIMode(ctx context.Context, mode pii.Mode) (pii.PseudonymContext, error) {
 	if invocationPIIPrepared && invocationPIIMode == mode {
-		return invocationPIISecret, nil
+		return invocationPIIContext, nil
 	}
 	if !pii.IsEnabled(mode) {
 		invocationPIIPrepared = true
 		invocationPIIMode = mode
-		invocationPIISecret = pii.Secret{}
-		return pii.Secret{}, nil
+		invocationPIIContext = pii.PseudonymContext{}
+		return pii.PseudonymContext{}, nil
 	}
 
-	secret, err := resolvePIISecret(ctx, mode, cfgPath)
+	pseudonym, err := resolvePIIContext(ctx, mode, cfgPath)
 	if err != nil {
-		return pii.Secret{}, fmt.Errorf("resolving PII redaction secret: %w", err)
+		return pii.PseudonymContext{}, fmt.Errorf("resolving PII redaction key: %w", err)
 	}
 	invocationPIIPrepared = true
 	invocationPIIMode = mode
-	invocationPIISecret = secret
-	return secret, nil
+	invocationPIIContext = pseudonym
+	return pseudonym, nil
 }
 
 // redactRawWithPII is the mandatory presentation boundary for Inbox JSON. Once

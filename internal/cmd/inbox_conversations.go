@@ -39,6 +39,7 @@ func newConversationsCmd() *cobra.Command {
 	listCmd.Flags().String("custom-fields-by-ids", "", "custom field filters")
 	listCmd.Flags().String("query", "", "search query")
 	listCmd.Flags().String("embed", "", "embed resources (e.g. threads)")
+	markProtectedFlags(listCmd, "custom-fields-by-ids", "query")
 
 	createCmd := conversationsCreateCmd()
 	permission.Annotate(createCmd, "conversations", permission.OpWrite)
@@ -54,6 +55,7 @@ func newConversationsCmd() *cobra.Command {
 	createCmd.Flags().Bool("imported", false, "mark conversation as imported")
 	createCmd.Flags().Bool("auto-reply", false, "trigger auto-reply behavior")
 	createCmd.Flags().StringSlice("field", nil, "custom field assignment in <id>=<value> format (repeatable)")
+	markProtectedFlags(createCmd, "subject", "customer", "body", "field")
 	createCmd.MarkFlagRequired("mailbox")
 	createCmd.MarkFlagRequired("subject")
 	createCmd.MarkFlagRequired("customer")
@@ -63,6 +65,7 @@ func newConversationsCmd() *cobra.Command {
 	permission.Annotate(updateCmd, "conversations", permission.OpWrite)
 	updateCmd.Flags().String("subject", "", "new subject")
 	updateCmd.Flags().String("status", "", "new status")
+	markProtectedFlags(updateCmd, "subject")
 
 	getCmd := conversationsGetCmd()
 	permission.Annotate(getCmd, "conversations", permission.OpRead)
@@ -644,6 +647,7 @@ func newConversationFieldsCmd() *cobra.Command {
 	}
 	permission.Annotate(setCmd, "conversations", permission.OpWrite)
 	setCmd.Flags().StringSlice("field", nil, "custom field assignment in <id>=<value> format (repeatable)")
+	markProtectedFlags(setCmd, "field")
 	setCmd.MarkFlagRequired("field")
 
 	cmd := &cobra.Command{
@@ -700,11 +704,11 @@ func parseConversationFieldAssignments(entries []string) ([]types.ConversationFi
 	for _, entry := range entries {
 		parts := strings.SplitN(entry, "=", 2)
 		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-			return nil, fmt.Errorf("invalid --field value %q: expected <id>=<value>", entry)
+			return nil, fmt.Errorf("invalid --field value: expected <id>=<value>")
 		}
 		fieldID, err := strconv.Atoi(strings.TrimSpace(parts[0]))
 		if err != nil {
-			return nil, fmt.Errorf("invalid --field id %q: must be an integer", parts[0])
+			return nil, fmt.Errorf("invalid --field id: must be an integer")
 		}
 		fields = append(fields, types.ConversationField{
 			ID:    fieldID,

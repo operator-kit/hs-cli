@@ -21,7 +21,7 @@ func TestTagsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tags", "list"})
+	setRootArgs(t, []string{"inbox", "tags", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -39,7 +39,7 @@ func TestTagsGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tags", "get", "2"})
+	setRootArgs(t, []string{"inbox", "tags", "get", "2"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()

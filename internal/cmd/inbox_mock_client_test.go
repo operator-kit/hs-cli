@@ -338,8 +338,12 @@ func useTestPIISecretResolver() {
 	if err != nil {
 		panic(err)
 	}
-	resolvePIISecret = func(context.Context, pii.Mode, string) (pii.Secret, error) {
-		return secret, nil
+	pseudonym, err := pii.NewPseudonymContext(secret, "command-test")
+	if err != nil {
+		panic(err)
+	}
+	resolvePIIContext = func(context.Context, pii.Mode, string) (pii.PseudonymContext, error) {
+		return pseudonym, nil
 	}
 	resetPIIInvocation()
 }

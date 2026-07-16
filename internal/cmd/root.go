@@ -33,7 +33,8 @@ var (
 	commitStr  string
 	dateStr    string
 
-	updateResult chan string
+	updateResult              chan string
+	invocationProtectedValues []string
 )
 
 func SetVersion(version, commit, date string) {
@@ -47,6 +48,15 @@ var rootCmd = &cobra.Command{
 	Short: "HelpScout CLI — manage mailboxes, conversations, customers and more",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		resetPIIInvocation()
+		invocationProtectedValues = nil
+		appliedProtected, err := applyProtectedInput(cmd, args)
+		if err != nil {
+			return err
+		}
+		if err := rejectUnprotectedFlagValues(cmd, appliedProtected); err != nil {
+			return err
+		}
+		invocationProtectedValues = appliedProtected.values
 
 		// Skip everything for config subcommands
 		for c := cmd; c != nil; c = c.Parent() {
@@ -55,7 +65,6 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		var err error
 		cfg, err = config.Load(cfgPath)
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
@@ -218,6 +227,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&page, "page", 1, "page number")
 	rootCmd.PersistentFlags().IntVar(&perPage, "per-page", 25, "results per page")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "show HTTP debug output")
+	rootCmd.PersistentFlags().StringVar(&protectedInputPath, protectedInputFlagName, "", "read protected string arguments from a private JSON file ('-' for stdin)")
 
 	rootCmd.AddCommand(updateCmd)
 }
@@ -232,13 +242,14 @@ func Execute() error {
 		executedCmd = rootCmd
 	}
 
-	fmt.Fprintf(executedCmd.ErrOrStderr(), "Error: %v\n", err)
+	safeErr := fmt.Errorf("%s", redactProtectedValues(err.Error(), invocationProtectedValues))
+	fmt.Fprintf(executedCmd.ErrOrStderr(), "Error: %v\n", safeErr)
 	if shouldShowUsageForError(err) {
 		fmt.Fprintln(executedCmd.ErrOrStderr())
 		_ = executedCmd.Usage()
 	}
 
-	return err
+	return safeErr
 }
 
 func getFormat() string {

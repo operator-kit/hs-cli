@@ -16,7 +16,7 @@ func TestShouldShowUsageForError_UnknownCommand(t *testing.T) {
 func TestExecute_UnknownFlag_PrintsUsage(t *testing.T) {
 	_, buf := setupE2E(t)
 
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "--wat"})
+	setRootArgs(t, []string{"inbox", "config", "get", "--wat"})
 	err := Execute()
 	require.Error(t, err)
 
@@ -29,7 +29,7 @@ func TestExecute_UnknownFlag_PrintsUsage(t *testing.T) {
 func TestExecute_ArgCountMismatch_PrintsUsage(t *testing.T) {
 	_, buf := setupE2E(t)
 
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "a", "b"})
+	setRootArgs(t, []string{"inbox", "config", "get", "a", "b"})
 	err := Execute()
 	require.Error(t, err)
 
@@ -44,7 +44,7 @@ func TestExecute_MissingRequiredFlag_PrintsUsage(t *testing.T) {
 	t.Setenv("HS_INBOX_APP_ID", "test-id")
 	t.Setenv("HS_INBOX_APP_SECRET", "test-secret")
 
-	rootCmd.SetArgs([]string{"inbox", "saved-replies", "create"})
+	setRootArgs(t, []string{"inbox", "saved-replies", "create"})
 	err := Execute()
 	require.Error(t, err)
 
@@ -60,7 +60,7 @@ func TestExecute_RuntimeAuthError_DoesNotPrintUsage(t *testing.T) {
 	t.Setenv("HS_INBOX_APP_SECRET", "")
 	apiClient = nil
 
-	rootCmd.SetArgs([]string{"inbox", "customers", "list"})
+	setRootArgs(t, []string{"inbox", "customers", "list"})
 	err := Execute()
 	require.Error(t, err)
 
@@ -78,7 +78,7 @@ func TestExecute_RuntimeAuthError_DoesNotPrintUsage(t *testing.T) {
 func TestExecute_RuntimeError_DoesNotPrintUsage(t *testing.T) {
 	_, buf := setupE2E(t)
 
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", "invalid"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", "invalid"})
 	err := Execute()
 	require.Error(t, err)
 

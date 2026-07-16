@@ -60,7 +60,7 @@ func newReportFamilyCmd(name string, path string) *cobra.Command {
 			for _, p := range paramFlags {
 				parts := strings.SplitN(p, "=", 2)
 				if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-					return fmt.Errorf("invalid --param value %q: expected key=value", p)
+					return fmt.Errorf("invalid --param value: expected key=value")
 				}
 				params.Set(strings.TrimSpace(parts[0]), parts[1])
 			}
@@ -87,5 +87,6 @@ func newReportFamilyCmd(name string, path string) *cobra.Command {
 	cmd.Flags().String("mailbox", "", "mailbox ID filter")
 	cmd.Flags().String("view", "", "report view filter")
 	cmd.Flags().StringSlice("param", nil, "additional query params as key=value (repeatable)")
+	markProtectedFlags(cmd, "param")
 	return cmd
 }

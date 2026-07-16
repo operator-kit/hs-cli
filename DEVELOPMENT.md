@@ -159,6 +159,46 @@ See the official Go documentation for the
 - **output package**: Formatters write to `bytes.Buffer` for assertion
 - **selfupdate package**: Uses `httptest.Server` for GitHub API mocking, `DirOverride`/`InstallDirOverride` for filesystem isolation
 
+### PII regression architecture
+
+Normal tests use the synthetic corpus at
+`internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
+production or Help Scout API data. The hermetic evaluator injects exact fixture
+name spans and checks redaction, preservation, customer/staff separation, and
+long-content behavior. The existing model-release smoke test loads the real
+bundle and scores the same corpus for complete expected-name coverage,
+unexpected person spans, chunking, and a two-minute evaluation budget:
+
+```bash
+HS_PII_MODEL_SMOKE_DIR=/path/to/extracted/bundle \
+  go test ./internal/pii/ner -run TestRuntimeBundleSmoke -count=1 -v -timeout=5m
+```
+
+The model-tag workflow runs that smoke on every advertised Linux and macOS
+target. Normal unit jobs skip it when `HS_PII_MODEL_SMOKE_DIR` is absent.
+
+Command tests call `setRootArgs`, which automatically moves annotated fixture
+values into the protected stdin envelope before Cobra parses argv. A regression
+that intentionally proves raw-argv rejection must call `rootCmd.SetArgs`
+directly and reset Cobra's changed flags first.
+
+### Protected inputs and pseudonym keys
+
+Use `markProtectedFlags` for any new flag that can contain PII, credentials,
+authored free text, or a private local path. The root preflight accepts those
+values only from the schema-1 `--protected-input` envelope. MCP transports all
+string values through that channel and uses the annotation to scrub genuinely
+sensitive values from child failures without erasing public IDs from output.
+
+Enabled PII engines accept only a `pii.PseudonymContext`, never bare secret
+material. The context combines the private HMAC key, explicit public key ID,
+and identity schema. The setup resolver persists a versioned keyring record;
+under the cross-process lock it migrates the pre-versioning 32-byte record by
+preserving those exact secret bytes and generating an independent random key
+ID. Never derive a public key ID from secret material: that would provide an
+offline verifier. Explicit deployments must set `HS_INBOX_PII_SECRET` and
+`HS_INBOX_PII_KEY_ID` together and rotate them together.
+
 ## Release
 
 Releases are automated via GitHub Actions. Push a `v*` tag to trigger a draft release with platform binaries:

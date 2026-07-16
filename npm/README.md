@@ -34,8 +34,8 @@ npx -y @operatorkit/hs inbox conversations list --status active
 # Get a conversation with threads
 npx -y @operatorkit/hs inbox conversations get 67890 --embed threads
 
-# Search articles
-npx -y @operatorkit/hs docs articles search --query "getting started"
+# List articles
+npx -y @operatorkit/hs docs articles list --collection <collection-id>
 
 # Team briefing — conversation counts per agent
 npx -y @operatorkit/hs inbox tools briefing
@@ -148,6 +148,11 @@ npx -y @operatorkit/hs mcp -t stdio
 
 Only the credentials for the APIs you use are required — `HS_INBOX_APP_ID` + `HS_INBOX_APP_SECRET` for Inbox, `HS_DOCS_API_KEY` for Docs. Permission and PII variables are optional.
 
+Sensitive CLI flags are marked `protected input only` and use a private JSON
+stdin/file envelope instead of argv; MCP applies that transport automatically.
+See the repository's
+[protected command input guide](https://github.com/operator-kit/hs-cli#protected-command-input).
+
 ## PII redaction
 
 An ML-powered PII redaction system designed for shared terminals, MCP/LLM workflows, and incident-safe exports.
@@ -185,7 +190,8 @@ Without the model installed, freeform text fields are hidden with a notice. Stru
 | `HS_FORMAT` | Default output format |
 | `HS_INBOX_PII_MODE` | PII redaction mode: `off`, `customers`, `all` |
 | `HS_INBOX_PII_ALLOW_UNREDACTED` | Allow `--unredacted` bypass |
-| `HS_INBOX_PII_SECRET` | Secret salt for deterministic pseudonyms |
+| `HS_INBOX_PII_SECRET` | Optional explicit private HMAC key; requires `HS_INBOX_PII_KEY_ID` |
+| `HS_INBOX_PII_KEY_ID` | Public rotation ID paired with an explicit PII secret |
 | `HS_INBOX_PERMISSIONS` | Inbox permission policy |
 | `HS_DOCS_PERMISSIONS` | Docs permission policy |
 | `HS_NO_UPDATE_CHECK` | Disable daily update check (`1`) |

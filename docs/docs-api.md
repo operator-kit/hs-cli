@@ -24,6 +24,32 @@ hs docs auth logout
 | `HS_DOCS_API_KEY` | Docs API key (overrides `docs_api_key`) |
 | `HS_DOCS_PERMISSIONS` | Docs permission policy |
 
+## Protected command input
+
+Search text, authored content, email lists, URL mappings, credential values,
+and upload paths marked `protected input only` are rejected on argv. Use the
+schema-versioned stdin/private-file envelope described in the
+[Inbox reference](inbox-api.md#protected-command-input), changing `command` to
+the exact Docs path, for example:
+
+```bash
+hs --protected-input - docs articles search
+```
+
+After the process starts, paste this envelope into stdin and signal EOF:
+
+```json
+{
+  "schema": 1,
+  "command": ["docs", "articles", "search"],
+  "flags": {"query": "password reset"}
+}
+```
+
+MCP performs this automatically. Later inline examples show logical API values
+for compactness; protected flag/value pairs must be moved into the envelope
+before execution.
+
 ## Permissions
 
 Same mechanism as Inbox permissions. When `HS_DOCS_PERMISSIONS` is set, only explicitly granted `resource:operation` pairs are allowed. When unset, everything is allowed.

@@ -60,78 +60,202 @@ func fixedSecretBytes(value byte) []byte {
 	return bytes.Repeat([]byte{value}, GeneratedSecretBytes)
 }
 
+func environment(secret, keyID string) func(string) (string, bool) {
+	return func(name string) (string, bool) {
+		switch name {
+		case EnvSecret:
+			return secret, secret != ""
+		case EnvKeyID:
+			return keyID, keyID != ""
+		default:
+			return "", false
+		}
+	}
+}
+
 func TestSecretResolverEnvironmentOverridesStoreAndPreservesBytes(t *testing.T) {
 	store := &memorySecretStore{loadErr: errors.New("store must not be called")}
 	resolver := &SecretResolver{
-		Store: store,
-		LookupEnv: func(string) (string, bool) {
-			return "  stable-secret  ", true
-		},
+		Store:     store,
+		LookupEnv: environment("  stable-secret  ", " Release-2026 "),
 	}
 
-	got, err := resolver.Resolve(context.Background(), pii.ModeAll)
+	got, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("ResolveContext returned error: %v", err)
 	}
 	want, err := pii.NewSecretString("  stable-secret  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
+	if got.Secret() != want {
 		t.Fatal("resolver changed explicit environment-secret bytes")
+	}
+	if got.KeyID() != "release-2026" || got.Schema() != pii.IdentitySchemaV2 {
+		t.Fatalf("resolved metadata = %q/%q", got.KeyID(), got.Schema())
 	}
 	if store.loadCalls != 0 || store.saveCalls != 0 {
 		t.Fatalf("environment override touched store: loads=%d saves=%d", store.loadCalls, store.saveCalls)
 	}
 }
 
-func TestSecretResolverBlankEnvironmentUsesStoredSecret(t *testing.T) {
-	stored := fixedSecretBytes(0x21)
-	store := &memorySecretStore{value: stored}
-	resolver := &SecretResolver{
-		Store: store,
-		LookupEnv: func(string) (string, bool) {
-			return "  \t ", true
-		},
-	}
-
-	got, err := resolver.Resolve(context.Background(), pii.ModeCustomers)
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	want, err := pii.NewSecret(stored)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want {
-		t.Fatal("resolver did not use stored secret")
+func TestSecretResolverEnvironmentRequiresSecretAndPublicKeyIDTogether(t *testing.T) {
+	for _, fixture := range []struct {
+		name   string
+		secret string
+		keyID  string
+	}{
+		{name: "missing key ID", secret: "private-secret"},
+		{name: "missing secret", keyID: "release-2026"},
+		{name: "invalid key ID", secret: "private-secret", keyID: "contains spaces"},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			resolver := &SecretResolver{LookupEnv: environment(fixture.secret, fixture.keyID)}
+			_, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
+			if err == nil || !strings.Contains(err.Error(), EnvSecret) || !strings.Contains(err.Error(), EnvKeyID) {
+				t.Fatalf("ResolveContext error = %v", err)
+			}
+		})
 	}
 }
 
-func TestSecretResolverGeneratesStoresAndReusesSecret(t *testing.T) {
+func TestSecretResolverRejectsExplicitBlankEnvironmentValues(t *testing.T) {
+	for _, fixture := range []struct {
+		name   string
+		values map[string]string
+	}{
+		{name: "blank secret", values: map[string]string{EnvSecret: "", EnvKeyID: "release-2026"}},
+		{name: "blank key ID", values: map[string]string{EnvSecret: "private-secret", EnvKeyID: "  "}},
+		{name: "blank secret only", values: map[string]string{EnvSecret: ""}},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			store := &memorySecretStore{loadErr: errors.New("store must not be called")}
+			resolver := &SecretResolver{
+				Store: store,
+				LookupEnv: func(name string) (string, bool) {
+					value, ok := fixture.values[name]
+					return value, ok
+				},
+			}
+			_, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
+			if err == nil || !strings.Contains(err.Error(), EnvSecret) || !strings.Contains(err.Error(), EnvKeyID) {
+				t.Fatalf("ResolveContext error = %v", err)
+			}
+			if store.loadCalls != 0 {
+				t.Fatalf("invalid explicit environment fell back to store: loads=%d", store.loadCalls)
+			}
+		})
+	}
+}
+
+func TestSecretResolverUsesVersionedStoredContext(t *testing.T) {
+	storedSecret := fixedSecretBytes(0x21)
+	record, err := encodeStoredPseudonym(storedSecret, "stored-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &memorySecretStore{value: record}
+	resolver := &SecretResolver{
+		Store:     store,
+		LookupEnv: environment("", ""),
+	}
+
+	got, err := resolver.ResolveContext(context.Background(), pii.ModeCustomers)
+	if err != nil {
+		t.Fatalf("ResolveContext returned error: %v", err)
+	}
+	want, err := pii.NewSecret(storedSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Secret() != want || got.KeyID() != "stored-a" {
+		t.Fatalf("resolver returned wrong stored context: key ID %q", got.KeyID())
+	}
+	if store.saveCalls != 0 {
+		t.Fatalf("versioned record was unexpectedly rewritten %d times", store.saveCalls)
+	}
+}
+
+func TestSecretResolverMigratesLegacyRawSecretUnderLock(t *testing.T) {
+	legacySecret := fixedSecretBytes(0x31)
+	keyRandom := bytes.Repeat([]byte{0x52}, GeneratedKeyIDBytes)
+	wantKeyID, err := generateKeyID(bytes.NewReader(keyRandom))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &memorySecretStore{value: append([]byte(nil), legacySecret...)}
+	lock := &memoryInitializationLock{}
+	resolver := &SecretResolver{
+		Store:     store,
+		Lock:      lock,
+		Random:    bytes.NewReader(keyRandom),
+		LookupEnv: environment("", ""),
+	}
+
+	first, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
+	if err != nil {
+		t.Fatalf("first ResolveContext returned error: %v", err)
+	}
+	second, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
+	if err != nil {
+		t.Fatalf("second ResolveContext returned error: %v", err)
+	}
+	wantSecret, err := pii.NewSecret(legacySecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Secret() != wantSecret || second.Secret() != wantSecret {
+		t.Fatal("legacy migration changed private key material")
+	}
+	if first.KeyID() != wantKeyID || second.KeyID() != wantKeyID {
+		t.Fatalf("migrated key IDs = %q/%q, want %q", first.KeyID(), second.KeyID(), wantKeyID)
+	}
+	if bytes.Equal(store.value, legacySecret) {
+		t.Fatal("legacy record was not migrated")
+	}
+	if store.saveCalls != 1 || lock.calls != 1 {
+		t.Fatalf("migration saves/locks = %d/%d, want 1/1", store.saveCalls, lock.calls)
+	}
+}
+
+func TestSecretResolverGeneratesStoresAndReusesContext(t *testing.T) {
 	store := &memorySecretStore{}
 	lock := &memoryInitializationLock{}
-	random := fixedSecretBytes(0x42)
+	secretRandom := fixedSecretBytes(0x42)
+	keyRandom := bytes.Repeat([]byte{0x24}, GeneratedKeyIDBytes)
+	random := append(append([]byte(nil), secretRandom...), keyRandom...)
 	resolver := &SecretResolver{
 		Store:     store,
 		Lock:      lock,
 		Random:    bytes.NewReader(random),
-		LookupEnv: func(string) (string, bool) { return "", false },
+		LookupEnv: environment("", ""),
 	}
 
-	first, err := resolver.Resolve(context.Background(), pii.ModeAll)
+	first, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
 	if err != nil {
-		t.Fatalf("first Resolve returned error: %v", err)
+		t.Fatalf("first ResolveContext returned error: %v", err)
 	}
-	second, err := resolver.Resolve(context.Background(), pii.ModeAll)
+	second, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
 	if err != nil {
-		t.Fatalf("second Resolve returned error: %v", err)
+		t.Fatalf("second ResolveContext returned error: %v", err)
 	}
 	if first != second {
-		t.Fatal("stored secret was not reused")
+		t.Fatal("stored pseudonym context was not reused")
 	}
-	if !bytes.Equal(store.value, random) {
-		t.Fatal("generated secret was not persisted exactly")
+	wantSecret, err := pii.NewSecret(secretRandom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantKeyID, err := generateKeyID(bytes.NewReader(keyRandom))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Secret() != wantSecret || first.KeyID() != wantKeyID {
+		t.Fatalf("generated context key ID = %q, want %q", first.KeyID(), wantKeyID)
+	}
+	stored, err := decodeStoredPseudonym(store.value)
+	if err != nil || stored.legacySecret != nil || stored.context != first {
+		t.Fatalf("stored versioned record did not round-trip: %v", err)
 	}
 	if store.saveCalls != 1 {
 		t.Fatalf("save calls = %d, want 1", store.saveCalls)
@@ -147,12 +271,12 @@ func TestSecretResolverOffDoesNotTouchDependencies(t *testing.T) {
 		},
 	}
 
-	got, err := resolver.Resolve(context.Background(), pii.ModeOff)
+	got, err := resolver.ResolveContext(context.Background(), pii.ModeOff)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("ResolveContext returned error: %v", err)
 	}
 	if !got.IsZero() {
-		t.Fatal("off mode returned a secret")
+		t.Fatal("off mode returned a pseudonym context")
 	}
 }
 
@@ -160,14 +284,14 @@ func TestSecretResolverStoreFailureIsSafeAndActionable(t *testing.T) {
 	store := &memorySecretStore{loadErr: errors.New("dbus path /private/user leaked")}
 	resolver := &SecretResolver{
 		Store:     store,
-		LookupEnv: func(string) (string, bool) { return "", false },
+		LookupEnv: environment("", ""),
 	}
 
-	_, err := resolver.Resolve(context.Background(), pii.ModeAll)
+	_, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
 	if err == nil {
-		t.Fatal("Resolve returned no error")
+		t.Fatal("ResolveContext returned no error")
 	}
-	if !strings.Contains(err.Error(), EnvSecret) {
+	if !strings.Contains(err.Error(), EnvSecret) || !strings.Contains(err.Error(), EnvKeyID) {
 		t.Fatalf("error does not explain environment recovery: %v", err)
 	}
 	if strings.Contains(err.Error(), "dbus") || strings.Contains(err.Error(), "/private/user") {
@@ -175,15 +299,20 @@ func TestSecretResolverStoreFailureIsSafeAndActionable(t *testing.T) {
 	}
 }
 
-func TestSecretResolverRejectsInvalidStoredSecret(t *testing.T) {
-	store := &memorySecretStore{value: []byte("short")}
-	resolver := &SecretResolver{
-		Store:     store,
-		LookupEnv: func(string) (string, bool) { return "", false },
-	}
-
-	if _, err := resolver.Resolve(context.Background(), pii.ModeAll); err == nil {
-		t.Fatal("Resolve accepted an invalid stored secret")
+func TestSecretResolverRejectsInvalidStoredRecord(t *testing.T) {
+	for _, raw := range [][]byte{
+		[]byte("short"),
+		[]byte(`{"schema":1,"identity_schema":"v2","key_id":"bad id","secret":"AA"}`),
+		[]byte(`{"schema":2,"identity_schema":"v2","key_id":"key-a","secret":"AA"}`),
+	} {
+		store := &memorySecretStore{value: raw}
+		resolver := &SecretResolver{Store: store, LookupEnv: environment("", "")}
+		if _, err := resolver.ResolveContext(context.Background(), pii.ModeAll); err == nil {
+			t.Fatalf("ResolveContext accepted invalid stored record %q", raw)
+		}
+		if store.saveCalls != 0 {
+			t.Fatal("invalid record was overwritten")
+		}
 	}
 }
 
@@ -194,19 +323,19 @@ func TestSecretResolverConcurrentInitializersConverge(t *testing.T) {
 	resolver := &SecretResolver{
 		Store:     store,
 		Lock:      lock,
-		Random:    bytes.NewReader(bytes.Repeat([]byte{0x7c}, GeneratedSecretBytes*workers)),
-		LookupEnv: func(string) (string, bool) { return "", false },
+		Random:    bytes.NewReader(bytes.Repeat([]byte{0x7c}, (GeneratedSecretBytes+GeneratedKeyIDBytes)*workers)),
+		LookupEnv: environment("", ""),
 	}
 
-	results := make(chan pii.Secret, workers)
+	results := make(chan pii.PseudonymContext, workers)
 	errs := make(chan error, workers)
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			secret, err := resolver.Resolve(context.Background(), pii.ModeAll)
-			results <- secret
+			pseudonym, err := resolver.ResolveContext(context.Background(), pii.ModeAll)
+			results <- pseudonym
 			errs <- err
 		}()
 	}
@@ -216,17 +345,17 @@ func TestSecretResolverConcurrentInitializersConverge(t *testing.T) {
 
 	for err := range errs {
 		if err != nil {
-			t.Fatalf("Resolve returned error: %v", err)
+			t.Fatalf("ResolveContext returned error: %v", err)
 		}
 	}
-	var first pii.Secret
-	for secret := range results {
+	var first pii.PseudonymContext
+	for pseudonym := range results {
 		if first.IsZero() {
-			first = secret
+			first = pseudonym
 			continue
 		}
-		if secret != first {
-			t.Fatal("concurrent initializers returned different secrets")
+		if pseudonym != first {
+			t.Fatal("concurrent initializers returned different contexts")
 		}
 	}
 	if store.saveCalls != 1 {

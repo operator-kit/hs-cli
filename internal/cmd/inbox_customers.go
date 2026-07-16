@@ -32,23 +32,23 @@ func newCustomersCmd() *cobra.Command {
 	listCmd.Flags().String("sort-order", "", "sort order")
 	listCmd.Flags().String("query", "", "search query (e.g. email)")
 	listCmd.Flags().String("embed", "", "embed resources (e.g. emails)")
+	markProtectedFlags(listCmd, "first-name", "last-name", "query")
 	listCmd.Flags().MarkDeprecated("embed", "does not map to the Inbox API customers endpoint and will be removed")
 
 	createCmd := customersCreateCmd()
 	permission.Annotate(createCmd, "customers", permission.OpWrite)
 	registerCustomerBodyFlags(createCmd)
-	createCmd.MarkFlagRequired("first-name")
 
 	updateCmd := customersUpdateCmd()
 	permission.Annotate(updateCmd, "customers", permission.OpWrite)
 	updateCmd.Flags().String("first-name", "", "first name")
 	updateCmd.Flags().String("last-name", "", "last name")
 	updateCmd.Flags().String("phone", "", "phone number")
+	markProtectedFlags(updateCmd, "first-name", "last-name", "phone")
 
 	overwriteCmd := customersOverwriteCmd()
 	permission.Annotate(overwriteCmd, "customers", permission.OpWrite)
 	registerCustomerBodyFlags(overwriteCmd)
-	overwriteCmd.MarkFlagRequired("first-name")
 
 	deleteCmd := customersDeleteCmd()
 	permission.Annotate(deleteCmd, "customers", permission.OpDelete)
@@ -75,6 +75,9 @@ func registerCustomerBodyFlags(cmd *cobra.Command) {
 	cmd.Flags().String("photo-url", "", "photo URL")
 	cmd.Flags().Int("organization-id", 0, "organization ID")
 	cmd.Flags().String("json", "", "raw JSON body (overrides all other flags)")
+	markProtectedFlags(cmd,
+		"first-name", "last-name", "email", "phone", "job-title", "background",
+		"location", "gender", "age", "photo-url", "json")
 }
 
 // customerBodyFromFlags builds a request body from flags or --json.
@@ -118,6 +121,14 @@ func customerBodyFromFlags(cmd *cobra.Command) (map[string]any, error) {
 		body["organization"] = map[string]int{"id": v}
 	}
 	return body, nil
+}
+
+func requireCustomerFirstName(body map[string]any) error {
+	firstName, _ := body["firstName"].(string)
+	if firstName == "" {
+		return fmt.Errorf("customer firstName is required in protected --first-name or --json input")
+	}
+	return nil
 }
 
 func customersListCmd() *cobra.Command {
@@ -254,6 +265,9 @@ func customersCreateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid --json payload: %w", err)
 			}
+			if err := requireCustomerFirstName(body); err != nil {
+				return err
+			}
 
 			id, err := apiClient.CreateCustomer(context.Background(), body)
 			if err != nil {
@@ -321,6 +335,9 @@ func customersOverwriteCmd() *cobra.Command {
 			body, err := customerBodyFromFlags(cmd)
 			if err != nil {
 				return fmt.Errorf("invalid --json payload: %w", err)
+			}
+			if err := requireCustomerFirstName(body); err != nil {
+				return err
 			}
 
 			if err := apiClient.OverwriteCustomer(context.Background(), args[0], body); err != nil {

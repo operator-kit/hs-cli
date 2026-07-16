@@ -69,6 +69,7 @@ func newSavedRepliesCmd() *cobra.Command {
 	}
 	listCmd.Flags().String("mailbox-id", "", "filter by mailbox ID")
 	listCmd.Flags().String("query", "", "search query")
+	markProtectedFlags(listCmd, "query")
 
 	getCmd := &cobra.Command{
 		Use:   "get <id>",
@@ -176,6 +177,7 @@ func savedReplyCreateUpdateFlags(cmd *cobra.Command) {
 	cmd.Flags().String("body", "", "saved reply body text")
 	cmd.Flags().Bool("private", false, "mark saved reply as private")
 	cmd.Flags().String("json", "", "full request body as JSON object")
+	markProtectedFlags(cmd, "name", "subject", "body", "json")
 }
 
 func savedReplyBodyFromFlags(cmd *cobra.Command, isCreate bool) (map[string]any, error) {

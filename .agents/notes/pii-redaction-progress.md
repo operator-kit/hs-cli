@@ -7,10 +7,10 @@ Last updated: 2026-07-16
 - Original review findings: **14**
 - Critical findings: **4 of 4 complete**
 - High findings: **4 of 4 complete**
-- Remaining medium findings: **5 of 5 regression-reproduced; 0 fixed**
-- Original findings complete: **9 of 14**
-- Remaining original findings: **5 open**
-- Additional observations raised during remediation: **2 open**
+- Remaining medium findings: **5 of 5 complete**
+- Original findings complete: **14 of 14**
+- Remaining original findings: **0 open**
+- Additional observations raised during remediation: **4 open; 2 complete**
 - Regression-test commit: `7eb27a9 test: reproduce critical PII redaction leaks`
 - Critical-fix commit: `5a7ea63 fix: enforce PII redaction boundaries`
 - High-fix commits:
@@ -18,6 +18,8 @@ Last updated: 2026-07-16
   - `0cfa643 fix: require private keys for PII pseudonyms`
   - `f304833 fix: gate PII models by runtime capability`
   - `f4416c3 fix: verify and atomically install PII models`
+- Medium regression commit: `6357435 test: reproduce medium PII redaction gaps`
+- Medium fixes: current `fix: close remaining PII redaction gaps` change set
 - Last green baseline before the intentionally failing medium regressions:
   - `go test ./... -count=1 -timeout=5m`
   - `go vet ./...`
@@ -27,22 +29,26 @@ Last updated: 2026-07-16
   - release-script syntax validation with Git Bash
   - embedded archive sizes and SHA-256 values checked against all four
     published `pii-model-v0.2.0` assets
-- Current medium regression verification:
-  - expected failure: `go test ./internal/cmd -run '^TestPIIRegression_Medium10_' -count=1 -v`
-  - expected failure: `go test ./internal/pii -run '^TestPIIRegression_Medium(11|12|13|14)_' -count=1 -v`
-  - green control: `go test ./... -skip '^TestPIIRegression_Medium' -count=1 -timeout=5m`
+- Current medium-fix verification:
+  - green focused regressions: `go test ./internal/pii ./internal/cmd -count=1`
+  - green full suite: `go test ./... -count=1 -timeout=5m`
   - green static check: `go vet ./...`
+  - green local build: `go build -buildvcs=false ./...`
+  - green cross-builds: Linux and Darwin on amd64 and arm64 with
+    `CGO_ENABLED=0`
+  - clean module graph: `go mod tidy -diff`
 
-Race verification is now complete. CGO was present but disabled, and the
-default GCC configured by Go was absent. The complete suite passes in the
-digest-pinned Docker test environment and natively on Windows with a compatible
-MinGW-w64 compiler, including the Windows-only PII secret-store lock tests.
-Docker is the canonical local dependency; a preflighted native Windows wrapper
-runs in CI for platform-specific coverage.
+The preceding race baseline passed in the digest-pinned Docker environment and
+natively on Windows with a compatible MinGW-w64 compiler, including the
+Windows-only PII secret-store lock tests. Docker remains the canonical local
+dependency and a preflighted native Windows wrapper runs in CI. The medium-fix
+change set has not been rerun with the race detector in this workstation
+session because Docker Desktop is stopped and no compatible GCC is currently
+on `PATH`; the portable full suite, vet, and build checks are green.
 
-The medium regression batch deliberately leaves the focused tests red, matching
-the earlier critical workflow. Production fixes for findings 10–14 have not
-started; the rest of the repository remains green when those tests are skipped.
+The medium regressions and their production fixes are now green. Normal CI uses
+a synthetic, non-production multilingual corpus; the existing real bundle
+smoke job scores the same cases when model artifacts are available.
 
 The release workflow requires a real runtime/model smoke test on each
 advertised Linux and Darwin target before publishing; those four jobs will
@@ -111,11 +117,11 @@ particular, `personKey` precedence and fake-person derivation were not changed.
 | 7 | High | Windows can install a model bundle that the bundled runtime cannot execute. | [x] Complete | `PII-F04` |
 | 8 | High | Downloaded model hashes are generated after download and are not independent trust anchors. | [x] Complete | `PII-F05` |
 | 9 | Medium | Model installation is non-atomic and lacks explicit download size, extraction size, and timeout limits. | [x] Complete | `PII-F06` |
-| 10 | Medium | CLI and MCP arguments can expose PII through argv, shell history, process inspection, and echoed command errors. | [ ] Reproduced; fix pending | `PII-F07` |
-| 11 | Medium | The small fake-name lists permit visually identical pseudonyms for different people. | [ ] Reproduced; fix pending | `PII-F08` |
-| 12 | Medium | Identity canonicalization does not normalize Unicode composition or define broader Unicode case/space semantics. | [ ] Reproduced; fix pending | `PII-F09` |
-| 13 | Medium | Secret rotation changes every identity without a key version or migration policy. | [ ] Reproduced; fix pending | `PII-F10` |
-| 14 | Medium | There is no maintained multilingual privacy corpus measuring false negatives and false positives. | [ ] Reproduced; fix pending | `PII-F11` |
+| 10 | Medium | CLI and MCP arguments can expose PII through argv, shell history, process inspection, and echoed command errors. | [x] Complete | `PII-F07` |
+| 11 | Medium | The small fake-name lists permit visually identical pseudonyms for different people. | [x] Complete | `PII-F08` |
+| 12 | Medium | Identity canonicalization does not normalize Unicode composition or define broader Unicode case/space semantics. | [x] Complete | `PII-F09` |
+| 13 | Medium | Secret rotation changes every identity without a key version or migration policy. | [x] Complete | `PII-F10` |
+| 14 | Medium | There is no maintained multilingual privacy corpus measuring false negatives and false positives. | [x] Complete | `PII-F11` |
 
 ## Completed critical work
 
@@ -335,63 +341,61 @@ archive attacks, HTTP/cancellation/runtime failures, concurrency, stale
 cleanup, marker/file damage, and preservation of a previous install. Implemented
 in `f4416c3`.
 
-## Open original findings
+## Completed medium work
 
-The focused contracts below are intentionally failing until their production
-fixes land. They use synthetic values and local process fixtures only; no Help
-Scout API calls or production content are involved.
+### 10. Protected command boundaries — complete
 
-### 10. Sensitive arguments cross process boundaries — open
+- MCP string inputs travel in a bounded schema-1 stdin envelope; child argv and
+  safe command displays contain placeholders.
+- Errors, stdout, and stderr are scrubbed using only values classified as
+  protected, preserving useful public IDs.
+- Direct CLI flags that can carry PII, credentials, authored content, or local
+  paths are annotated and rejected on argv. Help identifies them as
+  `protected input only`; stdin and private regular files are supported.
+- The command suite itself moves sensitive fixtures through this boundary, and
+  the focused regression proves raw direct-CLI input is stopped before API
+  work without echoing its value.
 
-Emails, search terms, message bodies, and custom-field values can enter argv.
-The MCP runner also reconstructs command lines in errors. Prefer stdin or
-protected files for sensitive input, redact reconstructed errors, and
-eventually let MCP call application services without a CLI subprocess.
+Longer-term service-layer MCP execution remains a worthwhile architectural
+improvement, but is no longer required to keep protected values off the current
+subprocess boundary.
 
-Regression evidence: `TestPIIRegression_Medium10_SensitiveMCPInputsStayOffProcessBoundaries`
-shows the fixture email and body in child argv, reconstructed command text, and
-returned MCP errors.
+### 11. Collision-safe display identities — complete
 
-### 11. Visual pseudonym collisions — open
+Displayed last names now carry a stable 40-bit HMAC-derived disambiguator and
+the public key ID. The original deterministic first name, base last name, and
+generated email remain pinned for already-canonical inputs; two fixture people
+that formerly both displayed as `Casey Stewart` are now visually distinct.
 
-Different identities can receive the same fake first/last name because table
-views may omit the generated email suffix. Add a readable deterministic
-disambiguator without exposing a source identifier.
+### 12. Versioned Unicode canonicalization — complete
 
-Regression evidence: `TestPIIRegression_Medium11_DisplayNamesDisambiguateDistinctPeople`
-shows two distinct fixture identities rendering as `Casey Stewart`, despite
-their generated emails being distinct.
+Identity schema `v2` applies NFC, Unicode case folding, NFC recomposition, and
+Unicode whitespace collapsing to names. Emails retain established
+trim/lowercase semantics with NFC added. Tests cover NFC/NFD equivalence,
+non-ASCII folding, and Unicode whitespace.
 
-### 12. Unicode identity canonicalization is incomplete — open
+### 13. Explicit rotation context and migration — complete
 
-NFC and NFD spellings can derive different person keys despite appearing
-identical. Define normalization, case-folding, and whitespace rules as a
-versioned identity-key schema before changing current output.
+- Enabled engines require one encapsulated `PseudonymContext` containing the
+  private HMAC key, public key ID, and identity schema; no secret-only engine
+  composition path remains.
+- New keyring records are schema-versioned JSON. Existing raw 32-byte records
+  are migrated under the cross-process initialization lock, preserving the
+  exact secret and adding an independently random public ID.
+- Explicit deployments must set `HS_INBOX_PII_SECRET` and
+  `HS_INBOX_PII_KEY_ID` together. IDs are validated and never derived from the
+  secret. Rotation means changing both intentionally; the displayed marker
+  identifies the active rotation.
 
-Regression evidence: `TestPIIRegression_Medium12_IdentityKeysNormalizeUnicodeComposition`
-shows visually identical NFC and NFD spellings producing different keys.
+### 14. Multilingual quality corpus — complete
 
-### 13. Secret rotation is unversioned — open
-
-Changing the secret intentionally changes every display identity, but output
-has no key identifier and there is no migration or historical-correlation
-policy. Design rotation together with issues 5 and 12.
-
-Regression evidence: `TestPIIRegression_Medium13_SecretRotationHasAnExplicitKeyIdentifier`
-confirms rotation changes the fixture pseudonym and that the engine exposes no
-opaque key identifier for callers to distinguish rotations.
-
-### 14. No multilingual quality corpus — open
-
-Build a synthetic, non-production evaluation corpus measuring privacy recall,
-false positives, customer/staff separation, long-content behavior, and
-performance across supported languages and scripts. Never use raw production
-content to construct it.
-
-Regression evidence: `TestPIIRegression_Medium14_MultilingualPrivacyCorpusIsMaintained`
-requires a schema-checked synthetic corpus covering Latin, Arabic, and Han
-scripts; redact and preserve outcomes; and the originally identified quality
-dimensions. The fixture is currently absent.
+The maintained synthetic corpus covers Latin, Arabic, and Han scripts;
+redaction and preservation; people, addresses, identifiers, customer/staff
+policy, and long content. Normal tests are hermetic. The real model release
+smoke uses the same corpus to require complete expected-name span coverage,
+zero unexpected person spans in the fixtures, long-content chunking, and a
+two-minute evaluation budget. Execution evidence awaits the next model-tag
+workflow because the model bundle is intentionally not part of the repository.
 
 ## Additional observations raised during remediation
 
@@ -411,14 +415,50 @@ current CLI and MCP subprocess model lets process exit reclaim the runtime, but
 an in-process server or future application-service integration should give the
 engine/detector explicit ownership and deterministic cleanup.
 
+### A3. Plain five-digit values were treated as ZIP codes — complete
+
+The new preserve corpus exposed `Order 12345` as a false positive. Plain
+five-digit values now require nearby ZIP/postal context or an already-redacted
+address/PO box; ZIP+4 remains independently specific enough to redact.
+
+### A4. Customer JSON creation relied on stale Cobra flag state — complete
+
+`customers create --json` marked `--first-name` required even though JSON is an
+alternative source, so a clean process would reject it and the old test passed
+only after another singleton-command test set the flag. Required `firstName`
+is now validated from the assembled protected body for both scalar and JSON
+input.
+
+### A5 / PII-F12. Disabled low-level identity methods can still pseudonymize — open
+
+The public `RedactPerson`, `RedactEmail`, and `RedactPhone` methods do not
+individually short-circuit when the engine mode is `off`. Current JSON and text
+entry points guard on `Enabled`, so supported command paths remain pass-through,
+but a future caller using an identity method directly could receive a
+pseudonym derived from an empty context. The engine API should enforce the
+mode invariant at its lowest public boundary and pin direct disabled-mode
+tests.
+
+### A6 / PII-F13. Legacy generated-email namespace can collide at scale — open
+
+Issue 11 deliberately preserved the established generated email format while
+adding strong disambiguation to full display names. That email format contains
+50 first-name choices, 50 last-name choices, and a 16-bit suffix—about 164
+million possible addresses, with birthday collisions becoming plausible around
+tens of thousands of identities. Email-only views therefore retain a residual
+collision risk. Expanding the suffix or adding the public key ID should be an
+explicit display/schema compatibility decision, not an implicit change inside
+the completed `v2` name fix.
+
 ## Suggested next sequence
 
-1. Reduce argv/MCP exposure in issue 10 before expanding sensitive write tools.
-2. Design issues 11–13 and A1 together as a versioned identity-key,
-   disambiguation, normalization, and secret-rotation contract.
-3. Build issue 14's evaluation corpus before changing model or normalization
-   behavior, so privacy regressions become measurable.
-4. Give the NER detector explicit invocation-scoped ownership before moving
+1. Design A1 as a future identity-alias schema without changing the completed
+   `v2` email/name precedence implicitly.
+2. Decide whether a future display schema may expand generated emails, and pin
+   the migration/compatibility contract before changing the legacy format.
+3. Give the NER detector explicit invocation-scoped ownership before moving
    the CLI/MCP flow into a long-lived in-process service.
+4. Make every public identity-redaction method honor `ModeOff` directly before
+   those methods are reused outside the guarded JSON/text presentation paths.
 5. Treat native Windows inference as a separate capability: add it only after
    a real Windows loader/model smoke job passes.

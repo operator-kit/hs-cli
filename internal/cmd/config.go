@@ -51,6 +51,7 @@ func newConfigSetCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&setInboxPIIAllow, "inbox-pii-allow-unredacted", false, "allow per-request --unredacted override")
 	cmd.Flags().StringVar(&setDocsAPIKey, "docs-api-key", "", "HelpScout Docs API key")
 	cmd.Flags().StringVar(&setDocsPermissions, "docs-permissions", "", "Docs permission policy")
+	markProtectedFlags(cmd, "inbox-app-secret", "docs-api-key")
 	return cmd
 }
 

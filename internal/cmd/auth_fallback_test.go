@@ -100,7 +100,7 @@ func TestAuthStatus_ConfigFallback_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "status"})
+	setRootArgs(t, []string{"inbox", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Authenticated")
@@ -118,7 +118,7 @@ func TestDocsAuthStatus_ConfigFallback_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	rootCmd.SetArgs([]string{"docs", "auth", "status"})
+	setRootArgs(t, []string{"docs", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Authenticated")
@@ -139,7 +139,7 @@ func TestAuthLogout_ClearsConfig_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "logout"})
+	setRootArgs(t, []string{"inbox", "auth", "logout"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Credentials removed")
@@ -164,7 +164,7 @@ func TestDocsAuthLogout_ClearsConfig_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	rootCmd.SetArgs([]string{"docs", "auth", "logout"})
+	setRootArgs(t, []string{"docs", "auth", "logout"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Docs API key removed")
@@ -181,7 +181,7 @@ func TestAuthStatus_NotAuthenticated_NoKeyringNoConfig_E2E(t *testing.T) {
 	t.Setenv("HS_INBOX_APP_ID", "")
 	t.Setenv("HS_INBOX_APP_SECRET", "")
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "status"})
+	setRootArgs(t, []string{"inbox", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Not authenticated")
@@ -192,7 +192,7 @@ func TestDocsAuthStatus_NotAuthenticated_E2E(t *testing.T) {
 
 	t.Setenv("HS_DOCS_API_KEY", "")
 
-	rootCmd.SetArgs([]string{"docs", "auth", "status"})
+	setRootArgs(t, []string{"docs", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Not authenticated")
