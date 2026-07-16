@@ -28,7 +28,7 @@ available for later planning.
 | PII-F09 | Medium | Complete | Identity canonicalization does not normalize Unicode composition. | Resolved by versioned Unicode canonicalization schema v2. |
 | PII-F10 | Medium | Complete | Secret rotation changes every displayed identity with no migration/version marker. | Resolved with explicit key IDs and locked legacy-record migration. |
 | PII-F11 | Medium | Complete | There is no measurable multilingual detection-quality corpus. | Resolved with hermetic and real-model corpus evaluators. |
-| PII-F12 | Medium | Open | Disabled low-level identity methods still pseudonymize when called directly. | Enforce mode at each public identity-redaction boundary. |
+| PII-F12 | Medium | Complete | Disabled low-level identity methods still pseudonymized when called directly. | Resolved with direct ModeOff guards and pass-through regressions. |
 | PII-F13 | Medium | Open | The compatibility-preserved generated-email namespace can collide at scale. | Version any email-format expansion and define migration expectations. |
 
 ## PII-F01 — Identity keys vary across payload shapes
@@ -152,18 +152,16 @@ The checked-in corpus is entirely synthetic. Hermetic tests cover policy and
 redaction mechanics; the real model release smoke measures full expected-name
 coverage, unexpected person spans, chunked long content, and runtime budget.
 
-## PII-F12 — Disabled low-level identity methods bypass the mode invariant
+## PII-F12 — Disabled low-level identity methods bypass the mode invariant — complete
 
 `RedactJSONWithContext` and `RedactText` return input unchanged when the engine
-is disabled, but `RedactPerson`, `RedactEmail`, and `RedactPhone` do not check
-the mode themselves. Supported command paths currently enter through guarded
-presentation methods, so this is not a known CLI leak. It is nevertheless a
-fragile public API contract: a future direct caller can pseudonymize with the
-zero context accepted by `NewEngine(ModeOff, ...)`.
+is disabled. `RedactPerson`, `RedactEmail`, and `RedactPhone` now enforce that
+same invariant independently at their public boundaries. Disabled calls return
+the exact name, email, and phone inputs, perform no hashing, and do not mutate
+the engine's pseudonym caches. Higher-level guards remain as cheap early exits.
 
-Add direct `ModeOff` pass-through tests for all three methods, then put the
-guard at those lowest public boundaries. Keep the higher-level guards as cheap
-early exits.
+`TestPIIRegression_FollowUp12_ModeOffLowLevelIdentityMethodsPassThrough`
+provides direct regression coverage for all three methods and cache state.
 
 ## PII-F13 — Legacy generated-email namespace can collide at scale
 

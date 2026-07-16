@@ -267,6 +267,21 @@ Regression proof:
 - `TestRuntimeBundleSmoke`
 - `.github/workflows/pii-model.yml` native smoke matrix
 
+## Additional contract PII-F12 — Enforce ModeOff at low-level identity boundaries — complete
+
+Every public identity-redaction method must enforce the engine mode itself.
+When the engine is `ModeOff`, `RedactPerson`, `RedactEmail`, and `RedactPhone`
+must return their exact inputs without hashing, deriving a pseudonym from the
+zero context, or mutating pseudonym caches. Callers must not need to remember an
+outer JSON/text guard for the mode contract to hold.
+
+Higher-level guards remain required as cheap early exits; they are not a
+substitute for encapsulation at the public low-level boundary.
+
+Regression proof:
+
+- `TestPIIRegression_FollowUp12_ModeOffLowLevelIdentityMethodsPassThrough`
+
 ## Rules for extending the PII surface
 
 Before merging a new PII-bearing path:

@@ -93,6 +93,24 @@ func TestRedactText_Disabled_Passthrough(t *testing.T) {
 	}
 }
 
+func TestPIIRegression_FollowUp12_ModeOffLowLevelIdentityMethodsPassThrough(t *testing.T) {
+	e := mustTestEngine(ModeOff, "")
+
+	first, last, email := e.RedactPerson("Alice", "Smith", "ALICE@example.com ")
+	if first != "Alice" || last != "Smith" || email != "ALICE@example.com " {
+		t.Fatalf("disabled person redaction changed input: %q %q <%s>", first, last, email)
+	}
+	if got := e.RedactEmail("ALICE@example.com "); got != "ALICE@example.com " {
+		t.Fatalf("disabled email redaction changed input: %q", got)
+	}
+	if got := e.RedactPhone("+1 (555) 123-4567"); got != "+1 (555) 123-4567" {
+		t.Fatalf("disabled phone redaction changed input: %q", got)
+	}
+	if len(e.people) != 0 || len(e.replace) != 0 {
+		t.Fatalf("disabled identity methods mutated pseudonym caches: people=%d replacements=%d", len(e.people), len(e.replace))
+	}
+}
+
 func TestRedactTextUsesKnownIdentity(t *testing.T) {
 	e := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	text := "Alice Smith wrote from alice@example.com"

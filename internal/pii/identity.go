@@ -108,6 +108,9 @@ func (e *Engine) ShouldRedactType(entityType string) bool {
 }
 
 func (e *Engine) RedactPerson(first, last, email string) (string, string, string) {
+	if !e.Enabled() {
+		return first, last, email
+	}
 	key := personKey(first, last, email)
 	if key == "" {
 		return first, last, email
@@ -129,6 +132,9 @@ func (e *Engine) RedactPerson(first, last, email string) (string, string, string
 }
 
 func (e *Engine) RedactEmail(email string) string {
+	if !e.Enabled() {
+		return email
+	}
 	if strings.TrimSpace(email) == "" {
 		return email
 	}
@@ -137,6 +143,9 @@ func (e *Engine) RedactEmail(email string) string {
 }
 
 func (e *Engine) RedactPhone(phone string) string {
+	if !e.Enabled() {
+		return phone
+	}
 	digits := onlyDigits(phone)
 	if digits == "" {
 		return phone

@@ -10,7 +10,7 @@ Last updated: 2026-07-16
 - Remaining medium findings: **5 of 5 complete**
 - Original findings complete: **14 of 14**
 - Remaining original findings: **0 open**
-- Additional observations raised during remediation: **4 open; 2 complete**
+- Additional observations raised during remediation: **3 open; 3 complete**
 - Regression-test commit: `7eb27a9 test: reproduce critical PII redaction leaks`
 - Critical-fix commit: `5a7ea63 fix: enforce PII redaction boundaries`
 - High-fix commits:
@@ -438,15 +438,14 @@ only after another singleton-command test set the flag. Required `firstName`
 is now validated from the assembled protected body for both scalar and JSON
 input.
 
-### A5 / PII-F12. Disabled low-level identity methods can still pseudonymize — open
+### A5 / PII-F12. Disabled low-level identity methods could pseudonymize — complete
 
-The public `RedactPerson`, `RedactEmail`, and `RedactPhone` methods do not
-individually short-circuit when the engine mode is `off`. Current JSON and text
-entry points guard on `Enabled`, so supported command paths remain pass-through,
-but a future caller using an identity method directly could receive a
-pseudonym derived from an empty context. The engine API should enforce the
-mode invariant at its lowest public boundary and pin direct disabled-mode
-tests.
+`RedactPerson`, `RedactEmail`, and `RedactPhone` now each enforce `ModeOff`
+directly and return their exact inputs without hashing or mutating pseudonym
+caches. Higher-level JSON/text guards remain as cheap early exits, but callers
+can no longer bypass the mode invariant by using a public identity method
+directly. `TestPIIRegression_FollowUp12_ModeOffLowLevelIdentityMethodsPassThrough`
+pins all three methods and the no-cache-mutation contract.
 
 ### A6 / PII-F13. Legacy generated-email namespace can collide at scale — open
 
@@ -467,7 +466,5 @@ the completed `v2` name fix.
    the migration/compatibility contract before changing the legacy format.
 3. Give the NER detector explicit invocation-scoped ownership before moving
    the CLI/MCP flow into a long-lived in-process service.
-4. Make every public identity-redaction method honor `ModeOff` directly before
-   those methods are reused outside the guarded JSON/text presentation paths.
-5. Treat native Windows inference as a separate capability: add it only after
+4. Treat native Windows inference as a separate capability: add it only after
    a real Windows loader/model smoke job passes.
