@@ -19,7 +19,7 @@ Last updated: 2026-07-16
   - `f304833 fix: gate PII models by runtime capability`
   - `f4416c3 fix: verify and atomically install PII models`
 - Medium regression commit: `6357435 test: reproduce medium PII redaction gaps`
-- Medium fixes: current `fix: close remaining PII redaction gaps` change set
+- Medium fixes: `8b237e4 fix: close remaining PII redaction gaps`
 - Last green baseline before the intentionally failing medium regressions:
   - `go test ./... -count=1 -timeout=5m`
   - `go vet ./...`
@@ -64,6 +64,11 @@ The implementation design used for high issues 5–8 is recorded in
 `pii-redaction-high-issues-implementation-plan.md`. It also includes issue 9
 because provenance verification and transactional installation must ship as
 one model-install boundary.
+
+The normative, issue-by-issue invariants and regression evidence are recorded
+in `docs/pii-redaction-hardening-contract.md`. Future changes should use that
+contract as the merge checklist; this progress report remains the historical
+implementation record.
 
 ## What was already good
 
@@ -264,15 +269,19 @@ Evidence:
 
 ### 5. Private keyed display identities — complete
 
-- Enabled engines now require an opaque non-empty `pii.Secret` and always use
-  HMAC; the unkeyed SHA-256 branch no longer exists.
+- Enabled engines now require a `PseudonymContext` containing an opaque
+  non-empty `pii.Secret` and always use HMAC; the unkeyed SHA-256 branch no
+  longer exists.
 - An explicit `HS_INBOX_PII_SECRET` retains its exact bytes and preserves the
-  baseline deterministic display identities.
-- When the environment variable is absent or blank, the application resolves
-  a generated 32-byte installation secret from the OS keyring.
+  baseline deterministic derivation. It must be paired with a non-blank
+  `HS_INBOX_PII_KEY_ID`.
+- When both environment variables are absent, the application resolves a
+  generated 32-byte installation secret and independent public key ID from the
+  OS keyring. An explicitly blank or partial pair fails closed.
 - Cross-process initialization locking makes concurrent first use converge on
-  one secret. Keyring, RNG, and lock failures stop protected work before API
-  access and never persist secret material in YAML or diagnostics.
+  one versioned key context. Keyring, RNG, and lock failures stop protected
+  work before API access and never persist secret material in YAML or
+  diagnostics.
 
 Evidence includes resolver precedence, keyring round-trip, concurrent
 initialization, lock, command preflight, failure-path, and golden identity

@@ -256,6 +256,10 @@ Tool names are namespaced (e.g. `helpscout_inbox_conversations_list`). Default o
 
 hs-cli includes an ML-powered PII redaction system designed for shared terminals, MCP/LLM workflows, and incident-safe exports.
 
+Maintainers should treat the
+[PII redaction hardening contract](docs/pii-redaction-hardening-contract.md)
+as the normative checklist for all 14 completed security and privacy findings.
+
 ### Why this matters
 
 Traditional redaction tools either hide entire blocks of content (destroying context) or rely on brittle regex patterns that miss real names. hs-cli takes a different approach:

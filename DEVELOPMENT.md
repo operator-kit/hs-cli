@@ -161,6 +161,12 @@ See the official Go documentation for the
 
 ### PII regression architecture
 
+The normative invariants for all 14 completed review findings live in
+[`docs/pii-redaction-hardening-contract.md`](docs/pii-redaction-hardening-contract.md).
+Treat its extension checklist as required review criteria for any new
+PII-bearing command, presenter, identity rule, runtime target, or installer
+path.
+
 Normal tests use the synthetic corpus at
 `internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
 production or Help Scout API data. The hermetic evaluator injects exact fixture
