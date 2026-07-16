@@ -259,6 +259,9 @@ hs-cli includes an ML-powered PII redaction system designed for shared terminals
 Maintainers should treat the
 [PII redaction hardening contract](docs/pii-redaction-hardening-contract.md)
 as the normative checklist for all 14 completed security and privacy findings.
+The [OpenAI Privacy Filter evaluation](docs/openai-privacy-filter-evaluation.md)
+documents the candidate model's coverage gains, footprint and runtime trade-offs,
+and the gated path recommended before any detector migration.
 
 ### Why this matters
 

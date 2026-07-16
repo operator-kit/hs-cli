@@ -167,6 +167,12 @@ Treat its extension checklist as required review criteria for any new
 PII-bearing command, presenter, identity rule, runtime target, or installer
 path.
 
+The current investigation of OpenAI's local Privacy Filter model is recorded in
+[docs/openai-privacy-filter-evaluation.md](docs/openai-privacy-filter-evaluation.md).
+It is an evaluation and migration proposal, not an implementation decision; its
+quality, performance, parity, and supply-chain gates must pass before changing
+the production detector.
+
 Normal tests use the synthetic corpus at
 `internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
 production or Help Scout API data. The hermetic evaluator injects exact fixture
