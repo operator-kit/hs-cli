@@ -236,7 +236,38 @@ and no dependency from internal/pii onto upstream model packages.
 
 ## Test and evidence topology
 
-The migration requires three deliberately separate test lanes.
+The migration requires four deliberately separate test lanes.
+
+### Evidence authority and execution order
+
+Docker CI is the source of truth for reference behavior, model comparison,
+quality, secrets, Linux parity, and performance selection. Native release
+testing proves that the already-selected candidate works on an advertised
+platform; it does not choose the variant. A developer workstation provides
+diagnostic evidence only.
+
+| Evidence authority | Allowed decisions |
+|---|---|
+| Hermetic pull-request tests | Policy and implementation regressions without real weights |
+| Docker CI on ordinary runners | Reproducibility, parity, quality, secret, and functional gates |
+| Docker CI on named stable performance runners | Blocking latency, memory, footprint, concurrency, and H0/H1/H2 gates |
+| Native release runners | Selected-candidate platform, installer, packaging, and rollback gates |
+| Personal/local machine, including Windows | Sanity, exploratory compatibility, and bug reproduction only |
+
+The enforced order is:
+
+1. Hermetic tests pass.
+2. CI builds the pinned Docker image and verifies model artifacts.
+3. Every model variant is compared sequentially inside Docker.
+4. q4 and q4f16 complete Docker H0/H1/H2 quality and performance gates.
+5. CI records one selected or rejected candidate.
+6. Only a selected candidate advances to native release verification.
+
+Local results must carry evidence authority local-sanity and
+authoritative=false. They cannot set a gate to pass, update an approved
+baseline, alter a budget, choose a model variant, or approve a release. A local
+failure may create a checked-in synthetic regression, which Docker CI must then
+reproduce and adjudicate.
 
 ### Lane A — hermetic tests on every pull request
 
@@ -253,35 +284,47 @@ Docker, Python, or model weights. They use:
 This lane owns policy, rendering, offset, fail-closed, mode, identity,
 serialization, and command-boundary regressions.
 
-### Lane B — real-model quality and release smoke
+### Lane B — Docker CI real-model quality and reference smoke
 
-This lane runs in a repo-owned Docker reference environment and on each native
-supported platform. It uses pinned model artifacts supplied through the trusted
-installer or CI cache. It must never download a moving main revision.
+This authoritative lane runs in a repo-owned Docker reference environment. It
+uses pinned model artifacts supplied through a verified CI cache and mounted
+read-only. It must never download a moving main revision during evaluation.
 
 It owns:
 
 - official Python reference predictions;
 - original, default ONNX, fp16, generic-quantized, q4, and q4f16 comparison;
-- native ONNX parity;
+- Linux Go/ONNX parity;
 - real tokenizer and decoder behavior;
 - multilingual and adversarial corpus evaluation; and
-- real bundle installation and inference smoke.
+- real-model functional and secret smoke.
 
 It should run on workflow dispatch, model-related pull requests, a scheduled
 cadence, and every PII model release tag. Normal unit jobs continue to skip real
 inference when no trusted model directory is supplied.
 
-### Lane C — controlled performance regression
+### Lane C — controlled Docker CI performance regression
 
-Performance gates must run on named, stable hardware profiles. Shared hosted
-runner results may be recorded for trend information but must not be the only
-blocking evidence because host contention makes them noisy.
+Performance gates run in the same pinned Docker image on named, stable CI
+hardware profiles. Shared hosted-runner results may be recorded for trend
+information but cannot approve G6 because host contention makes them noisy.
 
 The benchmark harness, workloads, budgets, and result schema remain checked in.
 Individual reports are retained as CI artifacts and the approved release
 baseline is committed as a small metadata record. Raw model files and large
 reports are not committed.
+
+### Lane D — selected-candidate native release verification
+
+This lane starts only after Docker CI selects a candidate and G2-G6 pass. It
+loads that exact graph, tokenizer, calibration, decoder, runtime, and manifest
+on native Linux and macOS targets. It owns platform-library loading, installer,
+status, transactional promotion, native smoke, rollback, and release packaging.
+
+Native results cannot substitute another variant or silently adjust Docker
+quality/performance baselines. A native failure returns the candidate to
+implementation or rejects the platform/release; it does not cause CI to choose
+a different model automatically.
 
 ### Sequential comparison rule
 
@@ -417,7 +460,8 @@ Create the test contract before implementation results can influence it.
 2. Record the mode and replacement matrices in executable fixtures.
 3. Add the typed corpus partitions described above.
 4. Add a schema validator and metric calculator.
-5. Run the current DistilBERT-plus-regex pipeline to produce a baseline report.
+5. Run the current DistilBERT-plus-regex pipeline in authoritative Docker CI to
+   produce the baseline report.
 6. Freeze proposed performance workloads and budgets before running Privacy
    Filter.
 7. Record exact existing deterministic outputs for known identities.
@@ -569,11 +613,14 @@ the harness and regenerate results. Do not hand-edit span goldens.
 ### Goal
 
 Produce a Go/ONNX adapter that matches the pinned reference semantics and can be
-selected without changing domain policy.
+selected without changing domain policy. Its first real execution and parity
+gate occur inside the pinned Linux Docker CI environment; native host
+verification comes only after Docker gates pass.
 
 ### Work
 
-1. Validate ONNX Runtime operator and external-data support on every target.
+1. Validate ONNX Runtime operator and external-data support first inside the
+   pinned Linux Docker image, then on each selected native target.
 2. Implement or adopt the exact tokenizer with source-offset preservation.
 3. Validate the 33-class label map.
 4. Implement BIOES constrained Viterbi decoding and all pinned calibration
@@ -604,7 +651,7 @@ selected without changing domain policy.
 - TestLongInputIsNeverSilentlyTruncated
 - TestNativeErrorOrPartialWindowFailsClosed
 - FuzzDetectedSpanByteBoundaries
-- real-bundle native smoke for every supported target
+- TestDockerRuntimeBundleSmokeCoversEveryPublishedONNXVariant
 
 ### G3 pass criteria
 
@@ -621,8 +668,8 @@ selected without changing domain policy.
   0.5 percentage points of sensitivity-weighted F2 versus the original weights.
 - All malformed model, calibration, tokenizer, offset, window, and runtime
   conditions fail closed.
-- At least one quantized variant passes real native smoke on every platform that
-  will continue to be advertised.
+- At least one quantized variant passes the authoritative Docker Go/ONNX smoke
+  and parity gates before native platform work begins.
 
 ### Failure handling
 
@@ -818,14 +865,16 @@ Phase 0 must freeze concrete machines matching these provisional profiles:
 
 | Profile | Provisional resources | Purpose |
 |---|---|---|
-| H0 constrained minimum | 2 vCPU, 4 GiB RAM limit, CPU-only, SSD, swap disabled | Prove the replacement remains safe and usable on modest hardware |
-| H1 typical laptop/CI | 4 vCPU, 8 GiB RAM, CPU-only, SSD | Primary absolute and comparative benchmark |
-| H2 developer workstation | 8 vCPU, 16 GiB RAM, CPU-only, SSD | Scaling, thread-count, and throughput characterization |
+| H0 CI constrained | 2 vCPU, 4 GiB RAM limit, CPU-only, SSD, swap disabled | Prove the replacement remains safe and usable on modest hardware |
+| H1 CI reference | 4 vCPU, 8 GiB RAM, CPU-only, SSD | Primary absolute and comparative benchmark |
+| H2 CI high-resource | 8 vCPU, 16 GiB RAM, CPU-only, SSD | Scaling, thread-count, and throughput characterization |
 
-Native compatibility and smoke still run on Linux amd64, Linux arm64, macOS
-Intel, and macOS Apple Silicon. At least H0 and H1 must use stable named hosts
-rather than an unspecified shared runner. GPU or accelerator measurements are
-useful exploratory evidence but cannot qualify a CPU-default release.
+All H0/H1/H2 source-of-truth runs execute in the pinned container on CI. H0,
+H1, and H2 must use stable named CI hosts rather than an unspecified shared
+runner. Native compatibility and smoke later run on Linux amd64, Linux arm64,
+macOS Intel, and macOS Apple Silicon using only the selected candidate. GPU or
+accelerator measurements are useful exploratory evidence but cannot qualify a
+CPU-default release.
 
 Each hardware profile record must pin:
 
@@ -920,7 +969,10 @@ after host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 - BenchmarkEveryPublishedVariantOnReferenceHardware
 - TestEveryPublishedVariantHasPerformanceAndMemoryEvidence
 - TestVariantComparisonRunsInIsolatedProcesses
+- TestDockerGatesCompleteBeforeNativeReleaseJobs
+- TestGateEvidenceRejectsLocalSanityAsAuthoritative
 - TestPerformanceBudgetsSchemaAndHardwareProfile
+- TestApprovedPerformanceBaselineRequiresNamedCIRunner
 - TestHardwareProfileRecordsRequiredReproductionMetadata
 - TestCandidatePassesConstrainedMinimumHardwareProfile
 - TestSelectedBackendConstructsExactlyOneNeuralDetector
@@ -932,8 +984,7 @@ after host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 
 ### G6 pass criteria
 
-- Every hard budget passes on H0, H1, H2, and each required native release
-  profile.
+- Every hard budget passes in authoritative Docker CI on H0, H1, and H2.
 - Every published variant has a separate reference-hardware report and explicit
   oracle, comparator, candidate, selected, or rejected disposition.
 - q4 and q4f16 complete the full matrix and the selected variant is named in
@@ -945,6 +996,8 @@ after host-noise suspicion; conflicting runs leave the gate not-run, not pass.
   growth is observed.
 - The approved baseline JSON and CI report contain enough metadata to reproduce
   the run.
+- No local-sanity or unspecified shared-runner result can approve or rewrite the
+  baseline.
 
 ### Failure handling
 
@@ -1141,6 +1194,12 @@ A new model-focused workflow should run on:
 - a scheduled cadence; and
 - model release candidates.
 
+The workflow builds one repo-owned evaluation image from pinned base-image and
+dependency identities. Verified model artifacts live in the CI cache or an
+upstream preparation job and are mounted read-only; they are not baked into a
+multi-gigabyte image layer. The image digest, artifact hashes, corpus hash, and
+budget hash are recorded before any gate runs.
+
 Jobs should be separated into:
 
 1. Verify immutable source locks and build the reference image.
@@ -1154,12 +1213,37 @@ Jobs should be separated into:
 6. Prove the release bundle contains exactly one selected model variant.
 7. Publish only synthetic reports and reproducibility metadata.
 
+Jobs 2-4 run inside Docker and must pass before job 5 can start. The workflow
+should encode that ordering through job dependencies, not maintainer convention.
+The selected-candidate identity emitted by Docker CI is an immutable input to
+native jobs.
+
+### Local Windows sanity
+
+The personal Windows development machine may run:
+
+- hermetic Go tests;
+- the same Docker image for convenience;
+- exploratory native Windows adapter loading;
+- a short q4/q4f16 smoke; and
+- bug reproduction before creating a synthetic fixture.
+
+These results are deliberately non-gating because the machine's CPU load,
+thermal state, installed software, storage cache, and configuration are not
+controlled CI inputs. Local commands must emit evidence authority local-sanity
+and authoritative=false. They must not write the approved baseline or generate
+a release gate summary.
+
+Windows remains unsupported for production inference until the selected bundle
+passes a real native Windows CI smoke on a declared runner. A successful check
+on the personal machine is useful confidence, not platform support evidence.
+
 ### Model release workflow
 
 The existing pii-model.yml remains the release authority and must be extended
 only after preview integration. A release cannot be created until build, trust,
 native smoke, quality, secret, performance, and rollback jobs all pass for the
-same immutable candidate manifest.
+same immutable candidate manifest selected by Docker CI.
 
 ## Gate result record
 
@@ -1179,6 +1263,8 @@ conceptual shape:
       "runtime_version": "...",
       "platform": "linux-amd64",
       "hardware_profile": "...",
+      "evidence_authority": "docker-ci",
+      "authoritative": true,
       "gates": {
         "G0": "pass",
         "G1": "pass",
@@ -1187,16 +1273,18 @@ conceptual shape:
         "G4": "pass",
         "G5": "pass",
         "G6": "pass",
-        "G7": "pass",
-        "G8": "pass",
-        "G9": "pass",
-        "G10": "pass"
+        "G7": "not-run",
+        "G8": "not-run",
+        "G9": "not-run",
+        "G10": "not-run"
       }
     }
 
 The real schema will include metric values and evidence artifact names. The
 evaluator must calculate gate states; a workflow must not declare pass by
-manually setting a label.
+manually setting a label. A Docker CI record cannot mark native or rollout gates
+as passed. The final release decision references immutable Docker and native
+records in an aggregate promotion record rather than overwriting either source.
 
 ## Failure taxonomy and decision rules
 
@@ -1231,6 +1319,8 @@ changes. CI should encode those dependencies and force re-evaluation.
 9. Retiring DistilBERT does not retire the baseline reports used to explain the
    migration decision.
 10. The hardening contract remains normative over this plan.
+11. Local or personal-machine output can add a regression fixture but can never
+    approve, replace, or rebaseline Docker CI evidence.
 
 ## Suggested implementation sequence
 

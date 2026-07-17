@@ -179,6 +179,9 @@ It defines the single-detector target, phase entry and exit criteria, permanent
 test lanes, numerical quality and performance budgets, failure handling,
 preview rollout, rollback, and retirement sequence. Treat its gate fixtures and
 budgets as reviewed source: do not rebaseline them from candidate results.
+For this migration, the pinned Docker evaluation in CI is authoritative for
+model comparison and performance selection. Personal-machine and local Windows
+results are sanity evidence only and must not approve or rewrite a baseline.
 
 Normal tests use the synthetic corpus at
 `internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
