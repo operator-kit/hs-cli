@@ -21,25 +21,27 @@ const (
 )
 
 type EvidenceMetadata struct {
-	GitCommit          string
-	Backend            string
-	ModelRevision      string
-	Variant            string
-	ArtifactSHA256     string
-	RuntimeVersion     string
-	ContainerImage     string
-	Platform           string
-	HardwareProfile    string
-	RunnerName         string
-	CorpusSHA256       string
-	BroadCorpusSHA256  string
-	PolicySHA256       string
-	BudgetSHA256       string
-	IdentitySHA256     string
-	ReportSchemaSHA256 string
-	Artifacts          []ArtifactIdentity
-	EvidenceAuthority  EvidenceAuthority
-	Authoritative      bool
+	GitCommit              string
+	Backend                string
+	ModelRevision          string
+	Variant                string
+	ArtifactSHA256         string
+	RuntimeVersion         string
+	ContainerImage         string
+	Platform               string
+	HardwareProfile        string
+	RunnerName             string
+	CorpusSHA256           string
+	BroadCorpusSHA256      string
+	PolicySHA256           string
+	BudgetSHA256           string
+	IdentitySHA256         string
+	ReportSchemaSHA256     string
+	HardwareContractSHA256 string
+	HardwareContractReady  bool
+	Artifacts              []ArtifactIdentity
+	EvidenceAuthority      EvidenceAuthority
+	Authoritative          bool
 }
 
 type ArtifactIdentity struct {
@@ -69,32 +71,34 @@ const (
 )
 
 type Report struct {
-	Schema             int                 `json:"schema"`
-	GitCommit          string              `json:"git_commit"`
-	CorpusSHA256       string              `json:"corpus_sha256"`
-	BroadCorpusSHA256  string              `json:"broad_corpus_sha256"`
-	PolicySHA256       string              `json:"policy_sha256"`
-	BudgetSHA256       string              `json:"budget_sha256"`
-	IdentitySHA256     string              `json:"identity_sha256"`
-	ReportSchemaSHA256 string              `json:"report_schema_sha256"`
-	Backend            string              `json:"backend"`
-	ModelRevision      string              `json:"model_revision"`
-	Variant            string              `json:"variant"`
-	ArtifactSHA256     string              `json:"artifact_sha256"`
-	RuntimeVersion     string              `json:"runtime_version"`
-	ContainerImage     string              `json:"container_image"`
-	Platform           string              `json:"platform"`
-	HardwareProfile    string              `json:"hardware_profile"`
-	RunnerName         string              `json:"runner_name"`
-	EvidenceAuthority  EvidenceAuthority   `json:"evidence_authority"`
-	Authoritative      bool                `json:"authoritative"`
-	Artifacts          []ArtifactIdentity  `json:"artifacts"`
-	CasesEvaluated     int                 `json:"cases_evaluated"`
-	Detector           DetectorMetrics     `json:"detector"`
-	FinalOutput        []OutputMetrics     `json:"final_output"`
-	FinalOutputSlices  []OutputMetricSlice `json:"final_output_slices"`
-	CaseResults        []CaseResult        `json:"case_results"`
-	Gates              []GateResult        `json:"gates"`
+	Schema                 int                 `json:"schema"`
+	GitCommit              string              `json:"git_commit"`
+	CorpusSHA256           string              `json:"corpus_sha256"`
+	BroadCorpusSHA256      string              `json:"broad_corpus_sha256"`
+	PolicySHA256           string              `json:"policy_sha256"`
+	BudgetSHA256           string              `json:"budget_sha256"`
+	IdentitySHA256         string              `json:"identity_sha256"`
+	ReportSchemaSHA256     string              `json:"report_schema_sha256"`
+	HardwareContractSHA256 string              `json:"hardware_contract_sha256"`
+	HardwareContractReady  bool                `json:"hardware_contract_ready"`
+	Backend                string              `json:"backend"`
+	ModelRevision          string              `json:"model_revision"`
+	Variant                string              `json:"variant"`
+	ArtifactSHA256         string              `json:"artifact_sha256"`
+	RuntimeVersion         string              `json:"runtime_version"`
+	ContainerImage         string              `json:"container_image"`
+	Platform               string              `json:"platform"`
+	HardwareProfile        string              `json:"hardware_profile"`
+	RunnerName             string              `json:"runner_name"`
+	EvidenceAuthority      EvidenceAuthority   `json:"evidence_authority"`
+	Authoritative          bool                `json:"authoritative"`
+	Artifacts              []ArtifactIdentity  `json:"artifacts"`
+	CasesEvaluated         int                 `json:"cases_evaluated"`
+	Detector               DetectorMetrics     `json:"detector"`
+	FinalOutput            []OutputMetrics     `json:"final_output"`
+	FinalOutputSlices      []OutputMetricSlice `json:"final_output_slices"`
+	CaseResults            []CaseResult        `json:"case_results"`
+	Gates                  []GateResult        `json:"gates"`
 }
 
 type DetectorMetrics struct {
@@ -361,27 +365,29 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		finalizeOutputMetrics(*outputTotals[ModeAll]),
 	}
 	report := &Report{
-		Schema:             ReportSchemaVersion,
-		GitCommit:          metadata.GitCommit,
-		CorpusSHA256:       metadata.CorpusSHA256,
-		BroadCorpusSHA256:  metadata.BroadCorpusSHA256,
-		PolicySHA256:       metadata.PolicySHA256,
-		BudgetSHA256:       metadata.BudgetSHA256,
-		IdentitySHA256:     metadata.IdentitySHA256,
-		ReportSchemaSHA256: metadata.ReportSchemaSHA256,
-		Backend:            metadata.Backend,
-		ModelRevision:      metadata.ModelRevision,
-		Variant:            metadata.Variant,
-		ArtifactSHA256:     metadata.ArtifactSHA256,
-		RuntimeVersion:     metadata.RuntimeVersion,
-		ContainerImage:     metadata.ContainerImage,
-		Platform:           metadata.Platform,
-		HardwareProfile:    metadata.HardwareProfile,
-		RunnerName:         metadata.RunnerName,
-		EvidenceAuthority:  metadata.EvidenceAuthority,
-		Authoritative:      metadata.Authoritative,
-		Artifacts:          artifacts,
-		CasesEvaluated:     len(corpus.Cases),
+		Schema:                 ReportSchemaVersion,
+		GitCommit:              metadata.GitCommit,
+		CorpusSHA256:           metadata.CorpusSHA256,
+		BroadCorpusSHA256:      metadata.BroadCorpusSHA256,
+		PolicySHA256:           metadata.PolicySHA256,
+		BudgetSHA256:           metadata.BudgetSHA256,
+		IdentitySHA256:         metadata.IdentitySHA256,
+		ReportSchemaSHA256:     metadata.ReportSchemaSHA256,
+		HardwareContractSHA256: metadata.HardwareContractSHA256,
+		HardwareContractReady:  metadata.HardwareContractReady,
+		Backend:                metadata.Backend,
+		ModelRevision:          metadata.ModelRevision,
+		Variant:                metadata.Variant,
+		ArtifactSHA256:         metadata.ArtifactSHA256,
+		RuntimeVersion:         metadata.RuntimeVersion,
+		ContainerImage:         metadata.ContainerImage,
+		Platform:               metadata.Platform,
+		HardwareProfile:        metadata.HardwareProfile,
+		RunnerName:             metadata.RunnerName,
+		EvidenceAuthority:      metadata.EvidenceAuthority,
+		Authoritative:          metadata.Authoritative,
+		Artifacts:              artifacts,
+		CasesEvaluated:         len(corpus.Cases),
 		Detector: DetectorMetrics{
 			Exact:               exactTotal.metrics(),
 			Covering:            coveringTotal.metrics(),
@@ -410,7 +416,8 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 		"container image": metadata.ContainerImage, "platform": metadata.Platform, "hardware profile": metadata.HardwareProfile,
 		"runner name": metadata.RunnerName, "corpus sha256": metadata.CorpusSHA256, "broad corpus sha256": metadata.BroadCorpusSHA256,
 		"policy sha256": metadata.PolicySHA256, "budget sha256": metadata.BudgetSHA256, "identity sha256": metadata.IdentitySHA256,
-		"report schema sha256": metadata.ReportSchemaSHA256,
+		"report schema sha256":     metadata.ReportSchemaSHA256,
+		"hardware contract sha256": metadata.HardwareContractSHA256,
 	} {
 		if value == "" {
 			return fmt.Errorf("evaluate privacy corpus: evidence metadata is missing %s", name)
@@ -426,6 +433,7 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 		for name, value := range map[string]string{
 			"artifact": metadata.ArtifactSHA256, "corpus": metadata.CorpusSHA256, "broad corpus": metadata.BroadCorpusSHA256, "policy": metadata.PolicySHA256,
 			"budget": metadata.BudgetSHA256, "identity": metadata.IdentitySHA256, "report schema": metadata.ReportSchemaSHA256,
+			"hardware contract": metadata.HardwareContractSHA256,
 		} {
 			if len(value) != sha256HexLength {
 				return fmt.Errorf("evaluate privacy corpus: authoritative %s identity is not SHA-256", name)
@@ -841,7 +849,7 @@ func evaluateGates(metadata EvidenceMetadata, finalOutput []OutputMetrics) []Gat
 	for gate := 0; gate <= 10; gate++ {
 		state := GateNotRun
 		reason := "phase-not-evaluated"
-		if gate == 0 && metadata.Authoritative && metadata.EvidenceAuthority == AuthorityDockerCI {
+		if gate == 0 && metadata.Authoritative && metadata.EvidenceAuthority == AuthorityDockerCI && metadata.HardwareContractReady {
 			state = GatePass
 			reason = "authoritative-policy-freeze-evidence-complete"
 			seenOff := false
@@ -859,7 +867,11 @@ func evaluateGates(metadata EvidenceMetadata, finalOutput []OutputMetrics) []Gat
 				reason = "mode-off-evidence-missing"
 			}
 		} else if gate == 0 {
-			reason = "authoritative-docker-evidence-not-run"
+			if metadata.Authoritative && metadata.EvidenceAuthority == AuthorityDockerCI && !metadata.HardwareContractReady {
+				reason = "stable-hardware-identities-not-frozen"
+			} else {
+				reason = "authoritative-docker-evidence-not-run"
+			}
 		}
 		gates = append(gates, GateResult{Gate: fmt.Sprintf("G%d", gate), State: state, Reason: reason})
 	}

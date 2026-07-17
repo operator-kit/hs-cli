@@ -65,12 +65,20 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 	if _, err := evaluation.LoadPolicy(filepath.Join(fixtureDir, "policy.json")); err != nil {
 		t.Fatalf("load frozen typed policy: %v", err)
 	}
-	if _, _, err := evaluation.LoadPerformanceContract(
+	_, budgets, err := evaluation.LoadPerformanceContract(
 		filepath.Join(fixtureDir, "performance", "workloads.json"),
 		filepath.Join(fixtureDir, "performance", "budgets.json"),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatalf("load frozen performance contract: %v", err)
 	}
+	_, hardwareReady, err := evaluation.LoadHardwareIdentityContract(
+		filepath.Join(fixtureDir, "performance", "hardware-identities.json"), budgets,
+	)
+	if err != nil {
+		t.Fatalf("load frozen hardware identity contract: %v", err)
+	}
+	metadata.HardwareContractReady = hardwareReady
 	if _, err := evaluation.LoadIdentitySnapshot(filepath.Join(fixtureDir, "identity-compatibility.json")); err != nil {
 		t.Fatalf("load deterministic identity snapshot: %v", err)
 	}
@@ -78,9 +86,11 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 	metadata.BudgetSHA256 = mustHashFiles(t,
 		filepath.Join(fixtureDir, "performance", "budgets.json"),
 		filepath.Join(fixtureDir, "performance", "workloads.json"),
+		filepath.Join(fixtureDir, "performance", "hardware-identities.json"),
 	)
 	metadata.IdentitySHA256 = mustHashFile(t, filepath.Join(fixtureDir, "identity-compatibility.json"))
 	metadata.ReportSchemaSHA256 = mustHashFile(t, filepath.Join(fixtureDir, "report-schema.json"))
+	metadata.HardwareContractSHA256 = mustHashFile(t, filepath.Join(fixtureDir, "performance", "hardware-identities.json"))
 
 	secret, err := pii.NewSecretString("phase0-baseline-synthetic-pseudonym-key")
 	if err != nil {
@@ -147,7 +157,9 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 	if err := evaluation.WriteReport(reportPath, report); err != nil {
 		t.Fatalf("write DistilBERT baseline report: %v", err)
 	}
-	requireAuthoritativeG0Pass(t, report)
+	if metadata.Authoritative {
+		requireAuthoritativeG0Pass(t, report)
+	}
 	t.Logf("wrote synthetic-only DistilBERT G0 baseline: cases=%d exact_f2=%.6f covering_f2=%.6f", report.CasesEvaluated, report.Detector.Exact.F2, report.Detector.Covering.F2)
 }
 

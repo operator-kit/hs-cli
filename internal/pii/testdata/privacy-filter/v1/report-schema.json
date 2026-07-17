@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema", "git_commit", "corpus_sha256", "broad_corpus_sha256", "policy_sha256", "budget_sha256",
-    "identity_sha256", "report_schema_sha256", "backend", "model_revision", "variant",
+	"identity_sha256", "report_schema_sha256", "hardware_contract_sha256", "hardware_contract_ready", "backend", "model_revision", "variant",
     "artifact_sha256", "runtime_version", "container_image", "platform", "hardware_profile",
     "runner_name", "evidence_authority", "authoritative", "artifacts", "cases_evaluated",
     "detector", "final_output", "final_output_slices", "case_results", "gates"
@@ -16,6 +16,8 @@
     "git_commit": {"type": "string", "minLength": 1},
     "corpus_sha256": {"$ref": "#/$defs/sha256"},
 	"broad_corpus_sha256": {"$ref": "#/$defs/sha256"},
+	"hardware_contract_sha256": {"$ref": "#/$defs/sha256"},
+	"hardware_contract_ready": {"type": "boolean"},
     "policy_sha256": {"$ref": "#/$defs/sha256"},
     "budget_sha256": {"$ref": "#/$defs/sha256"},
     "identity_sha256": {"$ref": "#/$defs/sha256"},

@@ -7,6 +7,10 @@ on:
       - "internal/pii/**"
       - "scripts/pii-model-sources.json"
       - "scripts/privacy-filter-*.sh"
+      - "go.mod"
+      - "go.sum"
+      - "patches/onnxruntime-purego/go.mod"
+      - "patches/onnxruntime-purego/go.sum"
       - ".github/workflows/privacy-filter-evaluation.yml"
   push:
     paths:
@@ -14,6 +18,10 @@ on:
       - "internal/pii/**"
       - "scripts/pii-model-sources.json"
       - "scripts/privacy-filter-*.sh"
+      - "go.mod"
+      - "go.sum"
+      - "patches/onnxruntime-purego/go.mod"
+      - "patches/onnxruntime-purego/go.sum"
       - ".github/workflows/privacy-filter-evaluation.yml"
   schedule:
     - cron: "17 4 * * 1"

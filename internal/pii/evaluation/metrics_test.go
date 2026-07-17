@@ -248,6 +248,7 @@ func testMetadata() EvidenceMetadata {
 		Variant: "int8", ArtifactSHA256: hash, RuntimeVersion: "fixture-runtime",
 		ContainerImage: "fixture-image", Platform: "linux-amd64", HardwareProfile: "local", RunnerName: "fixture-runner", CorpusSHA256: hash, BroadCorpusSHA256: hash,
 		PolicySHA256: hash, BudgetSHA256: hash, IdentitySHA256: hash, ReportSchemaSHA256: hash,
+		HardwareContractSHA256: hash, HardwareContractReady: true,
 		Artifacts:         []ArtifactIdentity{{Name: "fixture-component", SHA256: hash, SizeBytes: 1}},
 		EvidenceAuthority: AuthorityLocal, Authoritative: false,
 	}

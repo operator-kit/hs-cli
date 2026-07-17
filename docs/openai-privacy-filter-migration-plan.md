@@ -1,6 +1,6 @@
 # OpenAI Privacy Filter Single-Detector Migration Plan
 
-- Status: approved direction; Phase 0 contract implemented; adapter work not started
+- Status: approved direction; Phase 0/G0 machinery implemented; authoritative G0 evidence not-run pending stable H0/H1/H2 identities and Docker CI; adapter work not started
 - Plan date: 17 July 2026
 - Decision owner: hs-cli maintainers
 - Companion research: [OpenAI Privacy Filter evaluation](openai-privacy-filter-evaluation.md)

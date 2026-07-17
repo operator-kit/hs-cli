@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "evidence_authority": "docker-ci",
+  "hardware_identity_file": "hardware-identities.json",
   "sampling": {
     "minimum_fresh_processes": 20,
     "minimum_warm_samples": 100,
@@ -15,7 +16,7 @@
       "swap_bytes": 0,
       "cpu_only": true,
       "storage": "ssd",
-      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "os", "kernel", "power_governor", "onnx_runtime", "go_version", "python_version", "thread_settings", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
     },
     {
       "id": "H1",
@@ -25,7 +26,7 @@
       "swap_bytes": 0,
       "cpu_only": true,
       "storage": "ssd",
-      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "os", "kernel", "power_governor", "onnx_runtime", "go_version", "python_version", "thread_settings", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
     },
     {
       "id": "H2",
@@ -35,7 +36,7 @@
       "swap_bytes": 0,
       "cpu_only": true,
       "storage": "ssd",
-      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "os", "kernel", "power_governor", "onnx_runtime", "go_version", "python_version", "thread_settings", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
     }
   ],
   "limits": [

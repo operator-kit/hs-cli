@@ -3,47 +3,116 @@
   "workloads": [
     {
       "id": "subject",
-      "description": "Synthetic support subject no larger than 256 UTF-8 bytes.",
+      "description": "Synthetic support subject exactly 256 UTF-8 bytes.",
       "target_bytes": 256,
       "warmup_samples": 10,
       "measured_samples": 100,
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 1,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-subject-v1",
+      "payload_sha256": "87b7413601e04b8c34aabb42120de6bdbbc7d4c4d9896a611ad297ebab766a23"
     },
     {
       "id": "message",
-      "description": "Typical 2 KiB synthetic support message with mixed typed privacy targets.",
+      "description": "Synthetic 2 KiB support message with mixed typed privacy targets.",
       "target_bytes": 2048,
       "warmup_samples": 10,
       "measured_samples": 100,
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 1,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-message-v1",
+      "payload_sha256": "0a33d854d2ca835e6d05d7ba7aae087b7bbb870073309fa4b26e27dec4e73490"
     },
     {
       "id": "thread",
-      "description": "Approximately 20 KiB synthetic multi-message thread exercising window boundaries.",
+      "description": "Synthetic 20 KiB multi-message thread exercising window boundaries.",
       "target_bytes": 20480,
       "warmup_samples": 10,
       "measured_samples": 100,
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 1,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-thread-v1",
+      "payload_sha256": "88971c0a43aa3a3bfda69171b09306336108d9561efd49ae0664d06117103d15"
     },
     {
       "id": "export",
-      "description": "Approximately 100 KiB synthetic conversation export.",
+      "description": "Synthetic 100 KiB conversation export.",
       "target_bytes": 102400,
       "warmup_samples": 5,
       "measured_samples": 100,
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 1,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions", "truncations"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions",
+        "truncations"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-export-v1",
+      "payload_sha256": "34c4668b7a00e84088eea38aca880306d0a4a0739d406a5fecd0fe3148ef1627"
     },
     {
       "id": "adversarial-long",
@@ -54,7 +123,26 @@
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 1,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions", "truncations", "fail_closed"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions",
+        "truncations",
+        "fail_closed"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-adversarial-long-v1",
+      "payload_sha256": "03a38fc25a2b360f427f8d31d8d1937237d0030cca40f056e14686227c7b278f"
     },
     {
       "id": "mcp-longevity",
@@ -65,7 +153,26 @@
       "fresh_processes": 20,
       "concurrency": 1,
       "requests": 100,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "rss_growth", "page_faults", "disk_bytes", "detector_constructions", "goroutines"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions",
+        "rss_growth",
+        "goroutines"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-mcp-longevity-v1",
+      "payload_sha256": "2cd729fe76bf7bc8fed2afc60bd343fc4bdce35f745a1acf11333adde438fb43"
     },
     {
       "id": "mcp-burst",
@@ -76,7 +183,26 @@
       "fresh_processes": 20,
       "concurrency": 4,
       "requests": 4,
-      "required_metrics": ["load_time", "first_inference", "warm_p50", "warm_p95", "warm_p99", "cpu_time", "wall_time", "throughput", "rss", "page_faults", "disk_bytes", "detector_constructions", "deadlocks", "race_failures"]
+      "required_metrics": [
+        "load_time",
+        "first_inference",
+        "warm_p50",
+        "warm_p95",
+        "warm_p99",
+        "cpu_time",
+        "wall_time",
+        "throughput",
+        "rss",
+        "page_faults",
+        "disk_bytes",
+        "detector_constructions",
+        "deadlocks",
+        "race_failures"
+      ],
+      "generator": "hs-privacy-performance-payload",
+      "generator_version": 1,
+      "generator_seed": "performance-mcp-burst-v1",
+      "payload_sha256": "0bcee622e8d8e64f170b07ccfa109dfae3a94734330fc2b5d650dd70deedeefe"
     }
   ]
 }

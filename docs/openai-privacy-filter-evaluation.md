@@ -1,6 +1,6 @@
 # OpenAI Privacy Filter Evaluation for hs-cli
 
-- Status: investigation complete; Phase 0 contract implemented; model integration not started
+- Status: investigation complete; Phase 0/G0 machinery implemented; authoritative G0 evidence not-run; model integration not started
 - Research date: 16 July 2026
 - Decision owner: hs-cli maintainers
 - Recommended decision: run a pinned, local evaluation and native-runtime spike; do not replace the production detector until the quality and performance gates in this document pass.
