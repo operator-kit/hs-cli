@@ -173,6 +173,13 @@ It is an evaluation and migration proposal, not an implementation decision; its
 quality, performance, parity, and supply-chain gates must pass before changing
 the production detector.
 
+The implementation runbook is
+[docs/openai-privacy-filter-migration-plan.md](docs/openai-privacy-filter-migration-plan.md).
+It defines the single-detector target, phase entry and exit criteria, permanent
+test lanes, numerical quality and performance budgets, failure handling,
+preview rollout, rollback, and retirement sequence. Treat its gate fixtures and
+budgets as reviewed source: do not rebaseline them from candidate results.
+
 Normal tests use the synthetic corpus at
 `internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
 production or Help Scout API data. The hermetic evaluator injects exact fixture

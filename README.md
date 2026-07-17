@@ -262,6 +262,10 @@ as the normative checklist for all 14 completed security and privacy findings.
 The [OpenAI Privacy Filter evaluation](docs/openai-privacy-filter-evaluation.md)
 documents the candidate model's coverage gains, footprint and runtime trade-offs,
 and the gated path recommended before any detector migration.
+The accompanying
+[single-detector migration plan](docs/openai-privacy-filter-migration-plan.md)
+defines the phased implementation, permanent regression and performance tests,
+objective pass/fail gates, preview, rollback, and eventual DistilBERT retirement.
 
 ### Why this matters
 

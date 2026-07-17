@@ -5,6 +5,10 @@
 - Decision owner: hs-cli maintainers
 - Recommended decision: run a pinned, local evaluation and native-runtime spike; do not replace the production detector until the quality and performance gates in this document pass.
 
+The executable migration sequence, permanent regression suite, numerical
+acceptance budgets, and failure rules are defined in the
+[single-detector migration plan](openai-privacy-filter-migration-plan.md).
+
 ## Executive conclusion
 
 OpenAI Privacy Filter is a credible candidate for a major upgrade to hs-cli's residual free-text detection. It is not a hosted OpenAI API model. It is an Apache-2.0 open-weight token classifier designed to run locally, so adopting it would not require sending unredacted Help Scout content to OpenAI and would not introduce per-token API charges.
@@ -110,7 +114,7 @@ The 128,000-token claim still needs careful interpretation. The effective attent
 | private_url | Private-audience or person-identifying URL; model evaluation also maps IP addresses here | Deterministic URL/IP token |
 | private_date | Date of birth, birth year, or another date/time identifying a private person | Deterministic private-date token |
 | account_number | Credit card, bank, government, or other account identifier | Deterministic account token |
-| secret | API key, password, credential, OTP, or PIN | Deterministic secret token, with no reversible value |
+| secret | API key, password, credential, OTP, or PIN | Constant non-linkable secret marker, with no reversible value |
 
 The model identifies candidate spans. The surrounding application remains responsible for deciding whether to mask, remove, pseudonymize, alert, or route them. This aligns well with hs-cli: the model should detect; the domain layer should enforce policy and choose deterministic display replacements.
 
@@ -782,7 +786,8 @@ Add backend-independent tests for:
 - known staff protection in customers mode;
 - unknown third-party deterministic fake identities;
 - repeated unknown names mapping consistently;
-- account, secret, date, address, URL, email, and phone deterministic tokens;
+- account, date, address, URL, email, and phone deterministic tokens;
+- secret spans using a constant non-linkable marker rather than a pseudonym;
 - overlap precedence between known identity, model, and regex spans;
 - invalid, reversed, out-of-range, non-UTF-8-boundary, and source-mismatched spans failing closed;
 - detector error, panic boundary, and partial-result failure;
