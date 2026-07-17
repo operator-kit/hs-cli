@@ -60,7 +60,18 @@ jobs:
           HS_PII_G0_HARDWARE_PROFILE: docker-ci-functional
         run: ./scripts/privacy-filter-g0-baseline.sh
 
+      - name: Require authoritative G0 pass
+        if: always()
+        run: >-
+          jq -e '
+            .authoritative == true and
+            .evidence_authority == "docker-ci" and
+            ([.gates[] | select(.gate == "G0")] | length) == 1 and
+            any(.gates[]; .gate == "G0" and .state == "pass")
+          ' "${{ runner.temp }}/privacy-filter-g0-report/distilbert-baseline.json"
+
       - name: Upload immutable synthetic baseline report
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: distilbert-g0-baseline-${{ github.sha }}

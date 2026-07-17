@@ -2,7 +2,9 @@ package ner
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -127,7 +129,33 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 	if err := evaluation.WriteReport(reportPath, report); err != nil {
 		t.Fatalf("write DistilBERT baseline report: %v", err)
 	}
+	requireAuthoritativeG0Pass(t, report)
 	t.Logf("wrote synthetic-only DistilBERT G0 baseline: cases=%d exact_f2=%.6f covering_f2=%.6f", report.CasesEvaluated, report.Detector.Exact.F2, report.Detector.Covering.F2)
+}
+
+func requireAuthoritativeG0Pass(t *testing.T, report *evaluation.Report) {
+	t.Helper()
+	if err := evaluation.RequireGatePass(report, "G0"); err != nil {
+		t.Fatalf("authoritative DistilBERT baseline did not pass G0: %v", err)
+	}
+}
+
+func TestAuthoritativeG0GateFailureExitsNonZero(t *testing.T) {
+	const helperEnv = "HS_PII_G0_FAILED_GATE_HELPER"
+	if os.Getenv(helperEnv) == "1" {
+		requireAuthoritativeG0Pass(t, &evaluation.Report{Gates: []evaluation.GateResult{{
+			Gate: "G0", State: evaluation.GateFail,
+		}}})
+		return
+	}
+
+	command := exec.Command(os.Args[0], "-test.run=^TestAuthoritativeG0GateFailureExitsNonZero$", "-test.count=1")
+	command.Env = append(os.Environ(), helperEnv+"=1")
+	err := command.Run()
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitCode() == 0 {
+		t.Fatalf("failed authoritative G0 gate did not make the baseline command exit non-zero: %v", err)
+	}
 }
 
 func baselineMetadataFromEnvironment(t *testing.T) evaluation.EvidenceMetadata {

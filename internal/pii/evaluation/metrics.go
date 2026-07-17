@@ -579,3 +579,25 @@ func WriteReport(path string, report *Report) error {
 	}
 	return nil
 }
+
+// RequireGatePass rejects missing, duplicate, not-run, and failed gate results.
+// Authoritative commands call this after writing their report so failed evidence
+// remains inspectable without allowing the command to exit successfully.
+func RequireGatePass(report *Report, gate string) error {
+	if report == nil {
+		return fmt.Errorf("require evaluation gate %s: report is nil", gate)
+	}
+	var matches []GateResult
+	for _, result := range report.Gates {
+		if result.Gate == gate {
+			matches = append(matches, result)
+		}
+	}
+	if len(matches) != 1 {
+		return fmt.Errorf("require evaluation gate %s: found %d results, want exactly one", gate, len(matches))
+	}
+	if matches[0].State != GatePass {
+		return fmt.Errorf("require evaluation gate %s: state is %s, want %s", gate, matches[0].State, GatePass)
+	}
+	return nil
+}

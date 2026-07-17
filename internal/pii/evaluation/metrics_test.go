@@ -102,6 +102,31 @@ func TestGateEvidenceRejectsLocalSanityAsAuthoritative(t *testing.T) {
 	}
 }
 
+func TestRequireGatePassRejectsFailedIncompleteAndDuplicateEvidence(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		report *Report
+	}{
+		{name: "nil report"},
+		{name: "missing gate", report: &Report{}},
+		{name: "not run", report: &Report{Gates: []GateResult{{Gate: "G0", State: GateNotRun}}}},
+		{name: "failed", report: &Report{Gates: []GateResult{{Gate: "G0", State: GateFail}}}},
+		{name: "duplicate", report: &Report{Gates: []GateResult{
+			{Gate: "G0", State: GatePass}, {Gate: "G0", State: GatePass},
+		}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := RequireGatePass(test.report, "G0"); err == nil {
+				t.Fatal("non-passing gate evidence was accepted")
+			}
+		})
+	}
+	passing := &Report{Gates: []GateResult{{Gate: "G0", State: GatePass}}}
+	if err := RequireGatePass(passing, "G0"); err != nil {
+		t.Fatalf("passing gate evidence was rejected: %v", err)
+	}
+}
+
 func TestMetricMatchingUsesMaximumOneToOneAssignment(t *testing.T) {
 	targets := []Target{
 		{Kind: SpanSecret, Start: 10, End: 20},
