@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://operator-kit.example/schemas/privacy-filter-report-v2.json",
+  "title": "hs-cli privacy evaluation report v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "git_commit", "corpus_sha256", "policy_sha256", "budget_sha256",
+    "identity_sha256", "report_schema_sha256", "backend", "model_revision", "variant",
+    "artifact_sha256", "runtime_version", "container_image", "platform", "hardware_profile",
+    "runner_name", "evidence_authority", "authoritative", "artifacts", "cases_evaluated",
+    "detector", "final_output", "final_output_slices", "case_results", "gates"
+  ],
+  "properties": {
+    "schema": {"const": 2},
+    "git_commit": {"type": "string", "minLength": 1},
+    "corpus_sha256": {"$ref": "#/$defs/sha256"},
+    "policy_sha256": {"$ref": "#/$defs/sha256"},
+    "budget_sha256": {"$ref": "#/$defs/sha256"},
+    "identity_sha256": {"$ref": "#/$defs/sha256"},
+    "report_schema_sha256": {"$ref": "#/$defs/sha256"},
+    "backend": {"type": "string", "minLength": 1},
+    "model_revision": {"type": "string", "minLength": 1},
+    "variant": {"type": "string", "minLength": 1},
+    "artifact_sha256": {"$ref": "#/$defs/sha256"},
+    "runtime_version": {"type": "string", "minLength": 1},
+    "container_image": {"type": "string", "minLength": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "hardware_profile": {"type": "string", "minLength": 1},
+    "runner_name": {"type": "string", "minLength": 1},
+    "evidence_authority": {"enum": ["docker-ci", "local-sanity"]},
+    "authoritative": {"type": "boolean"},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "cases_evaluated": {"type": "integer", "minimum": 1},
+    "detector": {"$ref": "#/$defs/detector"},
+    "final_output": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/outputMetrics"}},
+    "final_output_slices": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/outputSlice"}},
+    "case_results": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/caseResult"}},
+    "gates": {"type": "array", "minItems": 11, "items": {"$ref": "#/$defs/gate"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "sha256", "size_bytes"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "metricSet": {
+      "type": "object", "additionalProperties": false,
+      "required": ["true_positive", "false_positive", "false_negative", "precision", "recall", "f1", "f2"],
+      "properties": {
+        "true_positive": {"type": "integer", "minimum": 0},
+        "false_positive": {"type": "integer", "minimum": 0},
+        "false_negative": {"type": "integer", "minimum": 0},
+        "precision": {"type": "number", "minimum": 0},
+        "recall": {"type": "number", "minimum": 0},
+        "f1": {"type": "number", "minimum": 0},
+        "f2": {"type": "number", "minimum": 0}
+      }
+    },
+    "weightedMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["true_positive_weight", "false_positive_weight", "false_negative_weight", "precision", "recall", "f2"],
+      "properties": {
+        "true_positive_weight": {"type": "integer", "minimum": 0},
+        "false_positive_weight": {"type": "integer", "minimum": 0},
+        "false_negative_weight": {"type": "integer", "minimum": 0},
+        "precision": {"type": "number", "minimum": 0},
+        "recall": {"type": "number", "minimum": 0},
+        "f2": {"type": "number", "minimum": 0}
+      }
+    },
+    "metricSlice": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "exact", "covering", "required_match"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "exact": {"$ref": "#/$defs/metricSet"},
+        "covering": {"$ref": "#/$defs/metricSet"},
+        "required_match": {"$ref": "#/$defs/metricSet"}
+      }
+    },
+    "metricSlices": {"type": "array", "items": {"$ref": "#/$defs/metricSlice"}},
+    "detector": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "exact", "covering", "required_match", "sensitivity_weighted", "by_kind", "by_risk",
+        "by_language", "by_script", "by_format", "by_boundary", "by_identity_policy"
+      ],
+      "properties": {
+        "exact": {"$ref": "#/$defs/metricSet"},
+        "covering": {"$ref": "#/$defs/metricSet"},
+        "required_match": {"$ref": "#/$defs/metricSet"},
+        "sensitivity_weighted": {"$ref": "#/$defs/weightedMetric"},
+        "by_kind": {"$ref": "#/$defs/metricSlices"},
+        "by_risk": {"$ref": "#/$defs/metricSlices"},
+        "by_language": {"$ref": "#/$defs/metricSlices"},
+        "by_script": {"$ref": "#/$defs/metricSlices"},
+        "by_format": {"$ref": "#/$defs/metricSlices"},
+        "by_boundary": {"$ref": "#/$defs/metricSlices"},
+        "by_identity_policy": {"$ref": "#/$defs/metricSlices"}
+      }
+    },
+    "outputMetrics": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "mode", "required_absent", "raw_value_leaks", "leak_rate", "required_present",
+        "preservation_failures", "preservation_rate", "over_redaction_rate",
+        "exact_pass_through_checks", "exact_pass_through_failures"
+      ],
+      "properties": {
+        "mode": {"enum": ["off", "customers", "all"]},
+        "required_absent": {"type": "integer", "minimum": 0},
+        "raw_value_leaks": {"type": "integer", "minimum": 0},
+        "leak_rate": {"type": "number", "minimum": 0},
+        "required_present": {"type": "integer", "minimum": 0},
+        "preservation_failures": {"type": "integer", "minimum": 0},
+        "preservation_rate": {"type": "number", "minimum": 0},
+        "over_redaction_rate": {"type": "number", "minimum": 0},
+        "exact_pass_through_checks": {"type": "integer", "minimum": 0},
+        "exact_pass_through_failures": {"type": "integer", "minimum": 0}
+      }
+    },
+    "outputSlice": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "mode", "dimension", "name", "required_absent", "raw_value_leaks", "leak_rate",
+        "required_present", "preservation_failures", "preservation_rate", "over_redaction_rate"
+      ],
+      "properties": {
+        "mode": {"enum": ["off", "customers", "all"]},
+        "dimension": {"enum": ["kind", "risk", "language", "script", "format", "match_policy", "identity_policy", "boundary"]},
+        "name": {"type": "string", "minLength": 1},
+        "required_absent": {"type": "integer", "minimum": 0},
+        "raw_value_leaks": {"type": "integer", "minimum": 0},
+        "leak_rate": {"type": "number", "minimum": 0},
+        "required_present": {"type": "integer", "minimum": 0},
+        "preservation_failures": {"type": "integer", "minimum": 0},
+        "preservation_rate": {"type": "number", "minimum": 0},
+        "over_redaction_rate": {"type": "number", "minimum": 0}
+      }
+    },
+    "caseResult": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "case_id", "exact_misses", "covering_misses", "false_positives", "required_absent",
+        "raw_value_leaks", "required_present", "preservation_failures"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "exact_misses": {"type": "integer", "minimum": 0},
+        "covering_misses": {"type": "integer", "minimum": 0},
+        "false_positives": {"type": "integer", "minimum": 0},
+        "required_absent": {"type": "integer", "minimum": 0},
+        "raw_value_leaks": {"type": "integer", "minimum": 0},
+        "required_present": {"type": "integer", "minimum": 0},
+        "preservation_failures": {"type": "integer", "minimum": 0}
+      }
+    },
+    "gate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gate", "state", "reason"],
+      "properties": {
+        "gate": {"type": "string", "pattern": "^G([0-9]|10)$"},
+        "state": {"enum": ["not-run", "pass", "fail"]},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

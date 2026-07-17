@@ -27,6 +27,9 @@ ARCHIVE_NAME="$(jq -er '.archive.filename' <<<"$BUNDLE")"
 ARCHIVE_SHA256="$(jq -er '.archive.sha256' <<<"$BUNDLE")"
 ARCHIVE_SIZE="$(jq -er '.archive.size' <<<"$BUNDLE")"
 MODEL_SHA256="$(jq -er '.files[] | select(.name == "model_quantized.onnx") | .sha256' <<<"$BUNDLE")"
+ARTIFACTS_JSON="$(jq -c '[
+  {name: "archive", sha256: .archive.sha256, size_bytes: .archive.size}
+] + [.files[] | {name: .name, sha256: .sha256, size_bytes: .size}]' <<<"$BUNDLE")"
 
 mkdir -p "$CACHE_DIR" "$REPORT_DIR"
 ARCHIVE_PATH="${CACHE_DIR}/${ARCHIVE_NAME}"
@@ -96,6 +99,7 @@ docker run --rm \
   -e HS_PII_G0_GIT_COMMIT="$GIT_COMMIT" \
   -e HS_PII_G0_MODEL_REVISION="$MODEL_REVISION" \
   -e HS_PII_G0_ARTIFACT_SHA256="$MODEL_SHA256" \
+	-e HS_PII_G0_ARTIFACTS_JSON="$ARTIFACTS_JSON" \
   -e HS_PII_G0_CONTAINER_IMAGE="$IMAGE_ID" \
   -e HS_PII_G0_HARDWARE_PROFILE="${HS_PII_G0_HARDWARE_PROFILE:-docker-functional}" \
   -e HS_PII_G0_EVIDENCE_AUTHORITY="$AUTHORITY" \

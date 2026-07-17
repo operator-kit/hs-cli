@@ -237,6 +237,17 @@ func LoadCorpusDir(dir string) (*Corpus, error) {
 	cases := make([]Case, 0)
 	seenIDs := make(map[string]string)
 	hasher := sha256.New()
+	schemaRaw, err := os.ReadFile(filepath.Join(dir, "schema.json"))
+	if err != nil {
+		return nil, fmt.Errorf("read privacy corpus schema: %w", err)
+	}
+	if _, err := decodeJSONValue(schemaRaw); err != nil {
+		return nil, fmt.Errorf("decode privacy corpus schema: %w", err)
+	}
+	hasher.Write([]byte("schema.json"))
+	hasher.Write([]byte{0})
+	hasher.Write(schemaRaw)
+	hasher.Write([]byte{0})
 
 	for _, partition := range RequiredPartitions {
 		name := partition + ".json"
@@ -244,6 +255,9 @@ func LoadCorpusDir(dir string) (*Corpus, error) {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read privacy corpus partition %q: %w", partition, err)
+		}
+		if err := ValidateJSONDocument(schemaRaw, raw); err != nil {
+			return nil, fmt.Errorf("validate privacy corpus partition %q against schema: %w", partition, err)
 		}
 		var document CorpusDocument
 		if err := decodeStrict(raw, &document); err != nil {

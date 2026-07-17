@@ -2,6 +2,7 @@ package ner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -70,6 +71,7 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 		filepath.Join(fixtureDir, "performance", "workloads.json"),
 	)
 	metadata.IdentitySHA256 = mustHashFile(t, filepath.Join(fixtureDir, "identity-compatibility.json"))
+	metadata.ReportSchemaSHA256 = mustHashFile(t, filepath.Join(fixtureDir, "report-schema.json"))
 
 	secret, err := pii.NewSecretString("phase0-baseline-synthetic-pseudonym-key")
 	if err != nil {
@@ -126,6 +128,13 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("evaluate DistilBERT baseline: %v", err)
 	}
+	reportSchema, err := os.ReadFile(filepath.Join(fixtureDir, "report-schema.json"))
+	if err != nil {
+		t.Fatalf("read frozen report schema: %v", err)
+	}
+	if err := evaluation.ValidateReportAgainstSchema(reportSchema, report); err != nil {
+		t.Fatalf("validate DistilBERT baseline report schema: %v", err)
+	}
 	if err := evaluation.WriteReport(reportPath, report); err != nil {
 		t.Fatalf("write DistilBERT baseline report: %v", err)
 	}
@@ -168,6 +177,10 @@ func baselineMetadataFromEnvironment(t *testing.T) evaluation.EvidenceMetadata {
 	if authoritative && (authority != evaluation.AuthorityDockerCI || os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_NAME") == "") {
 		t.Fatal("authoritative G0 evidence requires Docker CI running in GitHub Actions on an identified runner")
 	}
+	var artifacts []evaluation.ArtifactIdentity
+	if err := json.Unmarshal([]byte(requiredBaselineEnv(t, "HS_PII_G0_ARTIFACTS_JSON")), &artifacts); err != nil {
+		t.Fatalf("HS_PII_G0_ARTIFACTS_JSON: %v", err)
+	}
 	return evaluation.EvidenceMetadata{
 		GitCommit:         requiredBaselineEnv(t, "HS_PII_G0_GIT_COMMIT"),
 		Backend:           "distilbert",
@@ -179,6 +192,7 @@ func baselineMetadataFromEnvironment(t *testing.T) evaluation.EvidenceMetadata {
 		Platform:          runtime.GOOS + "-" + runtime.GOARCH,
 		HardwareProfile:   requiredBaselineEnv(t, "HS_PII_G0_HARDWARE_PROFILE"),
 		RunnerName:        requiredBaselineEnv(t, "RUNNER_NAME"),
+		Artifacts:         artifacts,
 		EvidenceAuthority: authority,
 		Authoritative:     authoritative,
 	}

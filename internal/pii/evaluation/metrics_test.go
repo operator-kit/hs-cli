@@ -1,11 +1,21 @@
 package evaluation
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func mustSHA256(t *testing.T, raw []byte) string {
+	t.Helper()
+	hash := sha256.Sum256(raw)
+	return hex.EncodeToString(hash[:])
+}
 
 func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	redactText := "private-value"
@@ -66,6 +76,14 @@ func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	if strings.Contains(string(firstJSON), redactText) {
 		t.Fatalf("metric report serialized a raw protected value")
 	}
+	schemaRaw, err := os.ReadFile(filepath.Join(corpusDir(t), "report-schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	report.ReportSchemaSHA256 = mustSHA256(t, schemaRaw)
+	if err := ValidateReportAgainstSchema(schemaRaw, report); err != nil {
+		t.Fatalf("metric report does not satisfy its frozen schema: %v", err)
+	}
 }
 
 func TestGateEvidenceRejectsLocalSanityAsAuthoritative(t *testing.T) {
@@ -84,6 +102,13 @@ func TestGateEvidenceRejectsLocalSanityAsAuthoritative(t *testing.T) {
 	metadata.ContainerImage = "sha256:" + hash
 	metadata.HardwareProfile = "docker-functional"
 	metadata.RunnerName = "privacy-filter-ci-01"
+	metadata.Artifacts = []ArtifactIdentity{
+		{Name: "archive", SHA256: hash, SizeBytes: 10},
+		{Name: "config.json", SHA256: hash, SizeBytes: 10},
+		{Name: "model_quantized.onnx", SHA256: hash, SizeBytes: 10},
+		{Name: "tokenizer.json", SHA256: hash, SizeBytes: 10},
+		{Name: "libonnxruntime.so", SHA256: hash, SizeBytes: 10},
+	}
 	if err := validateEvidenceMetadata(metadata); err != nil {
 		t.Fatalf("valid Docker CI evidence was rejected: %v", err)
 	}
@@ -152,12 +177,78 @@ func TestMetricMatchingUsesMaximumOneToOneAssignment(t *testing.T) {
 	}
 }
 
+func TestMetricReportFreezesRequiredMatchAndEndToEndSlices(t *testing.T) {
+	text := "Engineer Rowan Vale joined the thread."
+	value := "Rowan Vale"
+	start := strings.Index(text, value)
+	fixture := Case{
+		ID: "unknown-third-party", Language: "en", Script: "Latin", Shape: "quoted-reply", Risk: RiskHigh, Text: text,
+		Targets: []Target{{
+			ID: "developer", Kind: SpanPerson, Start: start, End: start + len(value), Value: value, Match: MatchCovering,
+			Actions: ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact},
+		}},
+		Outputs: ModeOutputs{
+			Off:       OutputExpectation{RequiredAbsent: []string{}, RequiredPresent: []string{value}},
+			Customers: OutputExpectation{RequiredAbsent: []string{value}, RequiredPresent: []string{}},
+			All:       OutputExpectation{RequiredAbsent: []string{value}, RequiredPresent: []string{}},
+		},
+	}
+	observation := CaseObservation{
+		CaseID:      fixture.ID,
+		Predictions: []PredictedSpan{{Kind: SpanPerson, Start: start - len("Engineer "), End: start + len(value)}},
+		Outputs:     map[Mode]string{ModeOff: text, ModeCustomers: "Engineer [PERSON] joined the thread.", ModeAll: "Engineer [PERSON] joined the thread."},
+	}
+	report, err := Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{observation}, testMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Detector.Exact.FalseNegative != 1 || report.Detector.Covering.TruePositive != 1 || report.Detector.RequiredMatch.TruePositive != 1 {
+		t.Fatalf("target match policies were not reported independently: %+v", report.Detector)
+	}
+	identity := findMetricSlice(t, report.Detector.ByIdentityPolicy, "unknown-third-party")
+	if identity.RequiredMatch.TruePositive != 1 {
+		t.Fatalf("unknown-third-party detector slice was not preserved: %+v", identity)
+	}
+	format := findMetricSlice(t, report.Detector.ByFormat, "quoted-reply")
+	if format.Covering.TruePositive != 1 {
+		t.Fatalf("format detector slice was not preserved: %+v", format)
+	}
+	output := findOutputSlice(t, report.FinalOutputSlices, ModeCustomers, "identity_policy", "unknown-third-party")
+	if output.RequiredAbsent != 1 || output.RawValueLeaks != 0 || output.LeakRate != 0 {
+		t.Fatalf("unknown-third-party final-output slice is wrong: %+v", output)
+	}
+}
+
+func findMetricSlice(t *testing.T, slices []MetricSlice, name string) MetricSlice {
+	t.Helper()
+	for _, slice := range slices {
+		if slice.Name == name {
+			return slice
+		}
+	}
+	t.Fatalf("metric slice %q not found", name)
+	return MetricSlice{}
+}
+
+func findOutputSlice(t *testing.T, slices []OutputMetricSlice, mode Mode, dimension, name string) OutputMetricSlice {
+	t.Helper()
+	for _, slice := range slices {
+		if slice.Mode == mode && slice.Dimension == dimension && slice.Name == name {
+			return slice
+		}
+	}
+	t.Fatalf("output slice %s/%s/%s not found", mode, dimension, name)
+	return OutputMetricSlice{}
+}
+
 func testMetadata() EvidenceMetadata {
+	hash := strings.Repeat("a", 64)
 	return EvidenceMetadata{
 		GitCommit: "fixture-commit", Backend: "distilbert", ModelRevision: "fixture-model",
-		Variant: "int8", ArtifactSHA256: "fixture-artifact", RuntimeVersion: "fixture-runtime",
-		ContainerImage: "fixture-image", Platform: "linux-amd64", HardwareProfile: "local", RunnerName: "fixture-runner", CorpusSHA256: "fixture-corpus",
-		PolicySHA256: "fixture-policy", BudgetSHA256: "fixture-budget", IdentitySHA256: "fixture-identity",
+		Variant: "int8", ArtifactSHA256: hash, RuntimeVersion: "fixture-runtime",
+		ContainerImage: "fixture-image", Platform: "linux-amd64", HardwareProfile: "local", RunnerName: "fixture-runner", CorpusSHA256: hash,
+		PolicySHA256: hash, BudgetSHA256: hash, IdentitySHA256: hash, ReportSchemaSHA256: hash,
+		Artifacts:         []ArtifactIdentity{{Name: "fixture-component", SHA256: hash, SizeBytes: 1}},
 		EvidenceAuthority: AuthorityLocal, Authoritative: false,
 	}
 }

@@ -50,6 +50,15 @@ func TestPrivacyCorpusSchemaIsStrictAndSelfConsistent(t *testing.T) {
 			t.Fatalf("schema definition %q must reject unknown fields", name)
 		}
 	}
+	for _, partition := range RequiredPartitions {
+		documentRaw, readErr := os.ReadFile(filepath.Join(corpusDir(t), partition+".json"))
+		if readErr != nil {
+			t.Fatalf("read corpus partition %q for schema validation: %v", partition, readErr)
+		}
+		if err := ValidateJSONDocument(schemaRaw, documentRaw); err != nil {
+			t.Fatalf("execute corpus JSON schema for partition %q: %v", partition, err)
+		}
+	}
 
 	t.Run("unknown fields", func(t *testing.T) {
 		var document CorpusDocument
@@ -84,6 +93,9 @@ func TestPrivacyCorpusSchemaIsStrictAndSelfConsistent(t *testing.T) {
 	})
 	t.Run("duplicate case IDs", func(t *testing.T) {
 		tempDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(tempDir, "schema.json"), schemaRaw, 0o600); err != nil {
+			t.Fatalf("write schema copy: %v", err)
+		}
 		for _, partition := range RequiredPartitions {
 			raw, readErr := os.ReadFile(filepath.Join(corpusDir(t), partition+".json"))
 			if readErr != nil {

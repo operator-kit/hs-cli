@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,7 +11,7 @@ import (
 	"strings"
 )
 
-const ReportSchemaVersion = 1
+const ReportSchemaVersion = 2
 
 type EvidenceAuthority string
 
@@ -20,22 +21,30 @@ const (
 )
 
 type EvidenceMetadata struct {
-	GitCommit         string
-	Backend           string
-	ModelRevision     string
-	Variant           string
-	ArtifactSHA256    string
-	RuntimeVersion    string
-	ContainerImage    string
-	Platform          string
-	HardwareProfile   string
-	RunnerName        string
-	CorpusSHA256      string
-	PolicySHA256      string
-	BudgetSHA256      string
-	IdentitySHA256    string
-	EvidenceAuthority EvidenceAuthority
-	Authoritative     bool
+	GitCommit          string
+	Backend            string
+	ModelRevision      string
+	Variant            string
+	ArtifactSHA256     string
+	RuntimeVersion     string
+	ContainerImage     string
+	Platform           string
+	HardwareProfile    string
+	RunnerName         string
+	CorpusSHA256       string
+	PolicySHA256       string
+	BudgetSHA256       string
+	IdentitySHA256     string
+	ReportSchemaSHA256 string
+	Artifacts          []ArtifactIdentity
+	EvidenceAuthority  EvidenceAuthority
+	Authoritative      bool
+}
+
+type ArtifactIdentity struct {
+	Name      string `json:"name"`
+	SHA256    string `json:"sha256"`
+	SizeBytes int64  `json:"size_bytes"`
 }
 
 type PredictedSpan struct {
@@ -59,44 +68,52 @@ const (
 )
 
 type Report struct {
-	Schema            int               `json:"schema"`
-	GitCommit         string            `json:"git_commit"`
-	CorpusSHA256      string            `json:"corpus_sha256"`
-	PolicySHA256      string            `json:"policy_sha256"`
-	BudgetSHA256      string            `json:"budget_sha256"`
-	IdentitySHA256    string            `json:"identity_sha256"`
-	Backend           string            `json:"backend"`
-	ModelRevision     string            `json:"model_revision"`
-	Variant           string            `json:"variant"`
-	ArtifactSHA256    string            `json:"artifact_sha256"`
-	RuntimeVersion    string            `json:"runtime_version"`
-	ContainerImage    string            `json:"container_image"`
-	Platform          string            `json:"platform"`
-	HardwareProfile   string            `json:"hardware_profile"`
-	RunnerName        string            `json:"runner_name"`
-	EvidenceAuthority EvidenceAuthority `json:"evidence_authority"`
-	Authoritative     bool              `json:"authoritative"`
-	CasesEvaluated    int               `json:"cases_evaluated"`
-	Detector          DetectorMetrics   `json:"detector"`
-	FinalOutput       []OutputMetrics   `json:"final_output"`
-	CaseResults       []CaseResult      `json:"case_results"`
-	Gates             []GateResult      `json:"gates"`
+	Schema             int                 `json:"schema"`
+	GitCommit          string              `json:"git_commit"`
+	CorpusSHA256       string              `json:"corpus_sha256"`
+	PolicySHA256       string              `json:"policy_sha256"`
+	BudgetSHA256       string              `json:"budget_sha256"`
+	IdentitySHA256     string              `json:"identity_sha256"`
+	ReportSchemaSHA256 string              `json:"report_schema_sha256"`
+	Backend            string              `json:"backend"`
+	ModelRevision      string              `json:"model_revision"`
+	Variant            string              `json:"variant"`
+	ArtifactSHA256     string              `json:"artifact_sha256"`
+	RuntimeVersion     string              `json:"runtime_version"`
+	ContainerImage     string              `json:"container_image"`
+	Platform           string              `json:"platform"`
+	HardwareProfile    string              `json:"hardware_profile"`
+	RunnerName         string              `json:"runner_name"`
+	EvidenceAuthority  EvidenceAuthority   `json:"evidence_authority"`
+	Authoritative      bool                `json:"authoritative"`
+	Artifacts          []ArtifactIdentity  `json:"artifacts"`
+	CasesEvaluated     int                 `json:"cases_evaluated"`
+	Detector           DetectorMetrics     `json:"detector"`
+	FinalOutput        []OutputMetrics     `json:"final_output"`
+	FinalOutputSlices  []OutputMetricSlice `json:"final_output_slices"`
+	CaseResults        []CaseResult        `json:"case_results"`
+	Gates              []GateResult        `json:"gates"`
 }
 
 type DetectorMetrics struct {
 	Exact               MetricSet      `json:"exact"`
 	Covering            MetricSet      `json:"covering"`
+	RequiredMatch       MetricSet      `json:"required_match"`
 	SensitivityWeighted WeightedMetric `json:"sensitivity_weighted"`
 	ByKind              []MetricSlice  `json:"by_kind"`
 	ByRisk              []MetricSlice  `json:"by_risk"`
 	ByLanguage          []MetricSlice  `json:"by_language"`
 	ByScript            []MetricSlice  `json:"by_script"`
+	ByFormat            []MetricSlice  `json:"by_format"`
+	ByBoundary          []MetricSlice  `json:"by_boundary"`
+	ByIdentityPolicy    []MetricSlice  `json:"by_identity_policy"`
 }
 
 type MetricSlice struct {
-	Name     string    `json:"name"`
-	Exact    MetricSet `json:"exact"`
-	Covering MetricSet `json:"covering"`
+	Name          string    `json:"name"`
+	Exact         MetricSet `json:"exact"`
+	Covering      MetricSet `json:"covering"`
+	RequiredMatch MetricSet `json:"required_match"`
 }
 
 type MetricSet struct {
@@ -119,10 +136,29 @@ type WeightedMetric struct {
 }
 
 type OutputMetrics struct {
-	Mode                 Mode `json:"mode"`
-	RawValueLeaks        int  `json:"raw_value_leaks"`
-	PreservationFailures int  `json:"preservation_failures"`
-	ExactPassThroughFail int  `json:"exact_pass_through_failures"`
+	Mode                   Mode    `json:"mode"`
+	RequiredAbsent         int     `json:"required_absent"`
+	RawValueLeaks          int     `json:"raw_value_leaks"`
+	LeakRate               float64 `json:"leak_rate"`
+	RequiredPresent        int     `json:"required_present"`
+	PreservationFailures   int     `json:"preservation_failures"`
+	PreservationRate       float64 `json:"preservation_rate"`
+	OverRedactionRate      float64 `json:"over_redaction_rate"`
+	ExactPassThroughChecks int     `json:"exact_pass_through_checks"`
+	ExactPassThroughFail   int     `json:"exact_pass_through_failures"`
+}
+
+type OutputMetricSlice struct {
+	Mode                 Mode    `json:"mode"`
+	Dimension            string  `json:"dimension"`
+	Name                 string  `json:"name"`
+	RequiredAbsent       int     `json:"required_absent"`
+	RawValueLeaks        int     `json:"raw_value_leaks"`
+	LeakRate             float64 `json:"leak_rate"`
+	RequiredPresent      int     `json:"required_present"`
+	PreservationFailures int     `json:"preservation_failures"`
+	PreservationRate     float64 `json:"preservation_rate"`
+	OverRedactionRate    float64 `json:"over_redaction_rate"`
 }
 
 type CaseResult struct {
@@ -130,13 +166,16 @@ type CaseResult struct {
 	ExactMisses          int    `json:"exact_misses"`
 	CoveringMisses       int    `json:"covering_misses"`
 	FalsePositives       int    `json:"false_positives"`
+	RequiredAbsent       int    `json:"required_absent"`
 	RawValueLeaks        int    `json:"raw_value_leaks"`
+	RequiredPresent      int    `json:"required_present"`
 	PreservationFailures int    `json:"preservation_failures"`
 }
 
 type GateResult struct {
-	Gate  string    `json:"gate"`
-	State GateState `json:"state"`
+	Gate   string    `json:"gate"`
+	State  GateState `json:"state"`
+	Reason string    `json:"reason"`
 }
 
 type metricCounts struct {
@@ -152,8 +191,15 @@ type weightedCounts struct {
 }
 
 type sliceCounts struct {
-	exact    metricCounts
-	covering metricCounts
+	exact         metricCounts
+	covering      metricCounts
+	requiredMatch metricCounts
+}
+
+type outputSliceKey struct {
+	mode      Mode
+	dimension string
+	name      string
 }
 
 func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceMetadata) (*Report, error) {
@@ -163,6 +209,8 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 	if err := validateEvidenceMetadata(metadata); err != nil {
 		return nil, err
 	}
+	artifacts := append([]ArtifactIdentity(nil), metadata.Artifacts...)
+	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Name < artifacts[j].Name })
 	byCase := make(map[string]CaseObservation, len(observations))
 	for _, observation := range observations {
 		if _, exists := byCase[observation.CaseID]; exists {
@@ -174,17 +222,21 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		return nil, fmt.Errorf("evaluate privacy corpus: got %d observations for %d cases", len(byCase), len(corpus.Cases))
 	}
 
-	exactTotal, coveringTotal := metricCounts{}, metricCounts{}
+	exactTotal, coveringTotal, requiredMatchTotal := metricCounts{}, metricCounts{}, metricCounts{}
 	weighted := weightedCounts{}
 	byKind := make(map[string]*sliceCounts)
 	byRisk := make(map[string]*sliceCounts)
 	byLanguage := make(map[string]*sliceCounts)
 	byScript := make(map[string]*sliceCounts)
+	byFormat := make(map[string]*sliceCounts)
+	byBoundary := make(map[string]*sliceCounts)
+	byIdentityPolicy := make(map[string]*sliceCounts)
 	outputTotals := map[Mode]*OutputMetrics{
 		ModeOff:       {Mode: ModeOff},
 		ModeCustomers: {Mode: ModeCustomers},
 		ModeAll:       {Mode: ModeAll},
 	}
+	outputSlices := make(map[outputSliceKey]*OutputMetricSlice)
 	caseResults := make([]CaseResult, 0, len(corpus.Cases))
 
 	for _, fixture := range corpus.Cases {
@@ -204,9 +256,10 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		}
 		exactCounts, _, _ := matchSpans(positiveTargets, observation.Predictions, false)
 		coveringCounts, _, _ := matchSpans(positiveTargets, observation.Predictions, true)
-		_, policyTargetMatched, policyPredictionMatched := matchPolicySpans(positiveTargets, observation.Predictions)
+		requiredMatchCounts, policyTargetMatched, policyPredictionMatched := matchPolicySpans(positiveTargets, observation.Predictions)
 		exactTotal.add(exactCounts)
 		coveringTotal.add(coveringCounts)
+		requiredMatchTotal.add(requiredMatchCounts)
 
 		weight := riskWeight(fixture.Risk)
 		for targetIndex := range positiveTargets {
@@ -222,15 +275,28 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 			}
 		}
 
-		addSliceCounts(byRisk, string(fixture.Risk), exactCounts, coveringCounts)
-		addSliceCounts(byLanguage, fixture.Language, exactCounts, coveringCounts)
-		addSliceCounts(byScript, fixture.Script, exactCounts, coveringCounts)
+		addSliceCounts(byRisk, string(fixture.Risk), exactCounts, coveringCounts, requiredMatchCounts)
+		addSliceCounts(byLanguage, fixture.Language, exactCounts, coveringCounts, requiredMatchCounts)
+		addSliceCounts(byScript, fixture.Script, exactCounts, coveringCounts, requiredMatchCounts)
+		addSliceCounts(byFormat, fixture.Shape, exactCounts, coveringCounts, requiredMatchCounts)
+		for _, boundary := range fixtureBoundaries(fixture) {
+			addSliceCounts(byBoundary, boundary, exactCounts, coveringCounts, requiredMatchCounts)
+		}
 		for _, kind := range SpanKinds {
 			kindTargets := filterTargets(positiveTargets, kind)
 			kindPredictions := filterPredictions(observation.Predictions, kind)
 			kindExact, _, _ := matchSpans(kindTargets, kindPredictions, false)
 			kindCovering, _, _ := matchSpans(kindTargets, kindPredictions, true)
-			addSliceCounts(byKind, string(kind), kindExact, kindCovering)
+			kindRequired, _, _ := matchPolicySpans(kindTargets, kindPredictions)
+			addSliceCounts(byKind, string(kind), kindExact, kindCovering, kindRequired)
+		}
+		for _, identityPolicy := range identityPoliciesForFixture(fixture, positiveTargets) {
+			policyTargets := filterTargetsByIdentityPolicy(fixture, positiveTargets, identityPolicy)
+			policyPredictions := predictionsOverlappingTargets(observation.Predictions, policyTargets)
+			policyExact, _, _ := matchSpans(policyTargets, policyPredictions, false)
+			policyCovering, _, _ := matchSpans(policyTargets, policyPredictions, true)
+			policyRequired, _, _ := matchPolicySpans(policyTargets, policyPredictions)
+			addSliceCounts(byIdentityPolicy, identityPolicy, policyExact, policyCovering, policyRequired)
 		}
 
 		result := CaseResult{
@@ -246,16 +312,40 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 				outputTotals[mode].ExactPassThroughFail++
 				result.PreservationFailures++
 			}
+			if mode == ModeOff {
+				outputTotals[mode].ExactPassThroughChecks++
+			}
 			for _, absent := range expected.RequiredAbsent {
+				outputTotals[mode].RequiredAbsent++
+				result.RequiredAbsent++
 				if strings.Contains(output, absent) {
 					outputTotals[mode].RawValueLeaks++
 					result.RawValueLeaks++
 				}
 			}
 			for _, present := range expected.RequiredPresent {
+				outputTotals[mode].RequiredPresent++
+				result.RequiredPresent++
 				if !strings.Contains(output, present) {
 					outputTotals[mode].PreservationFailures++
 					result.PreservationFailures++
+				}
+			}
+			for _, target := range fixture.Targets {
+				observed := strings.Contains(output, target.Value)
+				for _, slice := range outputDimensions(fixture, target) {
+					counts := outputSlice(outputSlices, mode, slice.dimension, slice.name)
+					if target.Actions.For(mode) == ActionRedact {
+						counts.RequiredAbsent++
+						if observed {
+							counts.RawValueLeaks++
+						}
+					} else {
+						counts.RequiredPresent++
+						if !observed {
+							counts.PreservationFailures++
+						}
+					}
 				}
 			}
 		}
@@ -263,38 +353,49 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 	}
 
 	sort.Slice(caseResults, func(i, j int) bool { return caseResults[i].CaseID < caseResults[j].CaseID })
-	finalOutput := []OutputMetrics{*outputTotals[ModeOff], *outputTotals[ModeCustomers], *outputTotals[ModeAll]}
+	finalOutput := []OutputMetrics{
+		finalizeOutputMetrics(*outputTotals[ModeOff]),
+		finalizeOutputMetrics(*outputTotals[ModeCustomers]),
+		finalizeOutputMetrics(*outputTotals[ModeAll]),
+	}
 	report := &Report{
-		Schema:            ReportSchemaVersion,
-		GitCommit:         metadata.GitCommit,
-		CorpusSHA256:      metadata.CorpusSHA256,
-		PolicySHA256:      metadata.PolicySHA256,
-		BudgetSHA256:      metadata.BudgetSHA256,
-		IdentitySHA256:    metadata.IdentitySHA256,
-		Backend:           metadata.Backend,
-		ModelRevision:     metadata.ModelRevision,
-		Variant:           metadata.Variant,
-		ArtifactSHA256:    metadata.ArtifactSHA256,
-		RuntimeVersion:    metadata.RuntimeVersion,
-		ContainerImage:    metadata.ContainerImage,
-		Platform:          metadata.Platform,
-		HardwareProfile:   metadata.HardwareProfile,
-		RunnerName:        metadata.RunnerName,
-		EvidenceAuthority: metadata.EvidenceAuthority,
-		Authoritative:     metadata.Authoritative,
-		CasesEvaluated:    len(corpus.Cases),
+		Schema:             ReportSchemaVersion,
+		GitCommit:          metadata.GitCommit,
+		CorpusSHA256:       metadata.CorpusSHA256,
+		PolicySHA256:       metadata.PolicySHA256,
+		BudgetSHA256:       metadata.BudgetSHA256,
+		IdentitySHA256:     metadata.IdentitySHA256,
+		ReportSchemaSHA256: metadata.ReportSchemaSHA256,
+		Backend:            metadata.Backend,
+		ModelRevision:      metadata.ModelRevision,
+		Variant:            metadata.Variant,
+		ArtifactSHA256:     metadata.ArtifactSHA256,
+		RuntimeVersion:     metadata.RuntimeVersion,
+		ContainerImage:     metadata.ContainerImage,
+		Platform:           metadata.Platform,
+		HardwareProfile:    metadata.HardwareProfile,
+		RunnerName:         metadata.RunnerName,
+		EvidenceAuthority:  metadata.EvidenceAuthority,
+		Authoritative:      metadata.Authoritative,
+		Artifacts:          artifacts,
+		CasesEvaluated:     len(corpus.Cases),
 		Detector: DetectorMetrics{
 			Exact:               exactTotal.metrics(),
 			Covering:            coveringTotal.metrics(),
+			RequiredMatch:       requiredMatchTotal.metrics(),
 			SensitivityWeighted: weighted.metrics(),
 			ByKind:              slicesToMetrics(byKind),
 			ByRisk:              slicesToMetrics(byRisk),
 			ByLanguage:          slicesToMetrics(byLanguage),
 			ByScript:            slicesToMetrics(byScript),
+			ByFormat:            slicesToMetrics(byFormat),
+			ByBoundary:          slicesToMetrics(byBoundary),
+			ByIdentityPolicy:    slicesToMetrics(byIdentityPolicy),
 		},
-		FinalOutput: finalOutput,
-		CaseResults: caseResults,
-		Gates:       evaluateGates(metadata, finalOutput),
+		FinalOutput:       finalOutput,
+		FinalOutputSlices: outputSlicesToMetrics(outputSlices),
+		CaseResults:       caseResults,
+		Gates:             evaluateGates(metadata, finalOutput),
 	}
 	return report, nil
 }
@@ -306,6 +407,7 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 		"container image": metadata.ContainerImage, "platform": metadata.Platform, "hardware profile": metadata.HardwareProfile,
 		"runner name": metadata.RunnerName, "corpus sha256": metadata.CorpusSHA256,
 		"policy sha256": metadata.PolicySHA256, "budget sha256": metadata.BudgetSHA256, "identity sha256": metadata.IdentitySHA256,
+		"report schema sha256": metadata.ReportSchemaSHA256,
 	} {
 		if value == "" {
 			return fmt.Errorf("evaluate privacy corpus: evidence metadata is missing %s", name)
@@ -320,7 +422,7 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 	if metadata.Authoritative {
 		for name, value := range map[string]string{
 			"artifact": metadata.ArtifactSHA256, "corpus": metadata.CorpusSHA256, "policy": metadata.PolicySHA256,
-			"budget": metadata.BudgetSHA256, "identity": metadata.IdentitySHA256,
+			"budget": metadata.BudgetSHA256, "identity": metadata.IdentitySHA256, "report schema": metadata.ReportSchemaSHA256,
 		} {
 			if len(value) != sha256HexLength {
 				return fmt.Errorf("evaluate privacy corpus: authoritative %s identity is not SHA-256", name)
@@ -338,6 +440,50 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 		}
 		if metadata.HardwareProfile == "local" || metadata.RunnerName == "local-sanity" {
 			return fmt.Errorf("evaluate privacy corpus: local hardware cannot produce authoritative evidence")
+		}
+	}
+	if err := validateArtifactIdentities(metadata.Artifacts, metadata.Authoritative); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateArtifactIdentities(artifacts []ArtifactIdentity, authoritative bool) error {
+	if len(artifacts) == 0 {
+		return fmt.Errorf("evaluate privacy corpus: evidence metadata has no component artifact identities")
+	}
+	seen := make(map[string]struct{}, len(artifacts))
+	for _, artifact := range artifacts {
+		if artifact.Name == "" || artifact.SHA256 == "" || artifact.SizeBytes <= 0 {
+			return fmt.Errorf("evaluate privacy corpus: component artifact identity has incomplete metadata")
+		}
+		if _, exists := seen[artifact.Name]; exists {
+			return fmt.Errorf("evaluate privacy corpus: duplicate component artifact %q", artifact.Name)
+		}
+		seen[artifact.Name] = struct{}{}
+		if authoritative {
+			if len(artifact.SHA256) != sha256HexLength {
+				return fmt.Errorf("evaluate privacy corpus: authoritative component %q identity is not SHA-256", artifact.Name)
+			}
+			if _, err := hex.DecodeString(artifact.SHA256); err != nil {
+				return fmt.Errorf("evaluate privacy corpus: authoritative component %q identity is not SHA-256", artifact.Name)
+			}
+		}
+	}
+	if authoritative {
+		for _, required := range []string{"archive", "config.json", "model_quantized.onnx", "tokenizer.json"} {
+			if _, exists := seen[required]; !exists {
+				return fmt.Errorf("evaluate privacy corpus: authoritative evidence is missing component %q", required)
+			}
+		}
+		hasRuntime := false
+		for name := range seen {
+			if strings.HasPrefix(name, "libonnxruntime.") {
+				hasRuntime = true
+			}
+		}
+		if !hasRuntime {
+			return fmt.Errorf("evaluate privacy corpus: authoritative evidence is missing the runtime library identity")
 		}
 	}
 	return nil
@@ -463,6 +609,76 @@ func filterPredictions(predictions []PredictedSpan, kind SpanKind) []PredictedSp
 	return out
 }
 
+func fixtureBoundaries(fixture Case) []string {
+	boundaries := make([]string, 0)
+	for _, tag := range fixture.Tags {
+		if strings.HasPrefix(tag, "boundary:") {
+			boundaries = append(boundaries, strings.TrimPrefix(tag, "boundary:"))
+		}
+	}
+	sort.Strings(boundaries)
+	return boundaries
+}
+
+func identityPolicyName(fixture Case, target Target) string {
+	if target.Kind != SpanPerson {
+		return ""
+	}
+	if target.IdentityID != "" {
+		for _, identity := range fixture.KnownIdentities {
+			if identity.ID != target.IdentityID {
+				continue
+			}
+			if identity.Type == "customer" {
+				return "known-customer"
+			}
+			return "known-staff"
+		}
+	}
+	if target.Actions.Customers == ActionRedact || target.Actions.All == ActionRedact {
+		return "unknown-third-party"
+	}
+	return "public-person"
+}
+
+func identityPoliciesForFixture(fixture Case, targets []Target) []string {
+	seen := make(map[string]struct{})
+	for _, target := range targets {
+		if name := identityPolicyName(fixture, target); name != "" {
+			seen[name] = struct{}{}
+		}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func filterTargetsByIdentityPolicy(fixture Case, targets []Target, wanted string) []Target {
+	out := make([]Target, 0)
+	for _, target := range targets {
+		if identityPolicyName(fixture, target) == wanted {
+			out = append(out, target)
+		}
+	}
+	return out
+}
+
+func predictionsOverlappingTargets(predictions []PredictedSpan, targets []Target) []PredictedSpan {
+	out := make([]PredictedSpan, 0)
+	for _, prediction := range predictions {
+		for _, target := range targets {
+			if prediction.Kind == target.Kind && prediction.Start < target.End && target.Start < prediction.End {
+				out = append(out, prediction)
+				break
+			}
+		}
+	}
+	return out
+}
+
 func (c *metricCounts) add(other metricCounts) {
 	c.tp += other.tp
 	c.fp += other.fp
@@ -488,7 +704,7 @@ func (c weightedCounts) metrics() WeightedMetric {
 	}
 }
 
-func addSliceCounts(slices map[string]*sliceCounts, name string, exact, covering metricCounts) {
+func addSliceCounts(slices map[string]*sliceCounts, name string, exact, covering, requiredMatch metricCounts) {
 	counts := slices[name]
 	if counts == nil {
 		counts = &sliceCounts{}
@@ -496,6 +712,7 @@ func addSliceCounts(slices map[string]*sliceCounts, name string, exact, covering
 	}
 	counts.exact.add(exact)
 	counts.covering.add(covering)
+	counts.requiredMatch.add(requiredMatch)
 }
 
 func slicesToMetrics(values map[string]*sliceCounts) []MetricSlice {
@@ -506,9 +723,84 @@ func slicesToMetrics(values map[string]*sliceCounts) []MetricSlice {
 	sort.Strings(names)
 	out := make([]MetricSlice, 0, len(names))
 	for _, name := range names {
-		out = append(out, MetricSlice{Name: name, Exact: values[name].exact.metrics(), Covering: values[name].covering.metrics()})
+		out = append(out, MetricSlice{
+			Name: name, Exact: values[name].exact.metrics(), Covering: values[name].covering.metrics(),
+			RequiredMatch: values[name].requiredMatch.metrics(),
+		})
 	}
 	return out
+}
+
+type metricDimension struct {
+	dimension string
+	name      string
+}
+
+func outputDimensions(fixture Case, target Target) []metricDimension {
+	dimensions := []metricDimension{
+		{dimension: "kind", name: string(target.Kind)},
+		{dimension: "risk", name: string(fixture.Risk)},
+		{dimension: "language", name: fixture.Language},
+		{dimension: "script", name: fixture.Script},
+		{dimension: "format", name: fixture.Shape},
+		{dimension: "match_policy", name: string(target.Match)},
+	}
+	if identityPolicy := identityPolicyName(fixture, target); identityPolicy != "" {
+		dimensions = append(dimensions, metricDimension{dimension: "identity_policy", name: identityPolicy})
+	}
+	for _, boundary := range fixtureBoundaries(fixture) {
+		dimensions = append(dimensions, metricDimension{dimension: "boundary", name: boundary})
+	}
+	return dimensions
+}
+
+func outputSlice(slices map[outputSliceKey]*OutputMetricSlice, mode Mode, dimension, name string) *OutputMetricSlice {
+	key := outputSliceKey{mode: mode, dimension: dimension, name: name}
+	counts := slices[key]
+	if counts == nil {
+		counts = &OutputMetricSlice{Mode: mode, Dimension: dimension, Name: name}
+		slices[key] = counts
+	}
+	return counts
+}
+
+func finalizeOutputMetrics(metrics OutputMetrics) OutputMetrics {
+	metrics.LeakRate = failureRate(metrics.RawValueLeaks, metrics.RequiredAbsent)
+	metrics.OverRedactionRate = failureRate(metrics.PreservationFailures, metrics.RequiredPresent)
+	metrics.PreservationRate = ratio(metrics.RequiredPresent-metrics.PreservationFailures, metrics.RequiredPresent)
+	return metrics
+}
+
+func outputSlicesToMetrics(values map[outputSliceKey]*OutputMetricSlice) []OutputMetricSlice {
+	keys := make([]outputSliceKey, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].mode != keys[j].mode {
+			return keys[i].mode < keys[j].mode
+		}
+		if keys[i].dimension != keys[j].dimension {
+			return keys[i].dimension < keys[j].dimension
+		}
+		return keys[i].name < keys[j].name
+	})
+	out := make([]OutputMetricSlice, 0, len(keys))
+	for _, key := range keys {
+		metrics := *values[key]
+		metrics.LeakRate = failureRate(metrics.RawValueLeaks, metrics.RequiredAbsent)
+		metrics.OverRedactionRate = failureRate(metrics.PreservationFailures, metrics.RequiredPresent)
+		metrics.PreservationRate = ratio(metrics.RequiredPresent-metrics.PreservationFailures, metrics.RequiredPresent)
+		out = append(out, metrics)
+	}
+	return out
+}
+
+func failureRate(failures, opportunities int) float64 {
+	if opportunities == 0 {
+		return 0
+	}
+	return ratio(failures, opportunities)
 }
 
 func ratio(numerator, denominator int) float64 {
@@ -545,22 +837,28 @@ func evaluateGates(metadata EvidenceMetadata, finalOutput []OutputMetrics) []Gat
 	gates := make([]GateResult, 0, 11)
 	for gate := 0; gate <= 10; gate++ {
 		state := GateNotRun
+		reason := "phase-not-evaluated"
 		if gate == 0 && metadata.Authoritative && metadata.EvidenceAuthority == AuthorityDockerCI {
 			state = GatePass
+			reason = "authoritative-policy-freeze-evidence-complete"
 			seenOff := false
 			for _, output := range finalOutput {
 				if output.Mode == ModeOff {
 					seenOff = true
 					if output.RawValueLeaks != 0 || output.PreservationFailures != 0 || output.ExactPassThroughFail != 0 {
 						state = GateFail
+						reason = "mode-off-contract-regression"
 					}
 				}
 			}
 			if !seenOff {
 				state = GateFail
+				reason = "mode-off-evidence-missing"
 			}
+		} else if gate == 0 {
+			reason = "authoritative-docker-evidence-not-run"
 		}
-		gates = append(gates, GateResult{Gate: fmt.Sprintf("G%d", gate), State: state})
+		gates = append(gates, GateResult{Gate: fmt.Sprintf("G%d", gate), State: state, Reason: reason})
 	}
 	return gates
 }
@@ -576,6 +874,24 @@ func WriteReport(path string, report *Report) error {
 	raw = append(raw, '\n')
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		return fmt.Errorf("write evaluation report: %w", err)
+	}
+	return nil
+}
+
+func ValidateReportAgainstSchema(schemaRaw []byte, report *Report) error {
+	if report == nil {
+		return fmt.Errorf("validate evaluation report schema: report is nil")
+	}
+	hash := sha256.Sum256(schemaRaw)
+	if report.ReportSchemaSHA256 != hex.EncodeToString(hash[:]) {
+		return fmt.Errorf("validate evaluation report schema: report schema identity does not match checked schema")
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		return fmt.Errorf("encode evaluation report for schema validation: %w", err)
+	}
+	if err := ValidateJSONDocument(schemaRaw, raw); err != nil {
+		return fmt.Errorf("validate evaluation report schema: %w", err)
 	}
 	return nil
 }
