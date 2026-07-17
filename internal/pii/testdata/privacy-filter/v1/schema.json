@@ -117,9 +117,22 @@
         "value": {"type": "string", "minLength": 1},
         "match": {"enum": ["exact", "covering"]},
         "identity_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+		"synthetic": {"$ref": "#/$defs/syntheticProvenance"},
         "actions": {"$ref": "#/$defs/modeActions"}
       }
     },
+	"syntheticProvenance": {
+	  "type": "object",
+	  "additionalProperties": false,
+	  "required": ["generator", "version", "seed", "recipe", "purpose"],
+	  "properties": {
+		"generator": {"const": "hs-privacy-structural"},
+		"version": {"const": 1},
+		"seed": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+		"recipe": {"type": "string", "minLength": 1},
+		"purpose": {"enum": ["must-detect", "preserve"]}
+	  }
+	},
     "modeActions": {
       "type": "object",
       "additionalProperties": false,

@@ -3,13 +3,13 @@
   "partition": "command-output-payloads",
   "cases": [
     {
-      "id": "command-secret-all-boundaries",
+      "id": "command-boundary-table-must-detect",
       "language": "en",
       "script": "Latin",
       "shape": "command-payload",
       "risk": "critical",
-      "reason": "A synthetic secret must be absent from every command, output, MCP, error, and diagnostic boundary.",
-      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"secret=not-a-real-example-command-secret-73af\"}",
+      "reason": "The independently exercised table boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_MTA6JwObqiOlkeBgF5UUvDriWxEGlxYC6MyS-6Fx\"}",
       "known_identities": [],
       "targets": [
         {
@@ -26,12 +26,19 @@
           }
         },
         {
-          "id": "secret",
+          "id": "secret-shape",
           "kind": "secret",
-          "start": 48,
-          "end": 86,
-          "value": "not-a-real-example-command-secret-73af",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_MTA6JwObqiOlkeBgF5UUvDriWxEGlxYC6MyS-6Fx",
           "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-table-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
           "actions": {
             "off": "preserve",
             "customers": "redact",
@@ -44,12 +51,12 @@
           "required_absent": [],
           "required_present": [
             "TICKET-EXAMPLE-42",
-            "not-a-real-example-command-secret-73af"
+            "cmdtok_MTA6JwObqiOlkeBgF5UUvDriWxEGlxYC6MyS-6Fx"
           ]
         },
         "customers": {
           "required_absent": [
-            "not-a-real-example-command-secret-73af"
+            "cmdtok_MTA6JwObqiOlkeBgF5UUvDriWxEGlxYC6MyS-6Fx"
           ],
           "required_present": [
             "TICKET-EXAMPLE-42"
@@ -57,7 +64,7 @@
         },
         "all": {
           "required_absent": [
-            "not-a-real-example-command-secret-73af"
+            "cmdtok_MTA6JwObqiOlkeBgF5UUvDriWxEGlxYC6MyS-6Fx"
           ],
           "required_present": [
             "TICKET-EXAMPLE-42"
@@ -67,18 +74,1856 @@
       "tags": [
         "command-output",
         "boundary:table",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-table-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised table boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=f15d7ff93d97a12ab8b64a96e98e63e58af4ddfb50d4ddb7dfee04a30e05d9eb\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "f15d7ff93d97a12ab8b64a96e98e63e58af4ddfb50d4ddb7dfee04a30e05d9eb",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-table-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "f15d7ff93d97a12ab8b64a96e98e63e58af4ddfb50d4ddb7dfee04a30e05d9eb"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "f15d7ff93d97a12ab8b64a96e98e63e58af4ddfb50d4ddb7dfee04a30e05d9eb"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "f15d7ff93d97a12ab8b64a96e98e63e58af4ddfb50d4ddb7dfee04a30e05d9eb"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:table",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-json-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised json boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_f6Drl9XXcJsJTw9_rE77SLi_BI4cHbCwKbqMcfQ3\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_f6Drl9XXcJsJTw9_rE77SLi_BI4cHbCwKbqMcfQ3",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-json-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_f6Drl9XXcJsJTw9_rE77SLi_BI4cHbCwKbqMcfQ3"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_f6Drl9XXcJsJTw9_rE77SLi_BI4cHbCwKbqMcfQ3"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_f6Drl9XXcJsJTw9_rE77SLi_BI4cHbCwKbqMcfQ3"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:json",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-json-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised json boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=ab5beaf4fc9ec5ef76a51c6da16fb5a1ace4cf6a62a07a95a51d31a8ef91e06c\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "ab5beaf4fc9ec5ef76a51c6da16fb5a1ace4cf6a62a07a95a51d31a8ef91e06c",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-json-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ab5beaf4fc9ec5ef76a51c6da16fb5a1ace4cf6a62a07a95a51d31a8ef91e06c"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ab5beaf4fc9ec5ef76a51c6da16fb5a1ace4cf6a62a07a95a51d31a8ef91e06c"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ab5beaf4fc9ec5ef76a51c6da16fb5a1ace4cf6a62a07a95a51d31a8ef91e06c"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:json",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-json-full-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised json-full boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_FJUleK4XANHScQE5nqOhV5JXCuHfiTlbscylI2CV\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_FJUleK4XANHScQE5nqOhV5JXCuHfiTlbscylI2CV",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-json-full-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_FJUleK4XANHScQE5nqOhV5JXCuHfiTlbscylI2CV"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_FJUleK4XANHScQE5nqOhV5JXCuHfiTlbscylI2CV"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_FJUleK4XANHScQE5nqOhV5JXCuHfiTlbscylI2CV"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:json-full",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-json-full-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised json-full boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=e9eb3ff25f05b7cc7bd11e8ed73aa9d9aa5ffbec04e63d7afc8dd2c9ceaecc7e\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "e9eb3ff25f05b7cc7bd11e8ed73aa9d9aa5ffbec04e63d7afc8dd2c9ceaecc7e",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-json-full-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e9eb3ff25f05b7cc7bd11e8ed73aa9d9aa5ffbec04e63d7afc8dd2c9ceaecc7e"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e9eb3ff25f05b7cc7bd11e8ed73aa9d9aa5ffbec04e63d7afc8dd2c9ceaecc7e"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e9eb3ff25f05b7cc7bd11e8ed73aa9d9aa5ffbec04e63d7afc8dd2c9ceaecc7e"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:json-full",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-csv-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised csv boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_m9XikpVtl8DwyX5sIEzqexw5hQAmeiT0sX_duLss\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_m9XikpVtl8DwyX5sIEzqexw5hQAmeiT0sX_duLss",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-csv-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_m9XikpVtl8DwyX5sIEzqexw5hQAmeiT0sX_duLss"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_m9XikpVtl8DwyX5sIEzqexw5hQAmeiT0sX_duLss"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_m9XikpVtl8DwyX5sIEzqexw5hQAmeiT0sX_duLss"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:csv",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-csv-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised csv boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=b35ccfa69f49b9cde1bfda37acbc30ec9bdbdf0e84ca3d8bd1eed2c39a00d36e\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "b35ccfa69f49b9cde1bfda37acbc30ec9bdbdf0e84ca3d8bd1eed2c39a00d36e",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-csv-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b35ccfa69f49b9cde1bfda37acbc30ec9bdbdf0e84ca3d8bd1eed2c39a00d36e"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b35ccfa69f49b9cde1bfda37acbc30ec9bdbdf0e84ca3d8bd1eed2c39a00d36e"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b35ccfa69f49b9cde1bfda37acbc30ec9bdbdf0e84ca3d8bd1eed2c39a00d36e"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:csv",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-source-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised source boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_oMkeLgZivkNKSRcOcoansVxLYf03gkPeG3fU5LR6\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_oMkeLgZivkNKSRcOcoansVxLYf03gkPeG3fU5LR6",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-source-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_oMkeLgZivkNKSRcOcoansVxLYf03gkPeG3fU5LR6"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_oMkeLgZivkNKSRcOcoansVxLYf03gkPeG3fU5LR6"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_oMkeLgZivkNKSRcOcoansVxLYf03gkPeG3fU5LR6"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:source",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-source-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised source boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=c1ed78fa6ce2f02ea0c0bedba8fdc2f61a58dfae24f45f3fd5ca6aa08d35f69a\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "c1ed78fa6ce2f02ea0c0bedba8fdc2f61a58dfae24f45f3fd5ca6aa08d35f69a",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-source-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "c1ed78fa6ce2f02ea0c0bedba8fdc2f61a58dfae24f45f3fd5ca6aa08d35f69a"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "c1ed78fa6ce2f02ea0c0bedba8fdc2f61a58dfae24f45f3fd5ca6aa08d35f69a"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "c1ed78fa6ce2f02ea0c0bedba8fdc2f61a58dfae24f45f3fd5ca6aa08d35f69a"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:source",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-rfc822-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised rfc822 boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_sKWZkDByWqx06mkLdhuGlHQwL-IotGKpecbAYITi\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_sKWZkDByWqx06mkLdhuGlHQwL-IotGKpecbAYITi",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-rfc822-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_sKWZkDByWqx06mkLdhuGlHQwL-IotGKpecbAYITi"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_sKWZkDByWqx06mkLdhuGlHQwL-IotGKpecbAYITi"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_sKWZkDByWqx06mkLdhuGlHQwL-IotGKpecbAYITi"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:rfc822",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-rfc822-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised rfc822 boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=d92fd0ba0e9ca4bcd7ff2b45c7cd3ef81acee96fd3b2eb10cddb9fb8ade0a5ba\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "d92fd0ba0e9ca4bcd7ff2b45c7cd3ef81acee96fd3b2eb10cddb9fb8ade0a5ba",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-rfc822-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d92fd0ba0e9ca4bcd7ff2b45c7cd3ef81acee96fd3b2eb10cddb9fb8ade0a5ba"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d92fd0ba0e9ca4bcd7ff2b45c7cd3ef81acee96fd3b2eb10cddb9fb8ade0a5ba"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d92fd0ba0e9ca4bcd7ff2b45c7cd3ef81acee96fd3b2eb10cddb9fb8ade0a5ba"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:rfc822",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-mcp-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised mcp boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_df0HkyNaCmPBJZ-W1-fVDwHj171EOIAqv8ozMRkO\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_df0HkyNaCmPBJZ-W1-fVDwHj171EOIAqv8ozMRkO",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-mcp-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_df0HkyNaCmPBJZ-W1-fVDwHj171EOIAqv8ozMRkO"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_df0HkyNaCmPBJZ-W1-fVDwHj171EOIAqv8ozMRkO"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_df0HkyNaCmPBJZ-W1-fVDwHj171EOIAqv8ozMRkO"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:mcp",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-mcp-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised mcp boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=e67f07adccf0c64e80beaf64c80cabef6a92e08f3ecb4addb7fbefb14a3fa17d\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "e67f07adccf0c64e80beaf64c80cabef6a92e08f3ecb4addb7fbefb14a3fa17d",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-mcp-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e67f07adccf0c64e80beaf64c80cabef6a92e08f3ecb4addb7fbefb14a3fa17d"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e67f07adccf0c64e80beaf64c80cabef6a92e08f3ecb4addb7fbefb14a3fa17d"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "e67f07adccf0c64e80beaf64c80cabef6a92e08f3ecb4addb7fbefb14a3fa17d"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:mcp",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-argv-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised argv boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_9p0bj46dn8HNMoc1Q4smlEz1ktyr4tdeclo-aa0h\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_9p0bj46dn8HNMoc1Q4smlEz1ktyr4tdeclo-aa0h",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-argv-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_9p0bj46dn8HNMoc1Q4smlEz1ktyr4tdeclo-aa0h"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_9p0bj46dn8HNMoc1Q4smlEz1ktyr4tdeclo-aa0h"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_9p0bj46dn8HNMoc1Q4smlEz1ktyr4tdeclo-aa0h"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:argv",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-argv-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised argv boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=b46a23a10e03c4cc9cbdfd7aac6cbba68c7ce6ee1cf2fbbfd94fc6ab0efef72a\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "b46a23a10e03c4cc9cbdfd7aac6cbba68c7ce6ee1cf2fbbfd94fc6ab0efef72a",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-argv-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b46a23a10e03c4cc9cbdfd7aac6cbba68c7ce6ee1cf2fbbfd94fc6ab0efef72a"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b46a23a10e03c4cc9cbdfd7aac6cbba68c7ce6ee1cf2fbbfd94fc6ab0efef72a"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b46a23a10e03c4cc9cbdfd7aac6cbba68c7ce6ee1cf2fbbfd94fc6ab0efef72a"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:argv",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-stdout-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised stdout boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_slHuITh147N9hjGZjhnGuFnxC8oLCtT5ySe1ieto\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_slHuITh147N9hjGZjhnGuFnxC8oLCtT5ySe1ieto",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-stdout-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_slHuITh147N9hjGZjhnGuFnxC8oLCtT5ySe1ieto"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_slHuITh147N9hjGZjhnGuFnxC8oLCtT5ySe1ieto"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_slHuITh147N9hjGZjhnGuFnxC8oLCtT5ySe1ieto"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:stdout",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-stdout-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised stdout boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=baca62fabfedf9bfd4ad2c24b81c6ae8fde8f28bf4ec5bd4b84c39ff6cd9b3cb\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "baca62fabfedf9bfd4ad2c24b81c6ae8fde8f28bf4ec5bd4b84c39ff6cd9b3cb",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-stdout-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "baca62fabfedf9bfd4ad2c24b81c6ae8fde8f28bf4ec5bd4b84c39ff6cd9b3cb"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "baca62fabfedf9bfd4ad2c24b81c6ae8fde8f28bf4ec5bd4b84c39ff6cd9b3cb"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "baca62fabfedf9bfd4ad2c24b81c6ae8fde8f28bf4ec5bd4b84c39ff6cd9b3cb"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:stdout",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-stderr-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised stderr boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_DPlGsGBfr5gZpAce7n1OProwR1hvm27x2rE1loWf\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_DPlGsGBfr5gZpAce7n1OProwR1hvm27x2rE1loWf",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-stderr-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_DPlGsGBfr5gZpAce7n1OProwR1hvm27x2rE1loWf"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_DPlGsGBfr5gZpAce7n1OProwR1hvm27x2rE1loWf"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_DPlGsGBfr5gZpAce7n1OProwR1hvm27x2rE1loWf"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:stderr",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-stderr-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised stderr boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=b76b6ded2a0aa61e97c3caf1cccf11c85eb3d2bd28aa3fddde0b26bb7b08fc6b\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "b76b6ded2a0aa61e97c3caf1cccf11c85eb3d2bd28aa3fddde0b26bb7b08fc6b",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-stderr-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b76b6ded2a0aa61e97c3caf1cccf11c85eb3d2bd28aa3fddde0b26bb7b08fc6b"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b76b6ded2a0aa61e97c3caf1cccf11c85eb3d2bd28aa3fddde0b26bb7b08fc6b"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "b76b6ded2a0aa61e97c3caf1cccf11c85eb3d2bd28aa3fddde0b26bb7b08fc6b"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:stderr",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-error-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised error boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_wH6HYdTvSBWKO727lEr6yzh5W9jswjUoOzPkP_c3\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_wH6HYdTvSBWKO727lEr6yzh5W9jswjUoOzPkP_c3",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-error-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_wH6HYdTvSBWKO727lEr6yzh5W9jswjUoOzPkP_c3"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_wH6HYdTvSBWKO727lEr6yzh5W9jswjUoOzPkP_c3"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_wH6HYdTvSBWKO727lEr6yzh5W9jswjUoOzPkP_c3"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:error",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-error-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised error boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cf0c5ed10c2ce93fd0e03b64edea93ae8fe2c7cfd7e0ed32f74b3bca4d28e7ab\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "cf0c5ed10c2ce93fd0e03b64edea93ae8fe2c7cfd7e0ed32f74b3bca4d28e7ab",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-error-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cf0c5ed10c2ce93fd0e03b64edea93ae8fe2c7cfd7e0ed32f74b3bca4d28e7ab"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cf0c5ed10c2ce93fd0e03b64edea93ae8fe2c7cfd7e0ed32f74b3bca4d28e7ab"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cf0c5ed10c2ce93fd0e03b64edea93ae8fe2c7cfd7e0ed32f74b3bca4d28e7ab"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:error",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-panic-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised panic boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_8UkEtRMroR1gtsKuPGB4bC3bSHVHRN9nBOasdnm6\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_8UkEtRMroR1gtsKuPGB4bC3bSHVHRN9nBOasdnm6",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-panic-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_8UkEtRMroR1gtsKuPGB4bC3bSHVHRN9nBOasdnm6"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_8UkEtRMroR1gtsKuPGB4bC3bSHVHRN9nBOasdnm6"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_8UkEtRMroR1gtsKuPGB4bC3bSHVHRN9nBOasdnm6"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
         "boundary:panic",
-        "boundary:diagnostic"
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-panic-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised panic boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=d97abce20c85ca2ec7e10cb8fa4ba7bf3b55f02f69b2ad6beb9e6fa4eb7ae76f\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "d97abce20c85ca2ec7e10cb8fa4ba7bf3b55f02f69b2ad6beb9e6fa4eb7ae76f",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-panic-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d97abce20c85ca2ec7e10cb8fa4ba7bf3b55f02f69b2ad6beb9e6fa4eb7ae76f"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d97abce20c85ca2ec7e10cb8fa4ba7bf3b55f02f69b2ad6beb9e6fa4eb7ae76f"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "d97abce20c85ca2ec7e10cb8fa4ba7bf3b55f02f69b2ad6beb9e6fa4eb7ae76f"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:panic",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-diagnostic-must-detect",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "The independently exercised diagnostic boundary has a locked must-detect expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=cmdtok_gxDbwA_qIWBxIi34Oildxozhx5lI3lRCug17brDV\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 94,
+          "value": "cmdtok_gxDbwA_qIWBxIi34Oildxozhx5lI3lRCug17brDV",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-diagnostic-must-detect",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "cmdtok_gxDbwA_qIWBxIi34Oildxozhx5lI3lRCug17brDV"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_gxDbwA_qIWBxIi34Oildxozhx5lI3lRCug17brDV"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_gxDbwA_qIWBxIi34Oildxozhx5lI3lRCug17brDV"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:diagnostic",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-boundary-diagnostic-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "The independently exercised diagnostic boundary has a locked preserve expectation.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"value=ba7a1ca2ee66a59ef4d04b61d91b9eed5c2fe2aab8b4efd6f0fd87a6fad3decf\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret-shape",
+          "kind": "secret",
+          "start": 47,
+          "end": 111,
+          "value": "ba7a1ca2ee66a59ef4d04b61d91b9eed5c2fe2aab8b4efd6f0fd87a6fad3decf",
+          "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-boundary-diagnostic-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ba7a1ca2ee66a59ef4d04b61d91b9eed5c2fe2aab8b4efd6f0fd87a6fad3decf"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ba7a1ca2ee66a59ef4d04b61d91b9eed5c2fe2aab8b4efd6f0fd87a6fad3decf"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "ba7a1ca2ee66a59ef4d04b61d91b9eed5c2fe2aab8b4efd6f0fd87a6fad3decf"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:diagnostic",
+        "synthetic-generator:v1"
       ]
     },
     {

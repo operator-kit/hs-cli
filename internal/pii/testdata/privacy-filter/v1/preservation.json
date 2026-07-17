@@ -9,7 +9,7 @@
       "shape": "log",
       "risk": "high",
       "reason": "The private email must be removed while the public checksum remains unchanged.",
-      "text": "artifact_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa notify=fixture.person@example.invalid",
+      "text": "artifact_sha256=bd1c62ab9a30bbeda6e13b8ca70e8dfd5d49b50fbfcb6be4dd7e89f08b58be7d notify=fixture.person@example.invalid",
       "known_identities": [],
       "targets": [
         {
@@ -17,8 +17,15 @@
           "kind": "secret",
           "start": 16,
           "end": 80,
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "value": "bd1c62ab9a30bbeda6e13b8ca70e8dfd5d49b50fbfcb6be4dd7e89f08b58be7d",
           "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-checksum-preserve",
+            "recipe": "checksum",
+            "purpose": "preserve"
+          },
           "actions": {
             "off": "preserve",
             "customers": "preserve",
@@ -43,7 +50,7 @@
         "off": {
           "required_absent": [],
           "required_present": [
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bd1c62ab9a30bbeda6e13b8ca70e8dfd5d49b50fbfcb6be4dd7e89f08b58be7d",
             "fixture.person@example.invalid"
           ]
         },
@@ -52,7 +59,7 @@
             "fixture.person@example.invalid"
           ],
           "required_present": [
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "bd1c62ab9a30bbeda6e13b8ca70e8dfd5d49b50fbfcb6be4dd7e89f08b58be7d"
           ]
         },
         "all": {
@@ -60,7 +67,7 @@
             "fixture.person@example.invalid"
           ],
           "required_present": [
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "bd1c62ab9a30bbeda6e13b8ca70e8dfd5d49b50fbfcb6be4dd7e89f08b58be7d"
           ]
         }
       },
@@ -87,6 +94,13 @@
           "end": 43,
           "value": "[REDACTED_SECRET]",
           "match": "exact",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-redacted-marker-preserve",
+            "recipe": "redacted-marker",
+            "purpose": "preserve"
+          },
           "actions": {
             "off": "preserve",
             "customers": "preserve",
@@ -215,6 +229,55 @@
       "tags": [
         "preservation",
         "company"
+      ]
+    },
+    {
+      "id": "preservation-signature-public-organization",
+      "language": "en",
+      "script": "Latin",
+      "shape": "signature",
+      "risk": "preservation",
+      "reason": "A public organization in a signature must remain unchanged.",
+      "text": "--\nAtlas Labs Support\nDocumentation: https://docs.example.invalid",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-organization",
+          "kind": "person",
+          "start": 3,
+          "end": 13,
+          "value": "Atlas Labs",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Atlas Labs"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Atlas Labs"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Atlas Labs"
+          ]
+        }
+      },
+      "tags": [
+        "preservation",
+        "format:signature"
       ]
     }
   ]

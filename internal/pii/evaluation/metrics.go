@@ -32,6 +32,7 @@ type EvidenceMetadata struct {
 	HardwareProfile    string
 	RunnerName         string
 	CorpusSHA256       string
+	BroadCorpusSHA256  string
 	PolicySHA256       string
 	BudgetSHA256       string
 	IdentitySHA256     string
@@ -71,6 +72,7 @@ type Report struct {
 	Schema             int                 `json:"schema"`
 	GitCommit          string              `json:"git_commit"`
 	CorpusSHA256       string              `json:"corpus_sha256"`
+	BroadCorpusSHA256  string              `json:"broad_corpus_sha256"`
 	PolicySHA256       string              `json:"policy_sha256"`
 	BudgetSHA256       string              `json:"budget_sha256"`
 	IdentitySHA256     string              `json:"identity_sha256"`
@@ -362,6 +364,7 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		Schema:             ReportSchemaVersion,
 		GitCommit:          metadata.GitCommit,
 		CorpusSHA256:       metadata.CorpusSHA256,
+		BroadCorpusSHA256:  metadata.BroadCorpusSHA256,
 		PolicySHA256:       metadata.PolicySHA256,
 		BudgetSHA256:       metadata.BudgetSHA256,
 		IdentitySHA256:     metadata.IdentitySHA256,
@@ -405,7 +408,7 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 		"git commit": metadata.GitCommit, "backend": metadata.Backend, "model revision": metadata.ModelRevision,
 		"variant": metadata.Variant, "artifact sha256": metadata.ArtifactSHA256, "runtime version": metadata.RuntimeVersion,
 		"container image": metadata.ContainerImage, "platform": metadata.Platform, "hardware profile": metadata.HardwareProfile,
-		"runner name": metadata.RunnerName, "corpus sha256": metadata.CorpusSHA256,
+		"runner name": metadata.RunnerName, "corpus sha256": metadata.CorpusSHA256, "broad corpus sha256": metadata.BroadCorpusSHA256,
 		"policy sha256": metadata.PolicySHA256, "budget sha256": metadata.BudgetSHA256, "identity sha256": metadata.IdentitySHA256,
 		"report schema sha256": metadata.ReportSchemaSHA256,
 	} {
@@ -421,7 +424,7 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 	}
 	if metadata.Authoritative {
 		for name, value := range map[string]string{
-			"artifact": metadata.ArtifactSHA256, "corpus": metadata.CorpusSHA256, "policy": metadata.PolicySHA256,
+			"artifact": metadata.ArtifactSHA256, "corpus": metadata.CorpusSHA256, "broad corpus": metadata.BroadCorpusSHA256, "policy": metadata.PolicySHA256,
 			"budget": metadata.BudgetSHA256, "identity": metadata.IdentitySHA256, "report schema": metadata.ReportSchemaSHA256,
 		} {
 			if len(value) != sha256HexLength {

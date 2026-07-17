@@ -53,6 +53,15 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 		t.Fatalf("load typed privacy corpus: %v", err)
 	}
 	metadata.CorpusSHA256 = corpus.Fingerprint
+	broad, err := evaluation.LoadBroadCorpusDir(filepath.Join(fixtureDir, "..", "broad", "v1"))
+	if err != nil {
+		t.Fatalf("load locked broad quality corpus: %v", err)
+	}
+	metadata.BroadCorpusSHA256 = broad.Fingerprint
+	combinedCases := make([]evaluation.Case, 0, len(corpus.Cases)+len(broad.Cases))
+	combinedCases = append(combinedCases, corpus.Cases...)
+	combinedCases = append(combinedCases, broad.Cases...)
+	evaluationCorpus := &evaluation.Corpus{Cases: combinedCases}
 	if _, err := evaluation.LoadPolicy(filepath.Join(fixtureDir, "policy.json")); err != nil {
 		t.Fatalf("load frozen typed policy: %v", err)
 	}
@@ -82,8 +91,8 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 		t.Fatalf("construct baseline pseudonym context: %v", err)
 	}
 
-	observations := make([]evaluation.CaseObservation, 0, len(corpus.Cases))
-	for _, fixture := range corpus.Cases {
+	observations := make([]evaluation.CaseObservation, 0, len(evaluationCorpus.Cases))
+	for _, fixture := range evaluationCorpus.Cases {
 		if err := ctx.Err(); err != nil {
 			t.Fatalf("DistilBERT baseline timed out after case %q: %v", fixture.ID, err)
 		}
@@ -124,7 +133,7 @@ func TestDistilBERTTypedCorpusBaseline(t *testing.T) {
 		})
 	}
 
-	report, err := evaluation.Evaluate(corpus, observations, metadata)
+	report, err := evaluation.Evaluate(evaluationCorpus, observations, metadata)
 	if err != nil {
 		t.Fatalf("evaluate DistilBERT baseline: %v", err)
 	}

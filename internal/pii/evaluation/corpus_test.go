@@ -168,8 +168,12 @@ func TestSecretFixturesContainOnlyDeclaredSyntheticMaterial(t *testing.T) {
 				continue
 			}
 			secretTargets++
-			if !declaredSyntheticSecret(target.Value) {
-				t.Fatalf("case %q secret target %q is not declared synthetic", fixture.ID, target.ID)
+			if target.Synthetic == nil {
+				t.Fatalf("case %q secret target %q lacks synthetic provenance", fixture.ID, target.ID)
+			}
+			generated, generationErr := GenerateSyntheticValue(*target.Synthetic)
+			if generationErr != nil || generated != target.Value {
+				t.Fatalf("case %q secret target %q does not match its deterministic provenance: %v", fixture.ID, target.ID, generationErr)
 			}
 		}
 	}

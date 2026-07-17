@@ -105,14 +105,15 @@ type KnownIdentity struct {
 }
 
 type Target struct {
-	ID         string      `json:"id"`
-	Kind       SpanKind    `json:"kind"`
-	Start      int         `json:"start"`
-	End        int         `json:"end"`
-	Value      string      `json:"value"`
-	Match      MatchPolicy `json:"match"`
-	IdentityID string      `json:"identity_id,omitempty"`
-	Actions    ModeActions `json:"actions"`
+	ID         string               `json:"id"`
+	Kind       SpanKind             `json:"kind"`
+	Start      int                  `json:"start"`
+	End        int                  `json:"end"`
+	Value      string               `json:"value"`
+	Match      MatchPolicy          `json:"match"`
+	IdentityID string               `json:"identity_id,omitempty"`
+	Synthetic  *SyntheticProvenance `json:"synthetic,omitempty"`
+	Actions    ModeActions          `json:"actions"`
 }
 
 type ModeActions struct {
@@ -388,8 +389,19 @@ func validateCase(fixture *Case) error {
 		if target.Value == "" || fixture.Text[target.Start:target.End] != target.Value {
 			return fmt.Errorf("%s: target %q value does not match its declared byte range", prefix, target.ID)
 		}
-		if target.Kind == SpanSecret && !declaredSyntheticSecret(target.Value) {
-			return fmt.Errorf("%s: secret target %q lacks a declared synthetic safety marker", prefix, target.ID)
+		if target.Kind == SpanSecret {
+			if target.Synthetic == nil {
+				return fmt.Errorf("%s: secret target %q lacks synthetic provenance", prefix, target.ID)
+			}
+			generated, err := GenerateSyntheticValue(*target.Synthetic)
+			if err != nil {
+				return fmt.Errorf("%s: secret target %q provenance: %w", prefix, target.ID, err)
+			}
+			if generated != target.Value {
+				return fmt.Errorf("%s: secret target %q does not match its deterministic synthetic provenance", prefix, target.ID)
+			}
+		} else if target.Synthetic != nil {
+			return fmt.Errorf("%s: non-secret target %q declares secret synthetic provenance", prefix, target.ID)
 		}
 		if target.IdentityID != "" {
 			identity, exists := known[target.IdentityID]
@@ -399,8 +411,13 @@ func validateCase(fixture *Case) error {
 			if target.Kind == SpanSecret || target.Kind == SpanAccountNumber || target.Kind == SpanPrivateDate {
 				return fmt.Errorf("%s: target %q kind %q cannot be protected by identity attribution", prefix, target.ID, target.Kind)
 			}
-			if target.Kind == SpanPerson && identity.Type == "user" && target.Actions.Customers != ActionPreserve {
-				return fmt.Errorf("%s: known staff person target %q must be preserved in customers mode", prefix, target.ID)
+			if target.Kind == SpanPerson && identity.Type == "user" &&
+				(target.Actions.Customers != ActionPreserve || target.Actions.All != ActionRedact) {
+				return fmt.Errorf("%s: known staff person target %q must preserve in customers and redact in all", prefix, target.ID)
+			}
+			if target.Kind == SpanPerson && identity.Type == "customer" &&
+				(target.Actions.Customers != ActionRedact || target.Actions.All != ActionRedact) {
+				return fmt.Errorf("%s: known customer person target %q must redact in customers and all", prefix, target.ID)
 			}
 		}
 		if err := validateActions(prefix, target); err != nil {
@@ -505,38 +522,15 @@ func validateSecretFixture(prefix string, fixture *Case) error {
 			(target.Actions.Customers != ActionPreserve || target.Actions.All != ActionPreserve) {
 			return fmt.Errorf("%s: near-miss secret target %q must be preserved", prefix, target.ID)
 		}
-		if !declaredSyntheticSecret(target.Value) {
-			return fmt.Errorf("%s: secret target %q lacks a declared synthetic safety marker", prefix, target.ID)
+		if target.Synthetic == nil || target.Synthetic.Recipe != fixture.SecretFixture.Family ||
+			target.Synthetic.Purpose != fixture.SecretFixture.Role {
+			return fmt.Errorf("%s: secret target %q provenance contradicts the fixture family or role", prefix, target.ID)
 		}
 	}
 	if !hasSecret {
 		return fmt.Errorf("%s: secret_fixture requires a typed secret target", prefix)
 	}
 	return nil
-}
-
-func declaredSyntheticSecret(value string) bool {
-	lower := strings.ToLower(value)
-	for _, marker := range []string{
-		"example", "not-a-real", "not_a_real", "invalid", "synthetic", "placeholder", "redacted",
-	} {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	if len(value) >= 16 {
-		uniform := true
-		for i := 1; i < len(value); i++ {
-			if value[i] != value[0] {
-				uniform = false
-				break
-			}
-		}
-		if uniform {
-			return true
-		}
-	}
-	return false
 }
 
 func validByteRange(text string, start, end int) bool {
@@ -584,8 +578,14 @@ func (c *Corpus) ValidateCoverage() error {
 	for _, family := range RequiredSecretFamilies {
 		secretFamilies[family] = &outcomes{}
 	}
-	shapes := make(map[string]bool, len(requiredShapes))
-	boundaries := make(map[string]bool, len(RequiredOutputBoundaries))
+	shapes := make(map[string]*outcomes, len(requiredShapes))
+	for _, shape := range requiredShapes {
+		shapes[shape] = &outcomes{}
+	}
+	boundaries := make(map[string]*outcomes, len(RequiredOutputBoundaries))
+	for _, boundary := range RequiredOutputBoundaries {
+		boundaries[boundary] = &outcomes{}
+	}
 
 	for _, document := range c.Documents {
 		partitionOutcome := partitions[document.Partition]
@@ -606,10 +606,16 @@ func (c *Corpus) ValidateCoverage() error {
 				languageOutcome.redact = languageOutcome.redact || hasRedact
 				languageOutcome.preserve = languageOutcome.preserve || hasPreserve
 			}
-			shapes[fixture.Shape] = true
+			shapeOutcome := shapes[fixture.Shape]
+			shapeOutcome.redact = shapeOutcome.redact || hasRedact
+			shapeOutcome.preserve = shapeOutcome.preserve || hasPreserve
 			for _, tag := range fixture.Tags {
 				if strings.HasPrefix(tag, "boundary:") {
-					boundaries[strings.TrimPrefix(tag, "boundary:")] = true
+					boundaryOutcome := boundaries[strings.TrimPrefix(tag, "boundary:")]
+					if boundaryOutcome != nil {
+						boundaryOutcome.redact = boundaryOutcome.redact || hasRedact
+						boundaryOutcome.preserve = boundaryOutcome.preserve || hasPreserve
+					}
 				}
 			}
 			if fixture.SecretFixture != nil {
@@ -644,13 +650,13 @@ func (c *Corpus) ValidateCoverage() error {
 		}
 	}
 	for _, shape := range requiredShapes {
-		if !shapes[shape] {
-			return fmt.Errorf("privacy corpus is missing required content shape %q", shape)
+		if outcome := shapes[shape]; !outcome.redact || !outcome.preserve {
+			return fmt.Errorf("privacy corpus content shape %q requires redact and preservation coverage", shape)
 		}
 	}
 	for _, boundary := range RequiredOutputBoundaries {
-		if !boundaries[boundary] {
-			return fmt.Errorf("privacy corpus is missing output boundary coverage %q", boundary)
+		if outcome := boundaries[boundary]; !outcome.redact || !outcome.preserve {
+			return fmt.Errorf("privacy corpus output boundary %q requires independent redact and preservation coverage", boundary)
 		}
 	}
 	return nil

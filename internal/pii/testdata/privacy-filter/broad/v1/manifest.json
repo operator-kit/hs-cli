@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "corpus_version": "broad-v1",
+  "schema_file": "../../v1/schema.json",
+  "schema_sha256": "94457b0524ae247d712799fca9c4a7ab5df089557ff235c404198feb4a8707cc",
+  "generator": {
+    "name": "hs-privacy-broad-corpus",
+    "version": 1,
+    "seed": "broad-v1"
+  },
+  "minimum_denominators": {
+    "secret_redact_cases": 100,
+    "account_redact_cases": 100,
+    "private_date_redact_cases": 100,
+    "preservation_cases": 100,
+    "language_redact_cases": 100,
+    "language_preserve_cases": 100
+  },
+  "maximum_case_basis_points": 100,
+  "minimum_secret_family_cases": 8,
+  "partitions": [
+    {
+      "name": "secrets",
+      "file": "secrets.json",
+      "sha256": "73b055c7b0851c8024982330f04741f7678707bfb56bf9ba2831915525f6474a",
+      "cases": 224,
+      "targets": 224
+    },
+    {
+      "name": "account-identifiers",
+      "file": "account-identifiers.json",
+      "sha256": "1673af4a577dea8c7fac93629b8124d405e91d452988908178501add6a746e4d",
+      "cases": 200,
+      "targets": 200
+    },
+    {
+      "name": "private-public-dates",
+      "file": "private-public-dates.json",
+      "sha256": "93e90cf5c56f6bd69ceeaa1c35d10dafaa968ae951c9e03907f028661e159f38",
+      "cases": 200,
+      "targets": 200
+    },
+    {
+      "name": "multilingual",
+      "file": "multilingual.json",
+      "sha256": "29acae80717b878b7374d20273c150e31cc99f013e4cdd3b74b5159f8b722532",
+      "cases": 2000,
+      "targets": 2000
+    },
+    {
+      "name": "preservation",
+      "file": "preservation.json",
+      "sha256": "9f79836b23e7b3703debc975135a72b9fd03c1423a5be95fcae690151ba4a390",
+      "cases": 100,
+      "targets": 100
+    }
+  ]
+}
