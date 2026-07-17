@@ -104,7 +104,9 @@ threshold then applies only to a fresh evaluation run.
 - Adding permanent quality, security, parity, release, and performance tests.
 - Supporting an explicit preview, rollback, default migration, and retirement
   sequence.
-- Evaluating q4 and q4f16 separately.
+- Inventorying and comparing the original safetensors checkpoint and every
+  published ONNX export: default, fp16, generic quantized, q4, and q4f16.
+- Packaging exactly one approved model variant in each production bundle.
 
 ### Out of scope for the initial replacement
 
@@ -260,7 +262,7 @@ installer or CI cache. It must never download a moving main revision.
 It owns:
 
 - official Python reference predictions;
-- q4 and q4f16 quality comparison;
+- original, default ONNX, fp16, generic-quantized, q4, and q4f16 comparison;
 - native ONNX parity;
 - real tokenizer and decoder behavior;
 - multilingual and adversarial corpus evaluation; and
@@ -307,6 +309,9 @@ Proposed repository layout:
         command-payloads/
         oracle/
             reference-spans.json
+            onnx-default-spans.json
+            fp16-spans.json
+            generic-quantized-spans.json
             q4-spans.json
             q4f16-spans.json
         performance/
@@ -382,7 +387,7 @@ The typed corpus must also cover:
 | G0 Policy freeze | We know what each typed span means | Reviewed corpus schema, mode matrix, secret policy, fixed budgets |
 | G1 Behavior-preserving seam | The architecture can swap detectors safely | Existing suite, generic detector contract, lifecycle and exact-output tests |
 | G2 Reference reproducibility | The upstream behavior is pinned and repeatable | Hashed Docker oracle, immutable revisions, deterministic golden generation |
-| G3 Native parity | Go/ONNX implements the intended model contract | Tokenizer, logits, BIOES/Viterbi, offset, q4/q4f16 parity tests |
+| G3 Native parity | Go/ONNX implements the intended model contract | Tokenizer, logits, BIOES/Viterbi, offset, and per-variant parity tests |
 | G4 Privacy quality | The candidate improves protection without unacceptable loss | Locked detector and end-to-end quality corpus |
 | G5 Secret safety | Credentials cannot escape protected boundaries | Critical secret corpus, output/log/error/argv tests, failure injection |
 | G6 Performance and footprint | The replacement fits the product | Controlled cold/warm latency, RSS, size, concurrency and longevity tests |
@@ -507,7 +512,8 @@ normal product runtime.
 1. Add a repo-owned Dockerfile and lock file for the official Python runtime.
 2. Pin the reviewed OpenAI source, model, tokenizer, calibration, and ONNX
    revisions by immutable identity and SHA-256.
-3. Run the original/reference weights, q4, and q4f16 in separate processes.
+3. Run the original safetensors checkpoint and the default, fp16, generic-
+   quantized, q4, and q4f16 ONNX exports in separate processes.
 4. Emit structured labels, character spans, scores, token IDs, offsets, and
    decoder metadata using a strict repository-owned schema.
 5. Convert reference character offsets to explicit fixture byte offsets only in
@@ -549,8 +555,9 @@ Proposed paths:
   schema.
 - No network call occurs during inference or golden comparison.
 - No non-synthetic input path is accepted by the standard evaluation command.
-- The original, q4, and q4f16 reports identify their distinct artifacts; no
-  variant inherits another variant's score.
+- Every published variant has a distinct report identifying its artifact,
+  footprint, runtime, quality metrics, and intended disposition; no variant
+  inherits another variant's score.
 
 ### Failure handling
 
@@ -576,7 +583,9 @@ selected without changing domain policy.
    spans.
 7. Map upstream categories into domain-owned SpanKind values.
 8. Make inference cancellation, serialization, and lifecycle explicit.
-9. Keep q4 and q4f16 adapters independently testable until selection.
+9. Keep every published ONNX variant independently selectable in the evaluation
+   harness until its disposition is recorded. Only variants that pass the
+   distribution budget proceed as release candidates.
 
 ### Permanent tests
 
@@ -587,6 +596,9 @@ selected without changing domain policy.
 - TestCalibrationIsRequiredAndPinned
 - TestPrivacyFilterAdapterMapsAllEightKinds
 - TestPrivacyFilterAdapterMatchesReferenceSpans
+- TestEveryPublishedVariantHasAnIndependentEvaluation
+- TestPublishedVariantInventoryMatchesPinnedSourceLock
+- TestVariantResultsCannotInheritAnotherArtifactIdentity
 - TestQ4AndQ4F16AreMeasuredIndependently
 - TestWindowMergingPreservesBoundarySpans
 - TestLongInputIsNeverSilentlyTruncated
@@ -602,6 +614,9 @@ selected without changing domain policy.
   critical cases and at least 99.5% exact typed-span parity overall.
 - Any remaining non-critical parity difference is reviewed and represented by
   an explicit fixture before the gate can pass.
+- Every published variant has a locked artifact-size, load-compatibility,
+  quality, and reference-hardware result even if it is later marked
+  non-shippable.
 - q4 or q4f16 retains 100% critical covering-span recall and loses no more than
   0.5 percentage points of sensitivity-weighted F2 versus the original weights.
 - All malformed model, calibration, tokenizer, offset, window, and runtime
@@ -611,10 +626,14 @@ selected without changing domain policy.
 
 ### Failure handling
 
-First determine whether the failure belongs to the adapter or quantization. Fix
-adapter parity defects. If q4 fails quality, evaluate q4f16. If both variants
-fail parity, platform, or quality, reject the native migration rather than
-shipping the Python reference or weakening the gate.
+First determine whether the failure belongs to the adapter, export, runtime, or
+quantization. Fix adapter parity defects. The larger exports remain diagnostic
+comparators even when they exceed the product size budget. If q4 and q4f16 both
+fail parity, platform, quality, or hardware gates, reject the default migration
+under the current budgets rather than silently shipping a multi-gigabyte
+variant, the Python reference, or a weakened gate. Raising the user hardware or
+download requirement needs a separate reviewed product decision followed by a
+fresh gate run.
 
 ## Phase 4 — prove privacy quality and useful coverage
 
@@ -746,6 +765,107 @@ wrong product policy.
 Establish that the candidate remains practical for one-shot CLI use and
 long-running MCP use without loading two neural models.
 
+### What the larger artifacts imply
+
+The files are unquestionably much larger than the current model, so download,
+disk use, cold file reads, and likely resident memory will increase materially.
+Inference CPU cost cannot be inferred from file size alone. Privacy Filter has
+approximately 1.5 billion total parameters but activates approximately 50
+million per token, and the exports use different numeric representations and
+operators. Sparse activation may keep warm inference practical even while
+startup and memory become more demanding.
+
+The plan therefore treats better-hardware requirements as a hypothesis to
+measure, not an assumption to publish. A default migration fails if it needs
+more than the frozen minimum profile or exceeds a hard budget. Raising the
+minimum hardware requirement is a separate product decision, not an automatic
+benchmark adjustment.
+
+### Published variant inventory
+
+The following totals are from the immutable model revision pinned in Phase 2.
+Core totals include the checkpoint or ONNX graph and external data, tokenizer,
+config, tokenizer config, and Viterbi calibration. They exclude the platform
+ONNX Runtime library, currently approximately 18.6 to 39.6 MB, and exclude
+archive compression.
+
+| Published variant | Core bytes | Decimal size | Binary size | Planned role |
+|---|---:|---:|---:|---|
+| Original safetensors | 2,826,861,317 | 2,826.9 MB | 2,695.9 MiB | Accuracy and decoder oracle; never the default user bundle |
+| Default ONNX | 1,850,730,517 | 1,850.7 MB | 1,765.0 MiB | Native parity and compatibility comparator |
+| ONNX fp16 | 2,103,639,127 | 2,103.6 MB | 2,006.2 MiB | Reduced-precision and accelerator-oriented comparator |
+| ONNX generic quantized | 1,646,076,122 | 1,646.1 MB | 1,569.8 MiB | Quantized compatibility comparator |
+| ONNX q4 | 945,152,182 | 945.2 MB | 901.4 MiB | Production candidate |
+| ONNX q4f16 | 837,099,555 | 837.1 MB | 798.3 MiB | Production candidate and current size leader |
+
+All six variants must receive an artifact, quality, load, memory, and reference-
+hardware result. Exceeding the current 1.25 GiB installed-bundle budget marks a
+variant non-shippable under this plan but does not remove it from comparison.
+Only q4 and q4f16 currently fit that budget before the runtime is added.
+
+Using the current platform runtime sizes, the uncompressed installed payload is
+approximately 856 to 877 MB for q4f16 and 964 to 985 MB for q4. The actual
+compressed user downloads must be measured from the release bundles; upstream
+file totals are not a substitute for that test.
+
+The benchmark environment may cache every variant, but a released platform
+bundle contains exactly one approved variant. Users must never download the
+entire upstream ONNX directory or multiple variants for normal operation.
+
+### Hardware profiles
+
+Phase 0 must freeze concrete machines matching these provisional profiles:
+
+| Profile | Provisional resources | Purpose |
+|---|---|---|
+| H0 constrained minimum | 2 vCPU, 4 GiB RAM limit, CPU-only, SSD, swap disabled | Prove the replacement remains safe and usable on modest hardware |
+| H1 typical laptop/CI | 4 vCPU, 8 GiB RAM, CPU-only, SSD | Primary absolute and comparative benchmark |
+| H2 developer workstation | 8 vCPU, 16 GiB RAM, CPU-only, SSD | Scaling, thread-count, and throughput characterization |
+
+Native compatibility and smoke still run on Linux amd64, Linux arm64, macOS
+Intel, and macOS Apple Silicon. At least H0 and H1 must use stable named hosts
+rather than an unspecified shared runner. GPU or accelerator measurements are
+useful exploratory evidence but cannot qualify a CPU-default release.
+
+Each hardware profile record must pin:
+
+- CPU model, architecture, supported instruction sets, physical/logical cores,
+  and virtualization;
+- RAM limit, swap policy, NUMA topology where relevant, and container limits;
+- storage type and benchmark workspace;
+- OS, kernel, power mode/governor, and thermal state;
+- ONNX Runtime, Go, and Python/reference versions;
+- intra-op/inter-op thread settings and environment variables; and
+- git, corpus, budget, and model artifact identities.
+
+If a candidate passes H1 but fails H0, G6 fails under the initial plan. The team
+may either optimize/reject it or explicitly propose H1-class hardware as the new
+minimum, update documentation and preflight behavior, and rerun every affected
+gate from frozen budgets.
+
+### Comparative benchmark method
+
+The current DistilBERT bundle and every Privacy Filter variant run against the
+same workloads in isolated processes. At minimum:
+
+1. All variants run quality, load, first-inference, warm subject, warm message,
+   and peak-RSS tests on H1.
+2. q4 and q4f16 run the full workload, longevity, concurrency, and native
+   platform matrix on H0, H1, and H2.
+3. A load failure, unsupported operator, out-of-memory termination, or timeout
+   is recorded as a variant failure rather than omitted.
+4. Fresh-process measurements distinguish a warm OS page cache from an
+   intentionally cold/evicted artifact cache.
+5. Thread counts of one, the runtime default, and the proposed production cap
+   are compared.
+6. Quality is rerun whenever a graph, runtime, tokenizer, decoder, thread/window
+   strategy, or quantization changes.
+
+Hard gates are applied before any ranking. No weighted score may compensate for
+a critical leak, parity failure, unsupported platform, or hardware-budget
+failure. Among variants that pass every hard gate, select the smallest and least
+resource-intensive variant that meets the user-experience budgets.
+
 ### Workload profiles
 
 | Profile | Synthetic input | Primary measure |
@@ -758,9 +878,10 @@ long-running MCP use without loading two neural models.
 | MCP longevity | 100 warm requests after warm-up | Reuse, RSS plateau, and race safety |
 | MCP burst | Four concurrent 2 KiB requests | Queueing, serialization, and deadlock safety |
 
-Each benchmark records fresh-process load time, first inference, warm p50/p95/
-p99, CPU time, wall time, tokens and bytes per second, Go heap, process RSS,
-thread count, artifact size, and detector-construction count.
+Each benchmark records variant identity, raw and compressed artifact size,
+fresh-process load time, first inference, warm p50/p95/p99, CPU time, wall time,
+tokens and bytes per second, Go heap, process RSS/private bytes, page faults,
+disk bytes read, thread count, and detector-construction count.
 
 ### Initial acceptance budgets
 
@@ -785,9 +906,9 @@ platform-specific budget was frozen in advance.
 | Four-request burst | Completes without deadlock within 5x single-request p95 |
 
 Performance sampling must include at least twenty fresh-process runs and one
-hundred warm samples per input profile after explicit warm-up. A release gate uses a
-clean controlled-host run. One automatic diagnostic rerun is allowed after
-host-noise suspicion; conflicting runs leave the gate not-run, not pass.
+hundred warm samples per input profile after explicit warm-up. A release gate
+uses a clean controlled-host run. One automatic diagnostic rerun is allowed
+after host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 
 ### Permanent tests and benchmarks
 
@@ -796,7 +917,12 @@ host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 - BenchmarkDetectorWarmMessage
 - BenchmarkDetectorWarmThread
 - BenchmarkDetectorWarmExport
+- BenchmarkEveryPublishedVariantOnReferenceHardware
+- TestEveryPublishedVariantHasPerformanceAndMemoryEvidence
+- TestVariantComparisonRunsInIsolatedProcesses
 - TestPerformanceBudgetsSchemaAndHardwareProfile
+- TestHardwareProfileRecordsRequiredReproductionMetadata
+- TestCandidatePassesConstrainedMinimumHardwareProfile
 - TestSelectedBackendConstructsExactlyOneNeuralDetector
 - TestDistilBERTFactoryIsNotCalledWhenPrivacyFilterSelected
 - TestPrivacyFilterFactoryIsNotCalledWhenDistilBERTSelected
@@ -806,10 +932,14 @@ host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 
 ### G6 pass criteria
 
-- Every hard budget passes on every advertised reference profile.
-- q4 and q4f16 reports are separate and the selected variant is named in the
-  result.
-- No benchmark process loads both model artifacts.
+- Every hard budget passes on H0, H1, H2, and each required native release
+  profile.
+- Every published variant has a separate reference-hardware report and explicit
+  oracle, comparator, candidate, selected, or rejected disposition.
+- q4 and q4f16 complete the full matrix and the selected variant is named in
+  every result and trusted manifest.
+- No benchmark process loads more than one model artifact.
+- No user bundle contains more than one model variant.
 - Normal command paths load the detector at most once per process.
 - No deadlock, race, handle leak, unbounded native allocation, or goroutine
   growth is observed.
@@ -818,11 +948,12 @@ host-noise suspicion; conflicting runs leave the gate not-run, not pass.
 
 ### Failure handling
 
-Optimize lifecycle, windowing, thread configuration, or evaluate the other
-quantized variant, then rerun all quality and performance gates. If the hard
-budgets still fail, reject the universal replacement. A separately selected
-enhanced profile is an acceptable future proposal; loading both detectors is
-not.
+Optimize lifecycle, windowing, thread configuration, or evaluate another
+published variant, then rerun all quality and performance gates. If q4 and
+q4f16 still fail the hard budgets, reject the universal replacement. A
+separately selected enhanced profile or a higher minimum hardware proposal is
+acceptable future work, but it requires explicit product review and fresh
+evidence; loading multiple detectors is not a workaround.
 
 ## Phase 7 — integrate preview selection and trusted bundles
 
@@ -1013,11 +1144,15 @@ A new model-focused workflow should run on:
 Jobs should be separated into:
 
 1. Verify immutable source locks and build the reference image.
-2. Generate/compare original, q4, and q4f16 oracle reports sequentially.
-3. Run native parity and quality on the Linux reference host.
-4. Run controlled performance on named hardware.
-5. Run native smoke on Linux and macOS amd64/arm64.
-6. Publish only synthetic reports and metadata.
+2. Generate/compare original safetensors, default ONNX, fp16, generic-
+   quantized, q4, and q4f16 oracle reports sequentially.
+3. Run the Python reference and every ONNX variant's applicable runtime
+   compatibility, quality, load, and resource comparison on the Linux H1
+   reference host.
+4. Run q4 and q4f16 through the full controlled H0/H1/H2 performance matrix.
+5. Run the selected candidate's native smoke on Linux and macOS amd64/arm64.
+6. Prove the release bundle contains exactly one selected model variant.
+7. Publish only synthetic reports and reproducibility metadata.
 
 ### Model release workflow
 
@@ -1107,7 +1242,7 @@ one pull request:
 3. Process-scoped single-detector lifecycle.
 4. Pinned Docker reference/oracle and golden tooling.
 5. BIOES/Viterbi decoder and tokenizer/offset tests.
-6. Native q4/q4f16 adapters and parity evidence.
+6. Native all-variant comparison, followed by full q4/q4f16 parity evidence.
 7. End-to-end quality and secret boundary regressions.
 8. Controlled performance harness and selected-variant decision.
 9. Backend-aware manifest, installer, status, and preview selection.
@@ -1142,5 +1277,6 @@ Until then, the current detector remains the production default.
 - [OpenAI Privacy Filter model card](https://cdn.openai.com/pdf/c66281ed-b638-456a-8ce1-97e9f5264a90/OpenAI-Privacy-Filter-Model-Card.pdf)
 - [OpenAI Privacy Filter source repository](https://github.com/openai/privacy-filter)
 - [OpenAI Privacy Filter model repository](https://huggingface.co/openai/privacy-filter)
+- [Pinned first-party ONNX variant directory](https://huggingface.co/openai/privacy-filter/tree/7ffa9a043d54d1be65afb281eddf0ffbe629385b/onnx)
 - [hs-cli OpenAI Privacy Filter evaluation](openai-privacy-filter-evaluation.md)
 - [hs-cli PII redaction hardening contract](pii-redaction-hardening-contract.md)
