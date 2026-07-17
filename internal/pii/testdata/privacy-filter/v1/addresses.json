@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "partition": "addresses",
+  "cases": [
+    {
+      "id": "address-private-street",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A private street address is covered by the existing regex contract.",
+      "text": "The customer is located at 123 Example Street.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "street-address",
+          "kind": "address",
+          "start": 27,
+          "end": 45,
+          "value": "123 Example Street",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "123 Example Street"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "123 Example Street"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "123 Example Street"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "address",
+        "street",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "address-private-international",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "An international private address with sparse formatting must be detected.",
+      "text": "Deliver the fixture to 4-2-8 Examplecho, Shibuya-ku.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "international-address",
+          "kind": "address",
+          "start": 23,
+          "end": 51,
+          "value": "4-2-8 Examplecho, Shibuya-ku",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "4-2-8 Examplecho, Shibuya-ku"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "4-2-8 Examplecho, Shibuya-ku"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "4-2-8 Examplecho, Shibuya-ku"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "address",
+        "international"
+      ]
+    },
+    {
+      "id": "address-public-business",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A clearly public business address should remain readable.",
+      "text": "Example Library's public office is 1 Public Square.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "business-address",
+          "kind": "address",
+          "start": 35,
+          "end": 50,
+          "value": "1 Public Square",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "1 Public Square"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "1 Public Square"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "1 Public Square"
+          ]
+        }
+      },
+      "tags": [
+        "address",
+        "public-business",
+        "preservation"
+      ]
+    },
+    {
+      "id": "address-city-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A city alone is public location context rather than a private address.",
+      "text": "The public event takes place in Paris.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "city",
+          "kind": "address",
+          "start": 32,
+          "end": 37,
+          "value": "Paris",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Paris"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Paris"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Paris"
+          ]
+        }
+      },
+      "tags": [
+        "address",
+        "city",
+        "preservation"
+      ]
+    }
+  ]
+}

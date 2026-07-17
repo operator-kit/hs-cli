@@ -1,0 +1,202 @@
+{
+  "schema": 1,
+  "partition": "command-output-payloads",
+  "cases": [
+    {
+      "id": "command-secret-all-boundaries",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "A synthetic secret must be absent from every command, output, MCP, error, and diagnostic boundary.",
+      "text": "{\"ticket\":\"TICKET-EXAMPLE-42\",\"message\":\"secret=not-a-real-example-command-secret-73af\"}",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 11,
+          "end": 28,
+          "value": "TICKET-EXAMPLE-42",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "secret",
+          "kind": "secret",
+          "start": 48,
+          "end": 86,
+          "value": "not-a-real-example-command-secret-73af",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "TICKET-EXAMPLE-42",
+            "not-a-real-example-command-secret-73af"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "not-a-real-example-command-secret-73af"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "not-a-real-example-command-secret-73af"
+          ],
+          "required_present": [
+            "TICKET-EXAMPLE-42"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "boundary:table",
+        "boundary:json",
+        "boundary:json-full",
+        "boundary:csv",
+        "boundary:source",
+        "boundary:rfc822",
+        "boundary:mcp",
+        "boundary:argv",
+        "boundary:stdout",
+        "boundary:stderr",
+        "boundary:error",
+        "boundary:panic",
+        "boundary:diagnostic"
+      ]
+    },
+    {
+      "id": "command-private-email",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "high",
+      "reason": "A private email in an authored command payload must be removed.",
+      "text": "message=contact private.command@example.invalid ticket=PUBLIC-EXAMPLE-7",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "email",
+          "kind": "email",
+          "start": 16,
+          "end": 47,
+          "value": "private.command@example.invalid",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "ticket",
+          "kind": "account_number",
+          "start": 55,
+          "end": 71,
+          "value": "PUBLIC-EXAMPLE-7",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "private.command@example.invalid",
+            "PUBLIC-EXAMPLE-7"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "private.command@example.invalid"
+          ],
+          "required_present": [
+            "PUBLIC-EXAMPLE-7"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "private.command@example.invalid"
+          ],
+          "required_present": [
+            "PUBLIC-EXAMPLE-7"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "protected-input",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "command-public-help-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "preservation",
+      "reason": "A public help command and placeholder should survive output handling.",
+      "text": "hs inbox conversations get CONVERSATION_ID_EXAMPLE",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "placeholder",
+          "kind": "account_number",
+          "start": 27,
+          "end": 50,
+          "value": "CONVERSATION_ID_EXAMPLE",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "CONVERSATION_ID_EXAMPLE"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "CONVERSATION_ID_EXAMPLE"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "CONVERSATION_ID_EXAMPLE"
+          ]
+        }
+      },
+      "tags": [
+        "command-output",
+        "preservation"
+      ]
+    }
+  ]
+}

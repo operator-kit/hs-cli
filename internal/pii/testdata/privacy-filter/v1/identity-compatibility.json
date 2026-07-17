@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "identity_schema": "v2",
+  "key_id": "privacy-filter-g0",
+  "key_fixture": "phase0-synthetic-pseudonym-key-v1",
+  "cases": [
+    {
+      "id": "canonical-email",
+      "input": {
+        "first": "Alice",
+        "last": "Smith",
+        "email": "ALICE@example.invalid "
+      },
+      "expected": {
+        "first": "Jamie",
+        "last": "Evans [privacy-filter-g0-6Y4KJMS4]",
+        "email": "jamie.evans-67cd@anon.local"
+      }
+    },
+    {
+      "id": "canonical-email-alias",
+      "input": {
+        "first": "Different",
+        "last": "Name",
+        "email": "alice@example.invalid"
+      },
+      "expected": {
+        "first": "Jamie",
+        "last": "Evans [privacy-filter-g0-6Y4KJMS4]",
+        "email": "jamie.evans-67cd@anon.local"
+      }
+    },
+    {
+      "id": "composed-latin-name",
+      "input": {
+        "first": "José",
+        "last": "Alvarez",
+        "email": ""
+      },
+      "expected": {
+        "first": "Zion",
+        "last": "Martin [privacy-filter-g0-B4CS3TN7]",
+        "email": ""
+      }
+    },
+    {
+      "id": "decomposed-latin-name",
+      "input": {
+        "first": "José",
+        "last": "Alvarez",
+        "email": ""
+      },
+      "expected": {
+        "first": "Zion",
+        "last": "Martin [privacy-filter-g0-B4CS3TN7]",
+        "email": ""
+      }
+    },
+    {
+      "id": "arabic-name",
+      "input": {
+        "first": "أحمد",
+        "last": "علي",
+        "email": ""
+      },
+      "expected": {
+        "first": "Casey",
+        "last": "Diaz [privacy-filter-g0-BKDVVUIK]",
+        "email": ""
+      }
+    },
+    {
+      "id": "han-name",
+      "input": {
+        "first": "张",
+        "last": "伟",
+        "email": ""
+      },
+      "expected": {
+        "first": "Shawn",
+        "last": "Mitchell [privacy-filter-g0-5DMVTQYN]",
+        "email": ""
+      }
+    },
+    {
+      "id": "devanagari-name",
+      "input": {
+        "first": "आरव",
+        "last": "शर्मा",
+        "email": ""
+      },
+      "expected": {
+        "first": "Jamie",
+        "last": "Moore [privacy-filter-g0-J4VG2LQX]",
+        "email": ""
+      }
+    },
+    {
+      "id": "email-only",
+      "input": {
+        "first": "",
+        "last": "",
+        "email": "fixture.person@example.invalid"
+      },
+      "expected": {
+        "first": "",
+        "last": "",
+        "email": "micah.lee-c05e@anon.local"
+      }
+    }
+  ]
+}

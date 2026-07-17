@@ -3,7 +3,9 @@
 /hs.exe
 /helpscout
 /helpscout.exe
-/build/
+/build/*
+!/build/privacy-filter/
+!/build/privacy-filter/**
 
 # IDE
 .idea/

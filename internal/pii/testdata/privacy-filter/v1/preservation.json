@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "partition": "preservation",
+  "cases": [
+    {
+      "id": "preservation-checksum-and-email",
+      "language": "en",
+      "script": "Latin",
+      "shape": "log",
+      "risk": "high",
+      "reason": "The private email must be removed while the public checksum remains unchanged.",
+      "text": "artifact_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa notify=fixture.person@example.invalid",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "checksum",
+          "kind": "secret",
+          "start": 16,
+          "end": 80,
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        },
+        {
+          "id": "private-email",
+          "kind": "email",
+          "start": 88,
+          "end": 118,
+          "value": "fixture.person@example.invalid",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture.person@example.invalid"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "fixture.person@example.invalid"
+          ],
+          "required_present": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "fixture.person@example.invalid"
+          ],
+          "required_present": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        }
+      },
+      "tags": [
+        "preservation",
+        "checksum",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "preservation-redacted-marker",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "An already-redacted marker is not a new secret.",
+      "text": "The prior output contains [REDACTED_SECRET] and no source value.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "redacted-marker",
+          "kind": "secret",
+          "start": 26,
+          "end": 43,
+          "value": "[REDACTED_SECRET]",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "[REDACTED_SECRET]"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "[REDACTED_SECRET]"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "[REDACTED_SECRET]"
+          ]
+        }
+      },
+      "tags": [
+        "preservation",
+        "marker"
+      ]
+    },
+    {
+      "id": "preservation-public-id",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public standards identifier must remain visible.",
+      "text": "The public specification is RFC-EXAMPLE-8259.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-standard",
+          "kind": "account_number",
+          "start": 28,
+          "end": 44,
+          "value": "RFC-EXAMPLE-8259",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "RFC-EXAMPLE-8259"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "RFC-EXAMPLE-8259"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "RFC-EXAMPLE-8259"
+          ]
+        }
+      },
+      "tags": [
+        "preservation",
+        "public-id"
+      ]
+    },
+    {
+      "id": "preservation-company-name",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public company name is not a private person.",
+      "text": "Example Robotics publishes the public library.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "company",
+          "kind": "person",
+          "start": 0,
+          "end": 16,
+          "value": "Example Robotics",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Example Robotics"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Example Robotics"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Example Robotics"
+          ]
+        }
+      },
+      "tags": [
+        "preservation",
+        "company"
+      ]
+    }
+  ]
+}

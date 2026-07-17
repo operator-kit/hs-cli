@@ -1,0 +1,403 @@
+{
+  "schema": 1,
+  "partition": "emails-phones-urls",
+  "cases": [
+    {
+      "id": "email-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "signature",
+      "risk": "critical",
+      "reason": "A private synthetic email is covered by the existing regex contract.",
+      "text": "Customer contact: private.person@example.invalid",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "email",
+          "kind": "email",
+          "start": 18,
+          "end": 48,
+          "value": "private.person@example.invalid",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "private.person@example.invalid"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "private.person@example.invalid"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "private.person@example.invalid"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "email",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "phone-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A private phone number is covered by the existing regex contract.",
+      "text": "Call the synthetic customer at 555-123-4567.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "phone",
+          "kind": "phone",
+          "start": 31,
+          "end": 43,
+          "value": "555-123-4567",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "555-123-4567"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "555-123-4567"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "555-123-4567"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "phone",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "url-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A private account URL is covered by deterministic URL defense in depth.",
+      "text": "The private fixture profile is https://private.example.invalid/u/alice.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "private-url",
+          "kind": "url",
+          "start": 31,
+          "end": 70,
+          "value": "https://private.example.invalid/u/alice",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "https://private.example.invalid/u/alice"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "https://private.example.invalid/u/alice"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "https://private.example.invalid/u/alice"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "url",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "ip-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A private infrastructure IP is treated as a private URL-class value.",
+      "text": "The customer's fixture appliance is at 192.0.2.44.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "private-ip",
+          "kind": "url",
+          "start": 39,
+          "end": 49,
+          "value": "192.0.2.44",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "192.0.2.44"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "192.0.2.44"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "192.0.2.44"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "url",
+        "ip",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "email-public-support",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A clearly public role mailbox should remain readable.",
+      "text": "Public documentation lists support@example.invalid.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-email",
+          "kind": "email",
+          "start": 27,
+          "end": 50,
+          "value": "support@example.invalid",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "support@example.invalid"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "support@example.invalid"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "support@example.invalid"
+          ]
+        }
+      },
+      "tags": [
+        "email",
+        "public",
+        "preservation"
+      ]
+    },
+    {
+      "id": "phone-public-switchboard",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public business switchboard should remain readable.",
+      "text": "Example Museum's public switchboard is 555-010-0000.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-phone",
+          "kind": "phone",
+          "start": 39,
+          "end": 51,
+          "value": "555-010-0000",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "555-010-0000"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "555-010-0000"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "555-010-0000"
+          ]
+        }
+      },
+      "tags": [
+        "phone",
+        "public",
+        "preservation"
+      ]
+    },
+    {
+      "id": "url-public-docs",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public documentation URL should remain readable.",
+      "text": "See the public guide at https://docs.example.invalid/start.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-url",
+          "kind": "url",
+          "start": 24,
+          "end": 58,
+          "value": "https://docs.example.invalid/start",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "https://docs.example.invalid/start"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "https://docs.example.invalid/start"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "https://docs.example.invalid/start"
+          ]
+        }
+      },
+      "tags": [
+        "url",
+        "public",
+        "preservation"
+      ]
+    },
+    {
+      "id": "ip-documentation-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A reserved documentation IP should remain visible in networking instructions.",
+      "text": "The public example uses reserved address 198.51.100.10.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "documentation-ip",
+          "kind": "url",
+          "start": 41,
+          "end": 54,
+          "value": "198.51.100.10",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "198.51.100.10"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "198.51.100.10"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "198.51.100.10"
+          ]
+        }
+      },
+      "tags": [
+        "url",
+        "ip",
+        "preservation"
+      ]
+    }
+  ]
+}

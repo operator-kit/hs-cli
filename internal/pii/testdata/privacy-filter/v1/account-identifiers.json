@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "partition": "account-identifiers",
+  "cases": [
+    {
+      "id": "account-customer-reference",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A contextual customer reference not covered by current numeric regexes is private.",
+      "text": "The private customer reference is CUST-EXAMPLE-4831.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "customer-reference",
+          "kind": "account_number",
+          "start": 34,
+          "end": 51,
+          "value": "CUST-EXAMPLE-4831",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "CUST-EXAMPLE-4831"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "CUST-EXAMPLE-4831"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "CUST-EXAMPLE-4831"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "account",
+        "customer-reference"
+      ]
+    },
+    {
+      "id": "account-government-document",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A synthetic government document identifier must be removed.",
+      "text": "The fixture passport number is P-EXAMPLE-7742-Z.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "passport",
+          "kind": "account_number",
+          "start": 31,
+          "end": 47,
+          "value": "P-EXAMPLE-7742-Z",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "P-EXAMPLE-7742-Z"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "P-EXAMPLE-7742-Z"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "P-EXAMPLE-7742-Z"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "account",
+        "government"
+      ]
+    },
+    {
+      "id": "account-order-number-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public operational order number is not a private account identifier.",
+      "text": "Order ORDER-EXAMPLE-12345 is ready for dispatch.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "order-number",
+          "kind": "account_number",
+          "start": 6,
+          "end": 25,
+          "value": "ORDER-EXAMPLE-12345",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "ORDER-EXAMPLE-12345"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "ORDER-EXAMPLE-12345"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "ORDER-EXAMPLE-12345"
+          ]
+        }
+      },
+      "tags": [
+        "account",
+        "operational",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "account-package-version-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A package build identifier should survive contextual account detection.",
+      "text": "Package build EXAMPLE-BUILD-2026.07.17 passed verification.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "build-id",
+          "kind": "account_number",
+          "start": 14,
+          "end": 38,
+          "value": "EXAMPLE-BUILD-2026.07.17",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-BUILD-2026.07.17"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-BUILD-2026.07.17"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-BUILD-2026.07.17"
+          ]
+        }
+      },
+      "tags": [
+        "account",
+        "package",
+        "preservation"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+**
+!go.mod
+!go.sum
+!patches/
+!patches/onnxruntime-purego/
+!patches/onnxruntime-purego/go.mod
+!patches/onnxruntime-purego/go.sum
