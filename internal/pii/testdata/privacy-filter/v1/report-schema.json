@@ -92,7 +92,7 @@
       "type": "object", "additionalProperties": false,
       "required": [
         "exact", "covering", "required_match", "sensitivity_weighted", "by_kind", "by_risk",
-        "by_language", "by_script", "by_format", "by_boundary", "by_identity_policy"
+		"by_language", "by_script", "by_format", "by_corpus", "by_partition", "by_boundary", "by_identity_policy", "by_secret_family"
       ],
       "properties": {
         "exact": {"$ref": "#/$defs/metricSet"},
@@ -104,8 +104,11 @@
         "by_language": {"$ref": "#/$defs/metricSlices"},
         "by_script": {"$ref": "#/$defs/metricSlices"},
         "by_format": {"$ref": "#/$defs/metricSlices"},
+		"by_corpus": {"$ref": "#/$defs/metricSlices"},
+		"by_partition": {"$ref": "#/$defs/metricSlices"},
         "by_boundary": {"$ref": "#/$defs/metricSlices"},
-        "by_identity_policy": {"$ref": "#/$defs/metricSlices"}
+		"by_identity_policy": {"$ref": "#/$defs/metricSlices"},
+		"by_secret_family": {"$ref": "#/$defs/metricSlices"}
       }
     },
     "outputMetrics": {
@@ -136,7 +139,7 @@
       ],
       "properties": {
         "mode": {"enum": ["off", "customers", "all"]},
-        "dimension": {"enum": ["kind", "risk", "language", "script", "format", "match_policy", "identity_policy", "boundary"]},
+		"dimension": {"enum": ["kind", "risk", "language", "script", "format", "corpus", "partition", "match_policy", "identity_policy", "secret_family", "boundary"]},
         "name": {"type": "string", "minLength": 1},
         "required_absent": {"type": "integer", "minimum": 0},
         "raw_value_leaks": {"type": "integer", "minimum": 0},

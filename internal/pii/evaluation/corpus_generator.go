@@ -276,7 +276,7 @@ func generateBroadCorpus(smokeDir, broadDir string) error {
 			SecretRedactCases: 100, AccountRedactCases: 100, PrivateDateRedactCases: 100,
 			PreservationCases: 100, LanguageRedactCases: 100, LanguagePreserveCases: 100,
 		},
-		MaximumCaseBasisPoints: 100, MinimumSecretFamilyCases: 8, Partitions: identities,
+		MaximumCaseBasisPoints: 100, MinimumSecretFamilyCases: len(requiredShapes), Partitions: identities,
 	}
 	raw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -290,7 +290,7 @@ func generateBroadCorpus(smokeDir, broadDir string) error {
 }
 
 func generateBroadSecrets() CorpusDocument {
-	document := CorpusDocument{Schema: 1, Partition: "secrets", Cases: make([]Case, 0, len(RequiredSecretFamilies)*16)}
+	document := CorpusDocument{Schema: 1, Partition: "secrets", Cases: make([]Case, 0, len(RequiredSecretFamilies)*len(requiredShapes)*2)}
 	detectContexts := []string{
 		"Credential copied from a support reply: ", "Authorization header value: ", "Log field auth_value=",
 		"Rotating this exposed value: ", "Quoted credential follows: ", "Configuration secret: ",
@@ -301,8 +301,8 @@ func generateBroadSecrets() CorpusDocument {
 		"Schema field label: ", "Non-confidential protocol token: ", "Release metadata: ",
 		"Public verification material: ", "Troubleshooting reference: ",
 	}
-	for familyIndex, family := range RequiredSecretFamilies {
-		for variation := 0; variation < 8; variation++ {
+	for _, family := range RequiredSecretFamilies {
+		for variation := 0; variation < len(requiredShapes); variation++ {
 			for _, role := range []string{"must-detect", "preserve"} {
 				provenance := SyntheticProvenance{
 					Generator: SyntheticSecretGenerator, Version: 1,
@@ -312,13 +312,13 @@ func generateBroadSecrets() CorpusDocument {
 				if err != nil {
 					panic(err)
 				}
-				shape := requiredShapes[(familyIndex*8+variation)%len(requiredShapes)]
-				context := detectContexts[variation]
+				shape := requiredShapes[variation]
+				context := detectContexts[variation%len(detectContexts)]
 				actions := ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact}
 				risk := RiskCritical
 				match := MatchCovering
 				if role == "preserve" {
-					context = preserveContexts[variation]
+					context = preserveContexts[variation%len(preserveContexts)]
 					actions = ModeActions{Off: ActionPreserve, Customers: ActionPreserve, All: ActionPreserve}
 					risk = RiskPreservation
 					match = MatchExact

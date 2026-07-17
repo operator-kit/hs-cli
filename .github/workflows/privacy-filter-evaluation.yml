@@ -72,8 +72,10 @@ jobs:
         if: always()
         run: >-
           jq -e '
+            .schema == 2 and
             .authoritative == true and
             .evidence_authority == "docker-ci" and
+            .hardware_contract_ready == true and
             ([.gates[] | select(.gate == "G0")] | length) == 1 and
             any(.gates[]; .gate == "G0" and .state == "pass")
           ' "${{ runner.temp }}/privacy-filter-g0-report/distilbert-baseline.json"

@@ -46,15 +46,24 @@ fi
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli-pii-g0-model.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
+ARCHIVE_NAMES="$(tar -tzf "$ARCHIVE_PATH" | sed 's#^\./##' | LC_ALL=C sort)"
+while IFS= read -r name; do
+  [[ -n "$name" && "$name" != */* && "$name" != "." && "$name" != ".." ]] || {
+    echo "G0 bundle contains an unsafe archive path" >&2
+    exit 1
+  }
+done <<<"$ARCHIVE_NAMES"
 tar -xzf "$ARCHIVE_PATH" -C "$STAGING"
 
 EXPECTED_NAMES="$(jq -r '.files[].name' <<<"$BUNDLE" | LC_ALL=C sort)"
-ACTUAL_NAMES="$(find "$STAGING" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)"
+ACTUAL_NAMES="$(find "$STAGING" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)"
+[[ "$ARCHIVE_NAMES" == "$EXPECTED_NAMES" ]] || { echo "G0 archive index contains unexpected or missing entries" >&2; exit 1; }
 [[ "$ACTUAL_NAMES" == "$EXPECTED_NAMES" ]] || { echo "G0 bundle contains unexpected or missing files" >&2; exit 1; }
 while IFS= read -r file; do
   NAME="$(jq -er '.name' <<<"$file")"
   EXPECTED_HASH="$(jq -er '.sha256' <<<"$file")"
   EXPECTED_SIZE="$(jq -er '.size' <<<"$file")"
+  [[ -f "${STAGING}/${NAME}" && ! -L "${STAGING}/${NAME}" ]] || { echo "G0 bundle entry is not a regular file: $NAME" >&2; exit 1; }
   [[ "$(stat -c '%s' "${STAGING}/${NAME}")" == "$EXPECTED_SIZE" ]] || { echo "G0 file size mismatch: $NAME" >&2; exit 1; }
   [[ "$(sha256sum "${STAGING}/${NAME}" | awk '{print $1}')" == "$EXPECTED_HASH" ]] || { echo "G0 file hash mismatch: $NAME" >&2; exit 1; }
 done < <(jq -c '.files[]' <<<"$BUNDLE")
@@ -99,7 +108,7 @@ docker run --rm \
   -e HS_PII_G0_GIT_COMMIT="$GIT_COMMIT" \
   -e HS_PII_G0_MODEL_REVISION="$MODEL_REVISION" \
   -e HS_PII_G0_ARTIFACT_SHA256="$MODEL_SHA256" \
-	-e HS_PII_G0_ARTIFACTS_JSON="$ARTIFACTS_JSON" \
+  -e HS_PII_G0_ARTIFACTS_JSON="$ARTIFACTS_JSON" \
   -e HS_PII_G0_CONTAINER_IMAGE="$IMAGE_ID" \
   -e HS_PII_G0_HARDWARE_PROFILE="${HS_PII_G0_HARDWARE_PROFILE:-docker-functional}" \
   -e HS_PII_G0_EVIDENCE_AUTHORITY="$AUTHORITY" \

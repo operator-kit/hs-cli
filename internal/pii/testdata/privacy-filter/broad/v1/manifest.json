@@ -17,14 +17,14 @@
     "language_preserve_cases": 100
   },
   "maximum_case_basis_points": 100,
-  "minimum_secret_family_cases": 8,
+  "minimum_secret_family_cases": 14,
   "partitions": [
     {
       "name": "secrets",
       "file": "secrets.json",
-      "sha256": "73b055c7b0851c8024982330f04741f7678707bfb56bf9ba2831915525f6474a",
-      "cases": 224,
-      "targets": 224
+      "sha256": "a9e66ece7cf42089e15f628ba9e89e64a75f3a0219b0f778a633dafd0c96c505",
+      "cases": 392,
+      "targets": 392
     },
     {
       "name": "account-identifiers",

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -57,39 +58,52 @@ func GenerateSyntheticValue(provenance SyntheticProvenance) (string, error) {
 func generateSyntheticCredential(provenance SyntheticProvenance) (string, error) {
 	switch provenance.Recipe {
 	case "api-key":
-		return "ak_" + syntheticAlphabet(provenance, "api", upperAlphaNumeric, 32), nil
+		return varySyntheticCredential(provenance, "ak_"+syntheticAlphabet(provenance, "api", upperAlphaNumeric, 32)), nil
 	case "access-token":
-		return "access_token_" + syntheticAlphabet(provenance, "access", alphaNumeric, 40), nil
+		return varySyntheticCredential(provenance, "access_token_"+syntheticAlphabet(provenance, "access", alphaNumeric, 40)), nil
 	case "oauth-token":
-		return "oat2_" + syntheticAlphabet(provenance, "oauth", alphaNumericDash, 52), nil
+		return varySyntheticCredential(provenance, "oat2_"+syntheticAlphabet(provenance, "oauth", alphaNumericDash, 52)), nil
 	case "password":
-		return "R7!" + syntheticAlphabet(provenance, "password", alphaNumeric, 14) + "#q2", nil
+		return varySyntheticCredential(provenance, "R7!"+syntheticAlphabet(provenance, "password", alphaNumeric, 14)+"#q2"), nil
 	case "jwt":
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 		payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"offline-fixture","aud":"privacy-eval"}`))
 		signature := syntheticAlphabet(provenance, "jwt-signature", alphaNumericDash, 43)
-		return header + "." + payload + "." + signature, nil
+		return varySyntheticCredential(provenance, header+"."+payload+"."+signature), nil
 	case "one-time-code":
-		return syntheticDigits(provenance, "otp", 8), nil
+		switch syntheticVariation(provenance) % 5 {
+		case 0:
+			return syntheticDigits(provenance, "otp", 6), nil
+		case 1:
+			return syntheticDigits(provenance, "otp", 8), nil
+		case 2:
+			return syntheticDigits(provenance, "pin", 4), nil
+		case 3:
+			return syntheticAlphabet(provenance, "recovery-a", upperAlphaNumeric, 4) + "-" + syntheticAlphabet(provenance, "recovery-b", upperAlphaNumeric, 4), nil
+		default:
+			return "Tmp!" + syntheticAlphabet(provenance, "temporary-password", alphaNumeric, 10), nil
+		}
 	case "private-key":
 		body := syntheticBase64(provenance, "private-key", 192)
-		return "-----BEGIN SECRET-KEYX-----\n" + wrapFixed(body, 64) + "\n-----END SECRET-KEYX-----", nil
+		labels := []string{"SECRET-KEYX", "RSA SECRET-KEYX", "EC SECRET-KEYX", "OPENSSH SECRET-KEYX", "ENCRYPTED SECRET-KEYX"}
+		label := labels[syntheticVariation(provenance)%len(labels)]
+		return "-----BEGIN " + label + "-----\n" + wrapFixed(body, 64) + "\n-----END " + label + "-----", nil
 	case "database-connection":
 		user := "svc_" + syntheticAlphabet(provenance, "db-user", lowerAlphaNumeric, 8)
 		password := "P9!" + syntheticAlphabet(provenance, "db-password", alphaNumeric, 18)
-		return "postgresql://" + user + ":" + password + "@192.0.2.42:5432/support", nil
+		return varySyntheticCredential(provenance, "postgresql://"+user+":"+password+"@192.0.2.42:5432/support"), nil
 	case "cookie-authorization":
-		return "session=" + syntheticAlphabet(provenance, "cookie", alphaNumericDash, 48), nil
+		return varySyntheticCredential(provenance, "session="+syntheticAlphabet(provenance, "cookie", alphaNumericDash, 48)), nil
 	case "webhook-secret":
-		return "whsig_" + syntheticAlphabet(provenance, "webhook", alphaNumeric, 40), nil
+		return varySyntheticCredential(provenance, "whsig_"+syntheticAlphabet(provenance, "webhook", alphaNumeric, 40)), nil
 	case "cloud-credential":
-		return "CLDX" + syntheticAlphabet(provenance, "cloud", upperAlphaNumeric, 16), nil
+		return varySyntheticCredential(provenance, "CLDX"+syntheticAlphabet(provenance, "cloud", upperAlphaNumeric, 16)), nil
 	case "source-control-token":
-		return "scm_" + syntheticAlphabet(provenance, "source-control", alphaNumeric, 36), nil
+		return varySyntheticCredential(provenance, "scm_"+syntheticAlphabet(provenance, "source-control", alphaNumeric, 36)), nil
 	case "payment-credential":
-		return "paylive_" + syntheticAlphabet(provenance, "payment", alphaNumeric, 32), nil
+		return varySyntheticCredential(provenance, "paylive_"+syntheticAlphabet(provenance, "payment", alphaNumeric, 32)), nil
 	case "observability-token":
-		return "obsap_" + syntheticHex(provenance, "observability", 32), nil
+		return varySyntheticCredential(provenance, "obsap_"+syntheticHex(provenance, "observability", 32)), nil
 	case "command-secret":
 		return "cmdtok_" + syntheticAlphabet(provenance, "command", alphaNumericDash, 40), nil
 	default:
@@ -110,10 +124,21 @@ func generateSyntheticNearMiss(provenance SyntheticProvenance) (string, error) {
 	case "jwt":
 		return "header.payload.signature", nil
 	case "one-time-code":
-		return syntheticDigits(provenance, "public-reference", 8), nil
+		switch syntheticVariation(provenance) % 3 {
+		case 0:
+			return syntheticDigits(provenance, "public-reference", 8), nil
+		case 1:
+			return "RFC-" + syntheticDigits(provenance, "public-reference", 6), nil
+		default:
+			return syntheticDigits(provenance, "public-reference", 4) + "." + syntheticDigits(provenance, "public-reference-b", 4), nil
+		}
 	case "private-key":
 		body := syntheticBase64(provenance, "public-key", 96)
-		return "-----BEGIN PUBLIC KEY-----\n" + wrapFixed(body, 64) + "\n-----END PUBLIC KEY-----", nil
+		label := "PUBLIC KEY"
+		if syntheticVariation(provenance)%2 == 1 {
+			label = "CERTIFICATE"
+		}
+		return "-----BEGIN " + label + "-----\n" + wrapFixed(body, 64) + "\n-----END " + label + "-----", nil
 	case "database-connection":
 		return "postgresql://192.0.2.42:5432/support", nil
 	case "cookie-authorization":
@@ -192,6 +217,45 @@ func syntheticStream(provenance SyntheticProvenance, label string, length int) [
 		out = append(out, digest[:]...)
 	}
 	return out[:length]
+}
+
+func syntheticVariation(provenance SyntheticProvenance) int {
+	separator := strings.LastIndexByte(provenance.Seed, '-')
+	if separator < 0 || separator+1 == len(provenance.Seed) {
+		return 0
+	}
+	variation, err := strconv.Atoi(provenance.Seed[separator+1:])
+	if err != nil {
+		return 0
+	}
+	return variation
+}
+
+func varySyntheticCredential(provenance SyntheticProvenance, value string) string {
+	if !strings.HasPrefix(provenance.Seed, "broad-secret-") {
+		return value
+	}
+	variation := syntheticVariation(provenance)
+	if variation < 8 || len(value) < 8 {
+		return value
+	}
+	middle := len(value) / 2
+	switch variation {
+	case 8:
+		return value[:middle] + "\n" + value[middle:]
+	case 9:
+		return value[:middle] + " " + value[middle:]
+	case 10:
+		return value[:middle] + "·" + value[middle:]
+	case 11:
+		return value[:middle] + "<wbr>" + value[middle:]
+	case 12:
+		return value[:middle] + "**" + value[middle:]
+	case 13:
+		return value + " / " + value
+	default:
+		return value
+	}
 }
 
 func wrapFixed(value string, width int) string {

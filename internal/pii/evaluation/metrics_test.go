@@ -23,6 +23,7 @@ func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	corpus := &Corpus{Cases: []Case{
 		{
 			ID: "redact-case", Language: "en", Script: "Latin", Shape: "prose", Risk: RiskCritical, Text: redactText,
+			CorpusTier: "smoke", Partition: "secrets", SecretFixture: &SecretFixtureRole{Family: "api-key", Role: "must-detect"},
 			Targets: []Target{{ID: "value", Kind: SpanSecret, Start: 0, End: len(redactText), Value: redactText, Match: MatchCovering, Actions: ModeActions{ActionPreserve, ActionRedact, ActionRedact}}},
 			Outputs: ModeOutputs{
 				Off:       OutputExpectation{RequiredAbsent: []string{}, RequiredPresent: []string{redactText}},
@@ -54,6 +55,9 @@ func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	}
 	if report.Detector.Exact.F2 != 1 || report.Detector.SensitivityWeighted.F2 != 1 {
 		t.Fatalf("unexpected F2 metrics: exact=%v weighted=%v", report.Detector.Exact.F2, report.Detector.SensitivityWeighted.F2)
+	}
+	if family := findMetricSlice(t, report.Detector.BySecretFamily, "api-key"); family.RequiredMatch.TruePositive != 1 {
+		t.Fatalf("secret-family slice was not reported: %+v", family)
 	}
 	for _, output := range report.FinalOutput {
 		if output.RawValueLeaks != 0 || output.PreservationFailures != 0 || output.ExactPassThroughFail != 0 {
@@ -183,6 +187,7 @@ func TestMetricReportFreezesRequiredMatchAndEndToEndSlices(t *testing.T) {
 	start := strings.Index(text, value)
 	fixture := Case{
 		ID: "unknown-third-party", Language: "en", Script: "Latin", Shape: "quoted-reply", Risk: RiskHigh, Text: text,
+		CorpusTier: "smoke", Partition: "people-third-parties",
 		Targets: []Target{{
 			ID: "developer", Kind: SpanPerson, Start: start, End: start + len(value), Value: value, Match: MatchCovering,
 			Actions: ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact},
@@ -213,9 +218,19 @@ func TestMetricReportFreezesRequiredMatchAndEndToEndSlices(t *testing.T) {
 	if format.Covering.TruePositive != 1 {
 		t.Fatalf("format detector slice was not preserved: %+v", format)
 	}
+	if corpus := findMetricSlice(t, report.Detector.ByCorpus, "smoke"); corpus.RequiredMatch.TruePositive != 1 {
+		t.Fatalf("corpus-tier detector slice was not preserved: %+v", corpus)
+	}
+	if partition := findMetricSlice(t, report.Detector.ByPartition, "people-third-parties"); partition.RequiredMatch.TruePositive != 1 {
+		t.Fatalf("partition detector slice was not preserved: %+v", partition)
+	}
 	output := findOutputSlice(t, report.FinalOutputSlices, ModeCustomers, "identity_policy", "unknown-third-party")
 	if output.RequiredAbsent != 1 || output.RawValueLeaks != 0 || output.LeakRate != 0 {
 		t.Fatalf("unknown-third-party final-output slice is wrong: %+v", output)
+	}
+	corpusOutput := findOutputSlice(t, report.FinalOutputSlices, ModeCustomers, "corpus", "smoke")
+	if corpusOutput.RequiredAbsent != 1 || corpusOutput.RawValueLeaks != 0 {
+		t.Fatalf("corpus-tier final-output slice is wrong: %+v", corpusOutput)
 	}
 }
 

@@ -134,6 +134,8 @@ func LoadBroadCorpusDir(dir string) (*BroadCorpus, error) {
 		targets := 0
 		for index := range document.Cases {
 			fixture := &document.Cases[index]
+			fixture.CorpusTier = "broad"
+			fixture.Partition = identity.Name
 			if err := validateCase(fixture); err != nil {
 				return nil, err
 			}
@@ -181,7 +183,7 @@ func validateBroadManifest(manifest *BroadCorpusManifest) error {
 		SecretRedactCases: 100, AccountRedactCases: 100, PrivateDateRedactCases: 100,
 		PreservationCases: 100, LanguageRedactCases: 100, LanguagePreserveCases: 100,
 	}
-	if manifest.MinimumDenominators != wantMinimums || manifest.MaximumCaseBasisPoints != 100 || manifest.MinimumSecretFamilyCases != 8 {
+	if manifest.MinimumDenominators != wantMinimums || manifest.MaximumCaseBasisPoints != 100 || manifest.MinimumSecretFamilyCases != len(requiredShapes) {
 		return fmt.Errorf("broad corpus statistical denominator contract changed")
 	}
 	if len(manifest.Partitions) != len(BroadCorpusPartitions) {
@@ -203,6 +205,7 @@ func validateBroadCoverage(cases []Case, manifest BroadCorpusManifest) (BroadCov
 		LanguagePreserveCases: make(map[string]int, len(RequiredLanguages)),
 	}
 	secretFamilies := make(map[string]map[string]int, len(RequiredSecretFamilies))
+	secretFamilyFormats := make(map[string]map[string]map[string]bool, len(RequiredSecretFamilies))
 	formats := make(map[string]struct{ redact, preserve bool }, len(requiredShapes))
 	for _, fixture := range cases {
 		target := fixture.Targets[0]
@@ -230,8 +233,12 @@ func validateBroadCoverage(cases []Case, manifest BroadCorpusManifest) (BroadCov
 		if fixture.SecretFixture != nil {
 			if secretFamilies[fixture.SecretFixture.Family] == nil {
 				secretFamilies[fixture.SecretFixture.Family] = make(map[string]int)
+				secretFamilyFormats[fixture.SecretFixture.Family] = map[string]map[string]bool{
+					"must-detect": {}, "preserve": {},
+				}
 			}
 			secretFamilies[fixture.SecretFixture.Family][fixture.SecretFixture.Role]++
+			secretFamilyFormats[fixture.SecretFixture.Family][fixture.SecretFixture.Role][fixture.Shape] = true
 		}
 	}
 	minimums := manifest.MinimumDenominators
@@ -251,6 +258,13 @@ func validateBroadCoverage(cases []Case, manifest BroadCorpusManifest) (BroadCov
 		if secretFamilies[family]["must-detect"] < manifest.MinimumSecretFamilyCases ||
 			secretFamilies[family]["preserve"] < manifest.MinimumSecretFamilyCases {
 			return BroadCoverage{}, fmt.Errorf("broad corpus secret family %q lacks required variations", family)
+		}
+		for _, role := range []string{"must-detect", "preserve"} {
+			for _, formatName := range requiredShapes {
+				if !secretFamilyFormats[family][role][formatName] {
+					return BroadCoverage{}, fmt.Errorf("broad corpus secret family %q role %q lacks format %q", family, role, formatName)
+				}
+			}
 		}
 	}
 	for _, formatName := range requiredShapes {

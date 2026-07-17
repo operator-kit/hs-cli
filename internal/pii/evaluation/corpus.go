@@ -93,6 +93,8 @@ type Case struct {
 	Outputs         ModeOutputs        `json:"outputs"`
 	Tags            []string           `json:"tags"`
 	SecretFixture   *SecretFixtureRole `json:"secret_fixture,omitempty"`
+	CorpusTier      string             `json:"-"`
+	Partition       string             `json:"-"`
 }
 
 type KnownIdentity struct {
@@ -276,6 +278,8 @@ func LoadCorpusDir(dir string) (*Corpus, error) {
 
 		for i := range document.Cases {
 			fixture := &document.Cases[i]
+			fixture.CorpusTier = "smoke"
+			fixture.Partition = partition
 			if err := validateCase(fixture); err != nil {
 				return nil, err
 			}
@@ -439,6 +443,18 @@ func validateCase(fixture *Case) error {
 	}
 	if err := validateUniqueStrings(prefix, "tags", fixture.Tags); err != nil {
 		return err
+	}
+	boundaryTags := 0
+	for _, tag := range fixture.Tags {
+		if strings.HasPrefix(tag, "boundary:") {
+			boundaryTags++
+			if !contains(RequiredOutputBoundaries, strings.TrimPrefix(tag, "boundary:")) {
+				return fmt.Errorf("%s: unknown output boundary tag %q", prefix, tag)
+			}
+		}
+	}
+	if boundaryTags > 1 {
+		return fmt.Errorf("%s: each fixture may exercise at most one output boundary", prefix)
 	}
 	if fixture.SecretFixture != nil {
 		if !contains(RequiredSecretFamilies, fixture.SecretFixture.Family) {

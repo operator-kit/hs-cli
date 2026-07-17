@@ -91,6 +91,27 @@ func TestPrivacyCorpusSchemaIsStrictAndSelfConsistent(t *testing.T) {
 			t.Fatalf("contradictory overlap was not rejected: %v", err)
 		}
 	})
+	t.Run("known customer must redact in both protected modes", func(t *testing.T) {
+		fixture := findCase(t, corpus, "person-known-customer")
+		fixture.Targets[0].Actions.Customers = ActionPreserve
+		if err := validateCase(&fixture); err == nil || !strings.Contains(err.Error(), "known customer") {
+			t.Fatalf("known customer policy weakening was not rejected: %v", err)
+		}
+	})
+	t.Run("known staff must redact in all mode", func(t *testing.T) {
+		fixture := findCase(t, corpus, "person-known-staff")
+		fixture.Targets[0].Actions.All = ActionPreserve
+		if err := validateCase(&fixture); err == nil || !strings.Contains(err.Error(), "known staff") {
+			t.Fatalf("known staff all-mode weakening was not rejected: %v", err)
+		}
+	})
+	t.Run("one independently exercised output boundary per case", func(t *testing.T) {
+		fixture := findCase(t, corpus, "command-boundary-table-must-detect")
+		fixture.Tags = append(fixture.Tags, "boundary:json")
+		if err := validateCase(&fixture); err == nil || !strings.Contains(err.Error(), "at most one output boundary") {
+			t.Fatalf("multi-boundary tag shortcut was not rejected: %v", err)
+		}
+	})
 	t.Run("duplicate case IDs", func(t *testing.T) {
 		tempDir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(tempDir, "schema.json"), schemaRaw, 0o600); err != nil {

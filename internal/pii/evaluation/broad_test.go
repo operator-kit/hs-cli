@@ -20,8 +20,8 @@ func TestBroadQualityCorpusHasStatisticallyMeaningfulLockedDenominators(t *testi
 	if err != nil {
 		t.Fatalf("load locked broad quality corpus: %v", err)
 	}
-	if len(corpus.Cases) != 2724 {
-		t.Fatalf("broad corpus case count changed: got %d want 2724", len(corpus.Cases))
+	if len(corpus.Cases) != 2892 {
+		t.Fatalf("broad corpus case count changed: got %d want 2892", len(corpus.Cases))
 	}
 	if len(corpus.Fingerprint) != sha256HexLength {
 		t.Fatalf("broad corpus lacks a stable SHA-256 identity: %q", corpus.Fingerprint)

@@ -111,8 +111,11 @@ type DetectorMetrics struct {
 	ByLanguage          []MetricSlice  `json:"by_language"`
 	ByScript            []MetricSlice  `json:"by_script"`
 	ByFormat            []MetricSlice  `json:"by_format"`
+	ByCorpus            []MetricSlice  `json:"by_corpus"`
+	ByPartition         []MetricSlice  `json:"by_partition"`
 	ByBoundary          []MetricSlice  `json:"by_boundary"`
 	ByIdentityPolicy    []MetricSlice  `json:"by_identity_policy"`
+	BySecretFamily      []MetricSlice  `json:"by_secret_family"`
 }
 
 type MetricSlice struct {
@@ -235,8 +238,11 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 	byLanguage := make(map[string]*sliceCounts)
 	byScript := make(map[string]*sliceCounts)
 	byFormat := make(map[string]*sliceCounts)
+	byCorpus := make(map[string]*sliceCounts)
+	byPartition := make(map[string]*sliceCounts)
 	byBoundary := make(map[string]*sliceCounts)
 	byIdentityPolicy := make(map[string]*sliceCounts)
+	bySecretFamily := make(map[string]*sliceCounts)
 	outputTotals := map[Mode]*OutputMetrics{
 		ModeOff:       {Mode: ModeOff},
 		ModeCustomers: {Mode: ModeCustomers},
@@ -285,6 +291,8 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		addSliceCounts(byLanguage, fixture.Language, exactCounts, coveringCounts, requiredMatchCounts)
 		addSliceCounts(byScript, fixture.Script, exactCounts, coveringCounts, requiredMatchCounts)
 		addSliceCounts(byFormat, fixture.Shape, exactCounts, coveringCounts, requiredMatchCounts)
+		addSliceCounts(byCorpus, caseCorpusTier(fixture), exactCounts, coveringCounts, requiredMatchCounts)
+		addSliceCounts(byPartition, casePartition(fixture), exactCounts, coveringCounts, requiredMatchCounts)
 		for _, boundary := range fixtureBoundaries(fixture) {
 			addSliceCounts(byBoundary, boundary, exactCounts, coveringCounts, requiredMatchCounts)
 		}
@@ -303,6 +311,14 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 			policyCovering, _, _ := matchSpans(policyTargets, policyPredictions, true)
 			policyRequired, _, _ := matchPolicySpans(policyTargets, policyPredictions)
 			addSliceCounts(byIdentityPolicy, identityPolicy, policyExact, policyCovering, policyRequired)
+		}
+		if fixture.SecretFixture != nil {
+			secretTargets := filterTargets(positiveTargets, SpanSecret)
+			secretPredictions := filterPredictions(observation.Predictions, SpanSecret)
+			secretExact, _, _ := matchSpans(secretTargets, secretPredictions, false)
+			secretCovering, _, _ := matchSpans(secretTargets, secretPredictions, true)
+			secretRequired, _, _ := matchPolicySpans(secretTargets, secretPredictions)
+			addSliceCounts(bySecretFamily, fixture.SecretFixture.Family, secretExact, secretCovering, secretRequired)
 		}
 
 		result := CaseResult{
@@ -398,8 +414,11 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 			ByLanguage:          slicesToMetrics(byLanguage),
 			ByScript:            slicesToMetrics(byScript),
 			ByFormat:            slicesToMetrics(byFormat),
+			ByCorpus:            slicesToMetrics(byCorpus),
+			ByPartition:         slicesToMetrics(byPartition),
 			ByBoundary:          slicesToMetrics(byBoundary),
 			ByIdentityPolicy:    slicesToMetrics(byIdentityPolicy),
+			BySecretFamily:      slicesToMetrics(bySecretFamily),
 		},
 		FinalOutput:       finalOutput,
 		FinalOutputSlices: outputSlicesToMetrics(outputSlices),
@@ -453,13 +472,13 @@ func validateEvidenceMetadata(metadata EvidenceMetadata) error {
 			return fmt.Errorf("evaluate privacy corpus: local hardware cannot produce authoritative evidence")
 		}
 	}
-	if err := validateArtifactIdentities(metadata.Artifacts, metadata.Authoritative); err != nil {
+	if err := validateArtifactIdentities(metadata.Artifacts, metadata.ArtifactSHA256, metadata.Authoritative); err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateArtifactIdentities(artifacts []ArtifactIdentity, authoritative bool) error {
+func validateArtifactIdentities(artifacts []ArtifactIdentity, primaryArtifactSHA256 string, authoritative bool) error {
 	if len(artifacts) == 0 {
 		return fmt.Errorf("evaluate privacy corpus: evidence metadata has no component artifact identities")
 	}
@@ -495,6 +514,11 @@ func validateArtifactIdentities(artifacts []ArtifactIdentity, authoritative bool
 		}
 		if !hasRuntime {
 			return fmt.Errorf("evaluate privacy corpus: authoritative evidence is missing the runtime library identity")
+		}
+		for _, artifact := range artifacts {
+			if artifact.Name == "model_quantized.onnx" && artifact.SHA256 != primaryArtifactSHA256 {
+				return fmt.Errorf("evaluate privacy corpus: primary artifact identity differs from model_quantized.onnx")
+			}
 		}
 	}
 	return nil
@@ -754,15 +778,34 @@ func outputDimensions(fixture Case, target Target) []metricDimension {
 		{dimension: "language", name: fixture.Language},
 		{dimension: "script", name: fixture.Script},
 		{dimension: "format", name: fixture.Shape},
+		{dimension: "corpus", name: caseCorpusTier(fixture)},
+		{dimension: "partition", name: casePartition(fixture)},
 		{dimension: "match_policy", name: string(target.Match)},
 	}
 	if identityPolicy := identityPolicyName(fixture, target); identityPolicy != "" {
 		dimensions = append(dimensions, metricDimension{dimension: "identity_policy", name: identityPolicy})
 	}
+	if target.Kind == SpanSecret && fixture.SecretFixture != nil {
+		dimensions = append(dimensions, metricDimension{dimension: "secret_family", name: fixture.SecretFixture.Family})
+	}
 	for _, boundary := range fixtureBoundaries(fixture) {
 		dimensions = append(dimensions, metricDimension{dimension: "boundary", name: boundary})
 	}
 	return dimensions
+}
+
+func caseCorpusTier(fixture Case) string {
+	if fixture.CorpusTier == "" {
+		return "unit"
+	}
+	return fixture.CorpusTier
+}
+
+func casePartition(fixture Case) string {
+	if fixture.Partition == "" {
+		return "unit"
+	}
+	return fixture.Partition
 }
 
 func outputSlice(slices map[outputSliceKey]*OutputMetricSlice, mode Mode, dimension, name string) *OutputMetricSlice {
