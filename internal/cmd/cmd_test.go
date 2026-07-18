@@ -159,6 +159,7 @@ func saveRestore(t *testing.T) {
 	origInvocationProtectedValues := append([]string(nil), invocationProtectedValues...)
 
 	selfupdate.DirOverride = t.TempDir()
+	versionStr = "dev"
 	resetPIIInvocation()
 
 	t.Cleanup(func() {

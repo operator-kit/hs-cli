@@ -19,6 +19,14 @@ func broadCorpusDir(t *testing.T) string {
 	return filepath.Join("..", "testdata", "privacy-filter", "broad", "v1")
 }
 
+func TestPrivacyFilterContractFilesUseCrossPlatformStableLineEndings(t *testing.T) {
+	repoRoot := filepath.Join("..", "..", "..")
+	attributes := readContractFile(t, filepath.Join(repoRoot, ".gitattributes"))
+	if !strings.Contains(attributes, "internal/pii/testdata/privacy-filter/** text eol=lf") {
+		t.Fatal("Privacy Filter fixture bytes must be checked out with LF line endings on every platform")
+	}
+}
+
 func TestBroadQualityCorpusHasStatisticallyMeaningfulLockedDenominators(t *testing.T) {
 	corpus, err := LoadBroadCorpusDir(broadCorpusDir(t))
 	if err != nil {

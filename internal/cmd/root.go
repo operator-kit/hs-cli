@@ -211,9 +211,11 @@ func startUpdateCheck(cmd *cobra.Command) {
 	if !selfupdate.ShouldCheck(versionStr) {
 		return
 	}
-	updateResult = make(chan string, 1)
+	currentVersion := versionStr
+	result := make(chan string, 1)
+	updateResult = result
 	go func() {
-		updateResult <- selfupdate.CheckForUpdate(versionStr)
+		result <- selfupdate.CheckForUpdate(currentVersion)
 	}()
 }
 

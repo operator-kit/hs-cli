@@ -46,7 +46,7 @@ fi
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli-pii-g0-model.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
-ARCHIVE_NAMES="$(tar -tzf "$ARCHIVE_PATH" | sed 's#^\./##' | LC_ALL=C sort)"
+ARCHIVE_NAMES="$(tar -tzf "$ARCHIVE_PATH" | sed -e 's#^\./##' -e '/^$/d' | LC_ALL=C sort)"
 while IFS= read -r name; do
   [[ -n "$name" && "$name" != */* && "$name" != "." && "$name" != ".." ]] || {
     echo "G0 bundle contains an unsafe archive path" >&2

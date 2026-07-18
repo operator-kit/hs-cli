@@ -330,6 +330,7 @@ func setupTest(mock *mockClient) *bytes.Buffer {
 	page = 1
 	perPage = 25
 	debug = false
+	versionStr = "dev"
 	return buf
 }
 
