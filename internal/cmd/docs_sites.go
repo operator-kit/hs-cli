@@ -37,6 +37,7 @@ func newDocsSitesCmd() *cobra.Command {
 	createCmd.Flags().String("favicon-url", "", "favicon URL")
 	createCmd.Flags().String("color", "", "primary color")
 	createCmd.Flags().String("contact-email", "", "contact email")
+	markProtectedFlags(createCmd, "contact-email")
 	createCmd.MarkFlagRequired("subdomain")
 	createCmd.MarkFlagRequired("title")
 
@@ -51,6 +52,7 @@ func newDocsSitesCmd() *cobra.Command {
 	updateCmd.Flags().String("favicon-url", "", "favicon URL")
 	updateCmd.Flags().String("color", "", "primary color")
 	updateCmd.Flags().String("contact-email", "", "contact email")
+	markProtectedFlags(updateCmd, "contact-email")
 
 	deleteCmd := docsSitesDeleteCmd()
 	permission.Annotate(deleteCmd, "sites", permission.OpDelete)
@@ -62,6 +64,7 @@ func newDocsSitesCmd() *cobra.Command {
 	permission.Annotate(restrictionsUpdateCmd, "sites", permission.OpWrite)
 	restrictionsUpdateCmd.Flags().StringSlice("emails", nil, "allowed email addresses")
 	restrictionsUpdateCmd.Flags().StringSlice("domains", nil, "allowed domains")
+	markProtectedFlags(restrictionsUpdateCmd, "emails")
 	restrictionsCmd.AddCommand(restrictionsGetCmd, restrictionsUpdateCmd)
 
 	cmd.AddCommand(listCmd, getCmd, createCmd, updateCmd, deleteCmd, restrictionsCmd)

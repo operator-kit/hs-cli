@@ -1,0 +1,426 @@
+{
+  "schema": 1,
+  "partition": "people-third-parties",
+  "cases": [
+    {
+      "id": "person-unknown-developer",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "An unknown developer mentioned by a customer is private third-party context.",
+      "text": "The customer asked developer Bob Exampleton to inspect the fixture.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "developer",
+          "kind": "person",
+          "start": 29,
+          "end": 43,
+          "value": "Bob Exampleton",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Bob Exampleton"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Bob Exampleton"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Bob Exampleton"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "third-party",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "person-known-customer",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A known customer keeps the existing deterministic customer identity policy.",
+      "text": "Alice Fixture asked for an account update.",
+      "known_identities": [
+        {
+          "id": "customer-alice",
+          "type": "customer",
+          "first": "Alice",
+          "last": "Fixture",
+          "email": "alice.fixture@example.invalid",
+          "phone": ""
+        }
+      ],
+      "targets": [
+        {
+          "id": "customer-name",
+          "kind": "person",
+          "start": 0,
+          "end": 13,
+          "value": "Alice Fixture",
+          "match": "exact",
+          "identity_id": "customer-alice",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Alice Fixture"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Alice Fixture"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Alice Fixture"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "known-customer",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "person-known-staff",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "Known staff is preserved in customers mode and redacted in all mode.",
+      "text": "Brenda Operator replied to the synthetic request.",
+      "known_identities": [
+        {
+          "id": "staff-brenda",
+          "type": "user",
+          "first": "Brenda",
+          "last": "Operator",
+          "email": "brenda.operator@company.example",
+          "phone": ""
+        }
+      ],
+      "targets": [
+        {
+          "id": "staff-name",
+          "kind": "person",
+          "start": 0,
+          "end": 15,
+          "value": "Brenda Operator",
+          "match": "exact",
+          "identity_id": "staff-brenda",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Brenda Operator"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Brenda Operator"
+          ]
+        },
+        "all": {
+          "required_absent": [
+            "Brenda Operator"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "known-staff",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "person-private-handle",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A person-identifying handle in private support context is an unknown third party.",
+      "text": "Please ask @fixture_developer about the private deployment.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "private-handle",
+          "kind": "person",
+          "start": 11,
+          "end": 29,
+          "value": "@fixture_developer",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "@fixture_developer"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "@fixture_developer"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "@fixture_developer"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "handle"
+      ]
+    },
+    {
+      "id": "person-public-historical",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public historical person in educational context should remain readable.",
+      "text": "The documentation credits Ada Lovelace for the historical example.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "public-person",
+          "kind": "person",
+          "start": 26,
+          "end": 38,
+          "value": "Ada Lovelace",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Ada Lovelace"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Ada Lovelace"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Ada Lovelace"
+          ]
+        }
+      },
+      "tags": [
+        "people",
+        "public",
+        "preservation"
+      ]
+    },
+    {
+      "id": "person-common-word-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A place name that resembles a person's name must not be treated as a private individual.",
+      "text": "The public shipping region is Jordan for this example.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "country-name",
+          "kind": "person",
+          "start": 30,
+          "end": 36,
+          "value": "Jordan",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Jordan"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Jordan"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Jordan"
+          ]
+        }
+      },
+      "tags": [
+        "people",
+        "false-positive",
+        "preservation"
+      ]
+    },
+    {
+      "id": "person-developer-owned-secret",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A customer mentioning an unknown developer and that developer's credential must protect both identities and the secret.",
+      "text": "Customer Alice Fixture said developer Rowan Exampleton pasted repository credential scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC.",
+      "known_identities": [
+        {
+          "id": "customer-alice",
+          "type": "customer",
+          "first": "Alice",
+          "last": "Fixture",
+          "email": "alice.fixture@example.invalid",
+          "phone": ""
+        }
+      ],
+      "targets": [
+        {
+          "id": "customer",
+          "kind": "person",
+          "start": 9,
+          "end": 22,
+          "value": "Alice Fixture",
+          "match": "exact",
+          "identity_id": "customer-alice",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "developer",
+          "kind": "person",
+          "start": 38,
+          "end": 54,
+          "value": "Rowan Exampleton",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "developer-secret",
+          "kind": "secret",
+          "start": 84,
+          "end": 124,
+          "value": "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-developer-owned-secret",
+            "recipe": "source-control-token",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "third-party",
+        "developer-owned-secret",
+        "adversarial",
+        "synthetic-generator:v1"
+      ]
+    }
+  ]
+}

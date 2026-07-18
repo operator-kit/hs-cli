@@ -24,7 +24,7 @@ func TestWebhooksList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "webhooks", "list"})
+	setRootArgs(t, []string{"inbox", "webhooks", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -45,7 +45,7 @@ func TestWebhooksGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "webhooks", "get", "1"})
+	setRootArgs(t, []string{"inbox", "webhooks", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -72,7 +72,7 @@ func TestWebhooksCreate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "webhooks", "create",
+	setRootArgs(t, []string{"inbox", "webhooks", "create",
 		"--url", "https://example.com/hook",
 		"--events", "convo.created",
 		"--secret", "sec",
@@ -103,7 +103,7 @@ func TestWebhooksUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "webhooks", "update", "1",
+	setRootArgs(t, []string{"inbox", "webhooks", "update", "1",
 		"--url", "https://new.com/hook",
 		"--payload-version", "V1",
 		"--mailbox-ids", "10",
@@ -124,7 +124,7 @@ func TestWebhooksDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "webhooks", "delete", "1"})
+	setRootArgs(t, []string{"inbox", "webhooks", "delete", "1"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Deleted webhook 1")

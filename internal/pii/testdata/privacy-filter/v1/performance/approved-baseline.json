@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "status": "not-run",
+  "reason": "awaiting-authoritative-docker-ci-and-stable-host-provisioning",
+  "git_commit": "",
+  "workflow_run_url": "",
+  "report_sha256": "",
+  "container_image": "",
+  "smoke_corpus_sha256": "",
+  "broad_corpus_sha256": "",
+  "budget_sha256": "",
+  "hardware_sha256": ""
+}

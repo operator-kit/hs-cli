@@ -31,6 +31,7 @@ func newWebhooksCmd() *cobra.Command {
 	createCmd.Flags().IntSlice("mailbox-ids", nil, "mailbox IDs to scope the webhook")
 	createCmd.Flags().Bool("notification", false, "send lightweight notification payloads")
 	createCmd.Flags().String("label", "", "human-readable webhook label")
+	markProtectedFlags(createCmd, "url", "secret", "label")
 	createCmd.MarkFlagRequired("url")
 	createCmd.MarkFlagRequired("events")
 	createCmd.MarkFlagRequired("secret")
@@ -44,6 +45,7 @@ func newWebhooksCmd() *cobra.Command {
 	updateCmd.Flags().IntSlice("mailbox-ids", nil, "mailbox IDs to scope the webhook")
 	updateCmd.Flags().Bool("notification", false, "send lightweight notification payloads")
 	updateCmd.Flags().String("label", "", "human-readable webhook label")
+	markProtectedFlags(updateCmd, "url", "secret", "label")
 
 	listCmd := webhooksListCmd()
 	permission.Annotate(listCmd, "webhooks", permission.OpRead)
@@ -74,9 +76,9 @@ func webhooksListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return output.PrintRaw(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items))
 				}
-				return output.PrintRaw(mustMarshal(cleanRawItems(items, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanMinimal)))
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListWebhooks, params, "webhooks", noPaginate)
@@ -132,9 +134,9 @@ func webhooksGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
-				return output.PrintRaw(mustMarshal(cleanRawObject(data, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanMinimal)))
 			}
 
 			var w types.Webhook

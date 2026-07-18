@@ -21,7 +21,7 @@ func TestMailboxesList_Table(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -39,7 +39,7 @@ func TestMailboxesList_JSON(t *testing.T) {
 	format = "json"
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "list", "--format", "json"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "list", "--format", "json"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -57,7 +57,7 @@ func TestMailboxesGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "get", "1"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()

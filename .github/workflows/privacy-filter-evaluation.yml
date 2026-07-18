@@ -1,0 +1,88 @@
+name: Privacy Filter Evaluation
+
+on:
+  pull_request:
+    paths:
+      - "build/privacy-filter/**"
+      - "internal/pii/**"
+      - "scripts/pii-model-sources.json"
+      - "scripts/privacy-filter-*.sh"
+      - "go.mod"
+      - "go.sum"
+      - "patches/onnxruntime-purego/**"
+      - ".github/workflows/privacy-filter-evaluation.yml"
+  push:
+    paths:
+      - "build/privacy-filter/**"
+      - "internal/pii/**"
+      - "scripts/pii-model-sources.json"
+      - "scripts/privacy-filter-*.sh"
+      - "go.mod"
+      - "go.sum"
+      - "patches/onnxruntime-purego/**"
+      - ".github/workflows/privacy-filter-evaluation.yml"
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: privacy-filter-evaluation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hermetic:
+    name: G0 hermetic contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test repository and frozen G0 contract
+        run: go test ./...
+
+      - name: Vet repository
+        run: go vet ./...
+
+  distilbert-baseline:
+    name: G0 authoritative DistilBERT baseline
+    needs: hermetic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Verify, mount, and evaluate the current model in pinned Docker
+        env:
+          HS_PII_G0_CACHE_DIR: ${{ runner.temp }}/privacy-filter-g0-cache
+          HS_PII_G0_REPORT_DIR: ${{ runner.temp }}/privacy-filter-g0-report
+          HS_PII_G0_EVIDENCE_AUTHORITY: docker-ci
+          HS_PII_G0_AUTHORITATIVE: "true"
+          HS_PII_G0_HARDWARE_PROFILE: docker-ci-functional
+        run: ./scripts/privacy-filter-g0-baseline.sh
+
+      - name: Require authoritative G0 pass
+        if: always()
+        run: >-
+          jq -e '
+            .schema == 2 and
+            .authoritative == true and
+            .evidence_authority == "docker-ci" and
+            .hardware_contract_ready == true and
+            ([.gates[] | select(.gate == "G0")] | length) == 1 and
+            any(.gates[]; .gate == "G0" and .state == "pass")
+          ' "${{ runner.temp }}/privacy-filter-g0-report/distilbert-baseline.json"
+
+      - name: Upload immutable synthetic baseline report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distilbert-g0-baseline-${{ github.sha }}
+          path: ${{ runner.temp }}/privacy-filter-g0-report/distilbert-baseline.json
+          if-no-files-found: error
+          retention-days: 90

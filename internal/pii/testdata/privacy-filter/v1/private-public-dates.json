@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "partition": "private-public-dates",
+  "cases": [
+    {
+      "id": "date-birth-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A date of birth identifying a private person is private.",
+      "text": "The synthetic customer's date of birth is 17 May 1988.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "date-of-birth",
+          "kind": "private_date",
+          "start": 42,
+          "end": 53,
+          "value": "17 May 1988",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "17 May 1988"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "17 May 1988"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "17 May 1988"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "date",
+        "birth"
+      ]
+    },
+    {
+      "id": "date-appointment-private",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A private appointment timestamp tied to a customer must be removed.",
+      "text": "The customer's private appointment is 2026-08-14 09:30.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "appointment",
+          "kind": "private_date",
+          "start": 38,
+          "end": 54,
+          "value": "2026-08-14 09:30",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "2026-08-14 09:30"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "2026-08-14 09:30"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "2026-08-14 09:30"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "date",
+        "appointment"
+      ]
+    },
+    {
+      "id": "date-release-public",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A software release date is public operational context.",
+      "text": "The public release date is 17 July 2026.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "release-date",
+          "kind": "private_date",
+          "start": 27,
+          "end": 39,
+          "value": "17 July 2026",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "17 July 2026"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "17 July 2026"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "17 July 2026"
+          ]
+        }
+      },
+      "tags": [
+        "date",
+        "release",
+        "preservation"
+      ]
+    },
+    {
+      "id": "date-event-public",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public conference date does not identify a private person.",
+      "text": "The Example Conference opens on 4 September 2026.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "event-date",
+          "kind": "private_date",
+          "start": 32,
+          "end": 48,
+          "value": "4 September 2026",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "4 September 2026"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "4 September 2026"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "4 September 2026"
+          ]
+        }
+      },
+      "tags": [
+        "date",
+        "event",
+        "preservation"
+      ]
+    }
+  ]
+}

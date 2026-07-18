@@ -25,7 +25,7 @@ func TestConversationsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "list"})
+	setRootArgs(t, []string{"inbox", "conversations", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -55,7 +55,7 @@ func TestConversationsListAdvancedFilters(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "conversations", "list",
 		"--status", "closed",
 		"--mailbox", "12",
@@ -91,7 +91,7 @@ func TestConversationsGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "get", "42"})
+	setRootArgs(t, []string{"inbox", "conversations", "get", "42"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -127,7 +127,7 @@ func TestConversationsGetWithThreads(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "get", "42", "--embed", "threads"})
+	setRootArgs(t, []string{"inbox", "conversations", "get", "42", "--embed", "threads"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -163,7 +163,7 @@ func TestConversationsCreate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "create",
+	setRootArgs(t, []string{"inbox", "conversations", "create",
 		"--mailbox", "1",
 		"--subject", "New",
 		"--customer", "a@b.com",
@@ -189,7 +189,7 @@ func TestConversationsCreateRejectsInvalidFieldFormat(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "create",
+	setRootArgs(t, []string{"inbox", "conversations", "create",
 		"--mailbox", "1",
 		"--subject", "New",
 		"--customer", "a@b.com",
@@ -218,7 +218,7 @@ func TestConversationsUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "update", "42", "--subject", "Updated"})
+	setRootArgs(t, []string{"inbox", "conversations", "update", "42", "--subject", "Updated"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Updated conversation 42")
@@ -234,7 +234,7 @@ func TestConversationsDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "delete", "42"})
+	setRootArgs(t, []string{"inbox", "conversations", "delete", "42"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Deleted conversation 42")
@@ -380,7 +380,7 @@ func TestConversationFieldsSet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "fields", "set", "42", "--field", "10=foo", "--field", "11=bar"})
+	setRootArgs(t, []string{"inbox", "conversations", "fields", "set", "42", "--field", "10=foo", "--field", "11=bar"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated custom fields for conversation 42")
 }
@@ -433,12 +433,12 @@ func TestConversationSnoozeSetAndClear(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "snooze", "set", "42", "--until", "2026-02-20T00:00:00Z"})
+	setRootArgs(t, []string{"inbox", "conversations", "snooze", "set", "42", "--until", "2026-02-20T00:00:00Z"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Snoozed conversation 42")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "conversations", "snooze", "clear", "42"})
+	setRootArgs(t, []string{"inbox", "conversations", "snooze", "clear", "42"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Cleared snooze for conversation 42")
 }

@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "latin-person-redact",
+      "language": "fr",
+      "script": "Latin",
+      "category": "person",
+      "expected": "redact",
+      "text": "Élodie Martin requested an account update.",
+      "detect_names": ["Élodie Martin"],
+      "absent": ["Élodie Martin"]
+    },
+    {
+      "id": "arabic-person-redact",
+      "language": "ar",
+      "script": "Arabic",
+      "category": "person",
+      "expected": "redact",
+      "text": "تواصل مع أحمد علي اليوم",
+      "detect_names": ["أحمد علي"],
+      "absent": ["أحمد علي"]
+    },
+    {
+      "id": "han-person-redact",
+      "language": "zh",
+      "script": "Han",
+      "category": "person",
+      "expected": "redact",
+      "text": "客户张伟需要帮助",
+      "detect_names": ["张伟"],
+      "absent": ["张伟"]
+    },
+    {
+      "id": "latin-address-redact",
+      "language": "en",
+      "script": "Latin",
+      "category": "address",
+      "expected": "redact",
+      "text": "The customer is located at 123 Main Street.",
+      "absent": ["123 Main Street"]
+    },
+    {
+      "id": "latin-email-redact",
+      "language": "en",
+      "script": "Latin",
+      "category": "identifier",
+      "expected": "redact",
+      "text": "Reply to corpus.person@example.test.",
+      "absent": ["corpus.person@example.test"]
+    },
+    {
+      "id": "latin-customer-staff-separation",
+      "language": "en",
+      "script": "Latin",
+      "category": "customer_staff",
+      "expected": "redact",
+      "mode": "customers",
+      "text": "Brenda Torres helped Alice Smith resolve the request.",
+      "detect_names": ["Brenda Torres", "Alice Smith"],
+      "known": [
+        {
+          "type": "user",
+          "first": "Brenda",
+          "last": "Torres",
+          "email": "brenda@company.example"
+        },
+        {
+          "type": "customer",
+          "first": "Alice",
+          "last": "Smith",
+          "email": "alice@example.test"
+        }
+      ],
+      "absent": ["Alice Smith"],
+      "present": ["Brenda Torres"]
+    },
+    {
+      "id": "latin-long-content-redact",
+      "language": "en",
+      "script": "Latin",
+      "category": "long_content",
+      "expected": "redact",
+      "repeat_prefix": "Operational context without personal data. ",
+      "repeat": 64,
+      "text": "Escalate to Morgan Reed for resolution.",
+      "detect_names": ["Morgan Reed"],
+      "absent": ["Morgan Reed"]
+    },
+    {
+      "id": "latin-order-number-preserve",
+      "language": "en",
+      "script": "Latin",
+      "category": "identifier",
+      "expected": "preserve",
+      "text": "Order 12345 is ready for dispatch.",
+      "present": ["Order 12345"]
+    },
+    {
+      "id": "arabic-operational-text-preserve",
+      "language": "ar",
+      "script": "Arabic",
+      "category": "person",
+      "expected": "preserve",
+      "text": "تم تحديث حالة الطلب بنجاح",
+      "present": ["تم تحديث حالة الطلب بنجاح"]
+    },
+    {
+      "id": "han-operational-text-preserve",
+      "language": "zh",
+      "script": "Han",
+      "category": "person",
+      "expected": "preserve",
+      "text": "工单状态已更新",
+      "present": ["工单状态已更新"]
+    }
+  ]
+}

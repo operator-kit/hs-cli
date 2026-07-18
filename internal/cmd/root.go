@@ -12,6 +12,7 @@ import (
 	"github.com/operator-kit/hs-cli/internal/auth"
 	"github.com/operator-kit/hs-cli/internal/config"
 	"github.com/operator-kit/hs-cli/internal/permission"
+	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/operator-kit/hs-cli/internal/selfupdate"
 )
 
@@ -32,7 +33,8 @@ var (
 	commitStr  string
 	dateStr    string
 
-	updateResult chan string
+	updateResult              chan string
+	invocationProtectedValues []string
 )
 
 func SetVersion(version, commit, date string) {
@@ -45,6 +47,17 @@ var rootCmd = &cobra.Command{
 	Use:   "hs",
 	Short: "HelpScout CLI — manage mailboxes, conversations, customers and more",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		resetPIIInvocation()
+		invocationProtectedValues = nil
+		appliedProtected, err := applyProtectedInput(cmd, args)
+		if err != nil {
+			return err
+		}
+		if err := rejectUnprotectedFlagValues(cmd, appliedProtected); err != nil {
+			return err
+		}
+		invocationProtectedValues = appliedProtected.values
+
 		// Skip everything for config subcommands
 		for c := cmd; c != nil; c = c.Parent() {
 			if c == configCmd {
@@ -52,13 +65,24 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		startUpdateCheck(cmd)
-
-		var err error
 		cfg, err = config.Load(cfgPath)
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
 		}
+		if commandUsesInboxPII(cmd) {
+			mode, modeErr := pii.ParseMode(cfg.InboxPIIMode)
+			if modeErr != nil {
+				return fmt.Errorf("invalid Inbox PII mode: %w", modeErr)
+			}
+			cfg.InboxPIIMode = mode.String()
+		}
+		if commandNeedsPIISecret(cmd) {
+			if err := preflightPIISecret(cmd.Context()); err != nil {
+				return err
+			}
+		}
+
+		startUpdateCheck(cmd)
 		// Flag overrides config
 		if cmd.Flags().Changed("format") {
 			cfg.Format = format
@@ -187,9 +211,11 @@ func startUpdateCheck(cmd *cobra.Command) {
 	if !selfupdate.ShouldCheck(versionStr) {
 		return
 	}
-	updateResult = make(chan string, 1)
+	currentVersion := versionStr
+	result := make(chan string, 1)
+	updateResult = result
 	go func() {
-		updateResult <- selfupdate.CheckForUpdate(versionStr)
+		result <- selfupdate.CheckForUpdate(currentVersion)
 	}()
 }
 
@@ -203,6 +229,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&page, "page", 1, "page number")
 	rootCmd.PersistentFlags().IntVar(&perPage, "per-page", 25, "results per page")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "show HTTP debug output")
+	rootCmd.PersistentFlags().StringVar(&protectedInputPath, protectedInputFlagName, "", "read protected string arguments from a private JSON file ('-' for stdin)")
 
 	rootCmd.AddCommand(updateCmd)
 }
@@ -217,13 +244,14 @@ func Execute() error {
 		executedCmd = rootCmd
 	}
 
-	fmt.Fprintf(executedCmd.ErrOrStderr(), "Error: %v\n", err)
+	safeErr := fmt.Errorf("%s", redactProtectedValues(err.Error(), invocationProtectedValues))
+	fmt.Fprintf(executedCmd.ErrOrStderr(), "Error: %v\n", safeErr)
 	if shouldShowUsageForError(err) {
 		fmt.Fprintln(executedCmd.ErrOrStderr())
 		_ = executedCmd.Usage()
 	}
 
-	return err
+	return safeErr
 }
 
 func getFormat() string {
@@ -255,6 +283,28 @@ func isUnderSubtree(cmd *cobra.Command, name string) bool {
 		}
 	}
 	return false
+}
+
+func commandUsesInboxPII(cmd *cobra.Command) bool {
+	return cmd.Name() == "mcp" || isUnderSubtree(cmd, "inbox")
+}
+
+func commandNeedsPIISecret(cmd *cobra.Command) bool {
+	if cmd.Name() == "mcp" {
+		return true
+	}
+	if !isUnderSubtree(cmd, "inbox") {
+		return false
+	}
+	for current := cmd; current != nil; current = current.Parent() {
+		if current == configCmd || current.Name() == "auth" {
+			return false
+		}
+	}
+	if cmd.Name() == "permissions" {
+		return false
+	}
+	return cmd.RunE != nil || cmd.Run != nil
 }
 
 func shouldShowUsageForError(err error) bool {

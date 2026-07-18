@@ -23,7 +23,7 @@ func TestUsersList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "list"})
+	setRootArgs(t, []string{"inbox", "users", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -42,7 +42,7 @@ func TestUsersListFilters(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "list", "--email", "agent@example.com", "--mailbox", "88"})
+	setRootArgs(t, []string{"inbox", "users", "list", "--email", "agent@example.com", "--mailbox", "88"})
 	require.NoError(t, rootCmd.Execute())
 }
 
@@ -58,7 +58,7 @@ func TestUsersGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "get", "1"})
+	setRootArgs(t, []string{"inbox", "users", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -77,7 +77,7 @@ func TestUsersMe(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "me"})
+	setRootArgs(t, []string{"inbox", "users", "me"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Owner")
 }
@@ -92,7 +92,7 @@ func TestUsersDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "delete", "9"})
+	setRootArgs(t, []string{"inbox", "users", "delete", "9"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Deleted user 9")
 }
@@ -106,7 +106,7 @@ func TestUsersStatusList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "status", "list"})
+	setRootArgs(t, []string{"inbox", "users", "status", "list"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Active")
 }
@@ -121,7 +121,7 @@ func TestUsersStatusGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "status", "get", "9"})
+	setRootArgs(t, []string{"inbox", "users", "status", "get", "9"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "away")
 }
@@ -139,7 +139,7 @@ func TestUsersStatusSet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "users", "status", "set", "9", "--status", "away"})
+	setRootArgs(t, []string{"inbox", "users", "status", "set", "9", "--status", "away"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated status for user 9")
 }

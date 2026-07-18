@@ -51,6 +51,7 @@ func newConfigSetCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&setInboxPIIAllow, "inbox-pii-allow-unredacted", false, "allow per-request --unredacted override")
 	cmd.Flags().StringVar(&setDocsAPIKey, "docs-api-key", "", "HelpScout Docs API key")
 	cmd.Flags().StringVar(&setDocsPermissions, "docs-permissions", "", "Docs permission policy")
+	markProtectedFlags(cmd, "inbox-app-secret", "docs-api-key")
 	return cmd
 }
 
@@ -81,9 +82,9 @@ func configFilePath() string {
 func runConfigSet(cmd *cobra.Command, args []string) error {
 	path := configFilePath()
 
-	existing, err := config.Load(path)
+	existing, err := config.LoadFile(path)
 	if err != nil {
-		existing = &config.Config{}
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	if cmd.Flags().Changed("inbox-app-id") {
@@ -99,10 +100,13 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		existing.Format = setFormat
 	}
 	if cmd.Flags().Changed("inbox-pii-mode") {
-		if !pii.IsValidMode(setInboxPIIMode) {
-			return fmt.Errorf("invalid --inbox-pii-mode: %q (expected off|customers|all)", setInboxPIIMode)
+		mode, modeErr := pii.ParseMode(setInboxPIIMode)
+		if modeErr != nil {
+			return fmt.Errorf("invalid --inbox-pii-mode: %w", modeErr)
 		}
-		existing.InboxPIIMode = setInboxPIIMode
+		existing.InboxPIIMode = mode.String()
+	} else if _, modeErr := pii.ParseMode(existing.InboxPIIMode); modeErr != nil {
+		return fmt.Errorf("invalid inbox_pii_mode in %s: %w; repair it with --inbox-pii-mode off|customers|all", path, modeErr)
 	}
 	if cmd.Flags().Changed("inbox-pii-allow-unredacted") {
 		existing.InboxPIIAllowUnredacted = setInboxPIIAllow

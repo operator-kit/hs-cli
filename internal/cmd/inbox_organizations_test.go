@@ -22,7 +22,7 @@ func TestOrganizationsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "organizations", "list", "--query", "acme"})
+	setRootArgs(t, []string{"inbox", "organizations", "list", "--query", "acme"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Acme")
 }
@@ -37,7 +37,7 @@ func TestOrganizationsGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "organizations", "get", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "acme.com")
 }
@@ -66,17 +66,17 @@ func TestOrganizationsCreateUpdateDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "organizations", "create", "--name", "Acme", "--domain", "acme.com"})
+	setRootArgs(t, []string{"inbox", "organizations", "create", "--name", "Acme", "--domain", "acme.com"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Created organization 1")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "update", "1", "--name", "Acme 2"})
+	setRootArgs(t, []string{"inbox", "organizations", "update", "1", "--name", "Acme 2"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated organization 1")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "delete", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "delete", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Deleted organization 1")
 }
@@ -95,12 +95,12 @@ func TestOrganizationRelatedLists(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "organizations", "conversations", "list", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "conversations", "list", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Billing")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "customers", "list", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "customers", "list", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "alice@example.com")
 }
@@ -135,27 +135,27 @@ func TestOrganizationPropertiesCRUD(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "organizations", "properties", "list"})
+	setRootArgs(t, []string{"inbox", "organizations", "properties", "list"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Tier")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "properties", "get", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "properties", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "text")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "properties", "create", "--name", "Tier", "--type", "text"})
+	setRootArgs(t, []string{"inbox", "organizations", "properties", "create", "--name", "Tier", "--type", "text"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Created organization property 1")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "properties", "update", "1", "--name", "Tier2"})
+	setRootArgs(t, []string{"inbox", "organizations", "properties", "update", "1", "--name", "Tier2"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated organization property 1")
 
 	buf.Reset()
-	rootCmd.SetArgs([]string{"inbox", "organizations", "properties", "delete", "1"})
+	setRootArgs(t, []string{"inbox", "organizations", "properties", "delete", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Deleted organization property 1")
 }

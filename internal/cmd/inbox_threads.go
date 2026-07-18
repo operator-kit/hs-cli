@@ -36,6 +36,7 @@ func newThreadsCmd() *cobra.Command {
 	replyCmd.Flags().String("created-at", "", "thread creation timestamp")
 	replyCmd.Flags().String("type", "", "reply thread type")
 	replyCmd.Flags().IntSlice("attachment-id", nil, "attachment IDs")
+	markProtectedFlags(replyCmd, "customer", "body", "to", "cc", "bcc")
 	replyCmd.MarkFlagRequired("customer")
 	replyCmd.MarkFlagRequired("body")
 
@@ -45,6 +46,7 @@ func newThreadsCmd() *cobra.Command {
 	noteCmd.Flags().Int("user-id", 0, "user ID for the note author")
 	noteCmd.Flags().String("status", "", "set conversation status after note")
 	noteCmd.Flags().IntSlice("attachment-id", nil, "attachment IDs")
+	markProtectedFlags(noteCmd, "body")
 	noteCmd.MarkFlagRequired("body")
 
 	chatCmd := threadsCreateVariantCmd(
@@ -76,6 +78,7 @@ func newThreadsCmd() *cobra.Command {
 	permission.Annotate(updateCmd, "conversations", permission.OpWrite)
 	updateCmd.Flags().String("text", "", "updated thread body text")
 	updateCmd.Flags().String("status", "", "updated thread status")
+	markProtectedFlags(updateCmd, "text")
 
 	listCmd := threadsListCmd()
 	permission.Annotate(listCmd, "conversations", permission.OpRead)
@@ -117,9 +120,9 @@ func threadsListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanThread)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanThread)), conversationPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, func(ctx context.Context, p url.Values) (json.RawMessage, error) {
@@ -293,6 +296,7 @@ func threadsCreateVariantCmd(use string, short string, createFn func(ctx context
 	cmd.Flags().Bool("imported", false, "mark as imported")
 	cmd.Flags().String("created-at", "", "thread creation timestamp")
 	cmd.Flags().IntSlice("attachment-id", nil, "attachment IDs")
+	markProtectedFlags(cmd, "customer", "body")
 	cmd.MarkFlagRequired("body")
 	return cmd
 }
@@ -366,7 +370,7 @@ func threadsSourceCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(data)
+				return printRawWithPII(data, conversationPIIContext)
 			}
 			engine, err := newPIIEngine()
 			if err != nil {

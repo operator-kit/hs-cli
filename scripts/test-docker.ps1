@@ -5,6 +5,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "Docker is required to run the isolated test suite."
+}
+
+& docker info --format "{{.ServerVersion}}" *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "The Docker engine is unavailable. Start Docker Desktop or Docker Engine and retry."
+}
+
 if (-not $GoTestArgs -or $GoTestArgs.Count -eq 0) {
     $GoTestArgs = @("./...")
 }
@@ -23,5 +32,7 @@ docker run --rm `
     -e GOCACHE=/tmp/go-cache `
     -e GOMODCACHE=/go/pkg/mod `
     -e GOTELEMETRY=off `
-    golang:1.25 `
+    golang:1.25.9-bookworm@sha256:298734aec230b5f3e8cee450ce6d7eccc39f1797ba548ee90d57e9803030c6c3 `
     go test @GoTestArgs
+
+exit $LASTEXITCODE

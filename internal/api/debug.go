@@ -7,73 +7,104 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
-// debugTransport wraps an http.RoundTripper and logs requests/responses to a file.
-// Auth token requests are skipped to avoid exposing credentials.
+// debugTransport wraps an http.RoundTripper and records requests/responses
+// through an always-on diagnostic sanitizer. Debug logging is deliberately
+// independent of the user-facing --unredacted policy.
 type debugTransport struct {
-	base http.RoundTripper
-	out  io.Writer
+	base      http.RoundTripper
+	out       io.Writer
+	sanitizer diagnosticSanitizer
+	mu        sync.Mutex
 }
 
 func (t *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
 	if strings.Contains(req.URL.Path, "oauth2/token") {
-		return t.base.RoundTrip(req)
+		return base.RoundTrip(req)
 	}
 
+	sanitizer := t.sanitizer
+	if sanitizer == nil {
+		sanitizer = newSafeDiagnosticSanitizer()
+	}
+
+	var record bytes.Buffer
 	ts := time.Now().Format("15:04:05.000")
-	fmt.Fprintf(t.out, "\n--- %s %s %s ---\n", ts, req.Method, req.URL)
-
-	for k, vals := range req.Header {
-		if strings.EqualFold(k, "Authorization") {
-			fmt.Fprintf(t.out, ">> %s: [redacted]\n", k)
-			continue
-		}
-		fmt.Fprintf(t.out, ">> %s: %s\n", k, strings.Join(vals, ", "))
-	}
+	fmt.Fprintf(&record, "\n--- %s %s %s ---\n", ts, req.Method, sanitizer.sanitizeURL(req.URL))
+	writeSanitizedHeaders(&record, ">>", req.Header, sanitizer)
 
 	if req.Body != nil && req.Body != http.NoBody {
-		body, err := io.ReadAll(req.Body)
-		req.Body.Close()
-		if err == nil && len(body) > 0 {
-			fmt.Fprintf(t.out, ">> %s\n", body)
-			req.Body = io.NopCloser(bytes.NewReader(body))
+		body, readErr := io.ReadAll(req.Body)
+		_ = req.Body.Close()
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		if readErr != nil {
+			fmt.Fprintln(&record, ">> [redacted unreadable body]")
+		} else if len(body) > 0 {
+			fmt.Fprintf(&record, ">> %s\n", sanitizer.sanitizeBody(body))
 		}
 	}
 
-	resp, err := t.base.RoundTrip(req)
+	resp, err := base.RoundTrip(req)
 	if err != nil {
-		fmt.Fprintf(t.out, "<< error: %v\n", err)
+		// Transport errors often embed the full request URL. Preserve the error
+		// category for diagnosis without persisting its potentially sensitive text.
+		fmt.Fprintf(&record, "<< error: request failed (%T)\n", err)
+		t.writeRecord(record.String())
 		return nil, err
 	}
 
-	fmt.Fprintf(t.out, "<< %s\n", resp.Status)
-	for k, vals := range resp.Header {
-		fmt.Fprintf(t.out, "<< %s: %s\n", k, strings.Join(vals, ", "))
-	}
+	fmt.Fprintf(&record, "<< %s\n", resp.Status)
+	writeSanitizedHeaders(&record, "<<", resp.Header, sanitizer)
 
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err == nil && len(body) > 0 {
-		fmt.Fprintf(t.out, "<< %s\n", body)
-	}
+	body, readErr := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(body))
+	if readErr != nil {
+		fmt.Fprintln(&record, "<< [redacted unreadable body]")
+	} else if len(body) > 0 {
+		fmt.Fprintf(&record, "<< %s\n", sanitizer.sanitizeBody(body))
+	}
 
+	t.writeRecord(record.String())
 	return resp, nil
 }
 
-// setupDebugLog creates the debug log file and wraps the client transport.
+func writeSanitizedHeaders(out io.Writer, prefix string, headers http.Header, sanitizer diagnosticSanitizer) {
+	for key, values := range headers {
+		fmt.Fprintf(out, "%s %s: %s\n", prefix, key, sanitizer.sanitizeHeader(key, values))
+	}
+}
+
+func (t *debugTransport) writeRecord(record string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, _ = io.WriteString(t.out, record)
+}
+
+// setupDebugLog creates a private debug log file and wraps the client transport.
 func setupDebugLog(httpClient *http.Client) {
 	path := "hs-debug.log"
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not create debug log: %v\n", err)
 		return
 	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		fmt.Fprintf(os.Stderr, "Warning: could not secure debug log: %v\n", err)
+		return
+	}
 	fmt.Fprintf(os.Stderr, "Debug log: %s\n", path)
 	httpClient.Transport = &debugTransport{
-		base: httpClient.Transport,
-		out:  f,
+		base:      httpClient.Transport,
+		out:       f,
+		sanitizer: newSafeDiagnosticSanitizer(),
 	}
 }

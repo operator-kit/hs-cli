@@ -64,9 +64,9 @@ func workflowsListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return output.PrintRaw(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items))
 				}
-				return output.PrintRaw(mustMarshal(cleanRawItems(items, cleanMinimal)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanMinimal)))
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListWorkflows, params, "workflows", noPaginate)

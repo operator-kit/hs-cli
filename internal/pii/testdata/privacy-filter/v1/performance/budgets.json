@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "evidence_authority": "docker-ci",
+  "hardware_identity_file": "hardware-identities.json",
+  "sampling": {
+    "minimum_fresh_processes": 20,
+    "minimum_warm_samples": 100,
+    "diagnostic_reruns": 1
+  },
+  "hardware_profiles": [
+    {
+      "id": "H0",
+      "runner_labels": ["self-hosted", "linux", "x64", "privacy-filter-h0"],
+      "vcpus": 2,
+      "memory_bytes": 4294967296,
+      "swap_bytes": 0,
+      "cpu_only": true,
+      "storage": "ssd",
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+    },
+    {
+      "id": "H1",
+      "runner_labels": ["self-hosted", "linux", "x64", "privacy-filter-h1"],
+      "vcpus": 4,
+      "memory_bytes": 8589934592,
+      "swap_bytes": 0,
+      "cpu_only": true,
+      "storage": "ssd",
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+    },
+    {
+      "id": "H2",
+      "runner_labels": ["self-hosted", "linux", "x64", "privacy-filter-h2"],
+      "vcpus": 8,
+      "memory_bytes": 17179869184,
+      "swap_bytes": 0,
+      "cpu_only": true,
+      "storage": "ssd",
+      "required_metadata": ["runner_name", "cpu_model", "architecture", "instruction_sets", "physical_cores", "logical_cores", "virtualization", "ram_limit", "swap_policy", "numa", "storage", "benchmark_workspace", "os", "kernel", "power_governor", "thermal_state", "onnx_runtime", "go_version", "python_version", "thread_settings", "container_limits", "git_commit", "corpus_sha256", "budget_sha256", "model_sha256"]
+    }
+  ],
+  "limits": [
+    {"id": "detector-readiness-reference", "workload": "all", "statistic": "p95", "maximum": 5000, "unit": "milliseconds", "profiles": ["H1", "H2"]},
+    {"id": "detector-readiness-slowest", "workload": "all", "statistic": "p95", "maximum": 8000, "unit": "milliseconds", "profiles": ["H0"]},
+    {"id": "warm-subject", "workload": "subject", "statistic": "p95", "maximum": 250, "unit": "milliseconds", "profiles": ["H0", "H1", "H2"]},
+    {"id": "warm-message", "workload": "message", "statistic": "p95", "maximum": 750, "unit": "milliseconds", "profiles": ["H0", "H1", "H2"]},
+    {"id": "warm-thread", "workload": "thread", "statistic": "p95", "maximum": 4000, "unit": "milliseconds", "profiles": ["H0", "H1", "H2"]},
+    {"id": "warm-export", "workload": "export", "statistic": "p95", "maximum": 20000, "unit": "milliseconds", "profiles": ["H0", "H1", "H2"]},
+    {"id": "peak-rss", "workload": "all", "statistic": "maximum", "maximum": 2147483648, "unit": "bytes", "profiles": ["H0", "H1", "H2"]},
+    {"id": "steady-rss", "workload": "mcp-longevity", "statistic": "post-warm", "maximum": 1610612736, "unit": "bytes", "profiles": ["H0", "H1", "H2"]},
+    {"id": "rss-growth-percent", "workload": "mcp-longevity", "statistic": "maximum", "maximum": 5, "unit": "percent", "profiles": ["H0", "H1", "H2"]},
+    {"id": "rss-growth-bytes", "workload": "mcp-longevity", "statistic": "maximum", "maximum": 67108864, "unit": "bytes", "profiles": ["H0", "H1", "H2"]},
+    {"id": "installed-bundle", "workload": "all", "statistic": "maximum", "maximum": 1342177280, "unit": "bytes", "profiles": ["H0", "H1", "H2"]},
+    {"id": "compressed-download", "workload": "all", "statistic": "maximum", "maximum": 1181116006, "unit": "bytes", "profiles": ["H0", "H1", "H2"]},
+    {"id": "detector-construction", "workload": "all", "statistic": "maximum", "maximum": 1, "unit": "count", "profiles": ["H0", "H1", "H2"]},
+    {"id": "mode-off-construction", "workload": "all", "statistic": "maximum", "maximum": 0, "unit": "count", "profiles": ["H0", "H1", "H2"]},
+    {"id": "mcp-burst-factor", "workload": "mcp-burst", "statistic": "single-request-p95-multiple", "maximum": 5, "unit": "factor", "profiles": ["H0", "H1", "H2"]}
+  ]
+}

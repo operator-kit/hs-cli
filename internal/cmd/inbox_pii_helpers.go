@@ -1,18 +1,37 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
-	"os"
+	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/operator-kit/hs-cli/internal/config"
 	"github.com/operator-kit/hs-cli/internal/output"
 	"github.com/operator-kit/hs-cli/internal/pii"
 	"github.com/operator-kit/hs-cli/internal/pii/ner"
+	"github.com/operator-kit/hs-cli/internal/pii/secretstore"
+	piisetup "github.com/operator-kit/hs-cli/internal/pii/setup"
 	"github.com/operator-kit/hs-cli/internal/types"
 )
 
-func effectivePIIMode() (string, error) {
-	mode := pii.ModeOff
+var (
+	customerPIIContext     = pii.JSONContext{RootEntity: "customer", Resource: pii.ResourceCustomer}
+	userPIIContext         = pii.JSONContext{RootEntity: "user", Resource: pii.ResourceUser}
+	conversationPIIContext = pii.JSONContext{Resource: pii.ResourceConversation}
+	ratingPIIContext       = pii.JSONContext{Resource: pii.ResourceRating}
+	reportPIIContext       = pii.JSONContext{Resource: pii.ResourceReport}
+	attachmentPIIContext   = pii.JSONContext{Resource: pii.ResourceAttachment}
+
+	resolvePIIContext     = defaultResolvePIIContext
+	invocationPIIPrepared bool
+	invocationPIIMode     pii.Mode
+	invocationPIIContext  pii.PseudonymContext
+)
+
+func effectivePIIMode() (pii.Mode, error) {
+	mode := ""
 	allowUnredacted := false
 	if cfg != nil {
 		mode = cfg.InboxPIIMode
@@ -26,6 +45,10 @@ func newPIIEngine() (*pii.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	pseudonym, err := contextForPIIMode(context.Background(), mode)
+	if err != nil {
+		return nil, err
+	}
 	var opts []pii.EngineOption
 	if ner.IsModelReady() {
 		d, nerErr := ner.NewDetector()
@@ -33,21 +56,85 @@ func newPIIEngine() (*pii.Engine, error) {
 			opts = append(opts, pii.WithNER(d))
 		}
 	}
-	return pii.NewEngine(mode, os.Getenv("HS_INBOX_PII_SECRET"), opts...), nil
+	engine, err := pii.NewEngine(mode, pseudonym, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating PII engine: %w", err)
+	}
+	return engine, nil
 }
 
-func printRawWithPII(data json.RawMessage) error {
-	engine, err := newPIIEngine()
+func defaultResolvePIIContext(ctx context.Context, mode pii.Mode, configPath string) (pii.PseudonymContext, error) {
+	path := config.ResolvedPath(configPath)
+	resolver := &piisetup.SecretResolver{
+		Store: secretstore.NewKeyringStore(),
+		Lock:  secretstore.NewFileLock(filepath.Join(filepath.Dir(path), ".pii-secret.lock")),
+	}
+	return resolver.ResolveContext(ctx, mode)
+}
+
+func resetPIIInvocation() {
+	invocationPIIPrepared = false
+	invocationPIIMode = pii.ModeOff
+	invocationPIIContext = pii.PseudonymContext{}
+}
+
+func preflightPIISecret(ctx context.Context) error {
+	mode, err := effectivePIIMode()
 	if err != nil {
 		return err
 	}
-	if !engine.Enabled() {
-		return output.PrintRaw(data)
+	_, err = contextForPIIMode(ctx, mode)
+	return err
+}
+
+func contextForPIIMode(ctx context.Context, mode pii.Mode) (pii.PseudonymContext, error) {
+	if invocationPIIPrepared && invocationPIIMode == mode {
+		return invocationPIIContext, nil
 	}
-	redacted, err := engine.RedactJSON(data)
+	if !pii.IsEnabled(mode) {
+		invocationPIIPrepared = true
+		invocationPIIMode = mode
+		invocationPIIContext = pii.PseudonymContext{}
+		return pii.PseudonymContext{}, nil
+	}
+
+	pseudonym, err := resolvePIIContext(ctx, mode, cfgPath)
 	if err != nil {
-		// Preserve existing behavior for non-JSON payloads.
-		return output.PrintRaw(data)
+		return pii.PseudonymContext{}, fmt.Errorf("resolving PII redaction key: %w", err)
+	}
+	invocationPIIPrepared = true
+	invocationPIIMode = mode
+	invocationPIIContext = pseudonym
+	return pseudonym, nil
+}
+
+// redactRawWithPII is the mandatory presentation boundary for Inbox JSON. Once
+// redaction is enabled it fails closed: malformed or uninspectable data is
+// never passed through unchanged.
+func redactRawWithPII(data json.RawMessage, contexts ...pii.JSONContext) (json.RawMessage, error) {
+	engine, err := newPIIEngine()
+	if err != nil {
+		return nil, err
+	}
+	if !engine.Enabled() {
+		return data, nil
+	}
+
+	ctx := pii.JSONContext{}
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
+	redacted, err := engine.RedactJSONWithContext(data, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("redacting Inbox output: %w", err)
+	}
+	return redacted, nil
+}
+
+func printRawWithPII(data json.RawMessage, contexts ...pii.JSONContext) error {
+	redacted, err := redactRawWithPII(data, contexts...)
+	if err != nil {
+		return err
 	}
 	return output.PrintRaw(redacted)
 }

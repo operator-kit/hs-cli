@@ -95,9 +95,9 @@ func teamsMembersCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)), userPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, fetch, params, "users", noPaginate)

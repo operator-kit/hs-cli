@@ -25,7 +25,7 @@ func TestMailboxFoldersList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "folders", "list", "10"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "folders", "list", "10"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Inbox")
 }
@@ -41,7 +41,7 @@ func TestMailboxCustomFieldsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "custom-fields", "list", "10"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "custom-fields", "list", "10"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Priority")
 }
@@ -57,7 +57,7 @@ func TestMailboxRoutingGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "routing", "get", "10"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "routing", "get", "10"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "enabled")
 }
@@ -76,7 +76,7 @@ func TestMailboxRoutingUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "routing", "update", "10", "--json", `{"enabled":true}`})
+	setRootArgs(t, []string{"inbox", "mailboxes", "routing", "update", "10", "--json", `{"enabled":true}`})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Updated routing for mailbox 10")
 }

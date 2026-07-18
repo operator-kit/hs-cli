@@ -1,0 +1,15 @@
+FROM golang:1.25.9-bookworm@sha256:298734aec230b5f3e8cee450ce6d7eccc39f1797ba548ee90d57e9803030c6c3
+
+ENV GOTELEMETRY=off \
+    GOTOOLCHAIN=local \
+    GOMODCACHE=/go/pkg/mod \
+    GOCACHE=/tmp/go-build-cache \
+    HOME=/tmp/hs-evaluation-home
+
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+COPY patches/onnxruntime-purego/go.mod patches/onnxruntime-purego/go.sum ./patches/onnxruntime-purego/
+RUN go mod download && go mod verify
+
+ENTRYPOINT ["go", "test"]

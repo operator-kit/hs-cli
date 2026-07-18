@@ -62,6 +62,7 @@ func newOrganizationsCmd() *cobra.Command {
 	}
 	permission.Annotate(listCmd, "organizations", permission.OpRead)
 	listCmd.Flags().String("query", "", "search query")
+	markProtectedFlags(listCmd, "query")
 
 	getCmd := &cobra.Command{
 		Use:   "get <id>",
@@ -110,6 +111,7 @@ func newOrganizationsCmd() *cobra.Command {
 	createCmd.Flags().String("name", "", "organization name (required)")
 	createCmd.Flags().String("domain", "", "organization domain")
 	createCmd.Flags().String("json", "", "full organization payload as JSON object")
+	markProtectedFlags(createCmd, "name", "domain", "json")
 	createCmd.MarkFlagRequired("name")
 
 	updateCmd := &cobra.Command{
@@ -135,6 +137,7 @@ func newOrganizationsCmd() *cobra.Command {
 	updateCmd.Flags().String("name", "", "organization name")
 	updateCmd.Flags().String("domain", "", "organization domain")
 	updateCmd.Flags().String("json", "", "full organization payload as JSON object")
+	markProtectedFlags(updateCmd, "name", "domain", "json")
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete <id>",
@@ -188,9 +191,9 @@ func newOrganizationConversationsCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), conversationPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanConversation)), conversationPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, fetch, params, "conversations", noPaginate)
@@ -248,9 +251,9 @@ func newOrganizationCustomersCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), customerPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanCustomer)), customerPIIContext)
 			}
 
 			items, _, err := api.PaginateAll(ctx, fetch, params, "customers", noPaginate)
@@ -368,6 +371,7 @@ func newOrganizationPropertiesCmd() *cobra.Command {
 	createCmd.Flags().String("name", "", "property name (required)")
 	createCmd.Flags().String("type", "", "property type")
 	createCmd.Flags().String("json", "", "full property payload as JSON object")
+	markProtectedFlags(createCmd, "json")
 	createCmd.MarkFlagRequired("name")
 
 	updateCmd := &cobra.Command{
@@ -392,6 +396,7 @@ func newOrganizationPropertiesCmd() *cobra.Command {
 	updateCmd.Flags().String("name", "", "property name")
 	updateCmd.Flags().String("type", "", "property type")
 	updateCmd.Flags().String("json", "", "full property payload as JSON object")
+	markProtectedFlags(updateCmd, "json")
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete <id>",

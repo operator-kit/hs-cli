@@ -8,6 +8,7 @@ import (
 
 	"github.com/operator-kit/hs-cli/internal/config"
 	"github.com/operator-kit/hs-cli/internal/output"
+	"github.com/operator-kit/hs-cli/internal/pii"
 )
 
 // mockClient implements api.ClientAPI with function fields.
@@ -318,6 +319,7 @@ func (m *mockClient) GetReport(ctx context.Context, family string, params url.Va
 
 // setupTest sets globals for testing and returns a buffer capturing output.
 func setupTest(mock *mockClient) *bytes.Buffer {
+	useTestPIISecretResolver()
 	buf := &bytes.Buffer{}
 	output.Out = buf
 	apiClient = mock
@@ -328,7 +330,23 @@ func setupTest(mock *mockClient) *bytes.Buffer {
 	page = 1
 	perPage = 25
 	debug = false
+	versionStr = "dev"
 	return buf
+}
+
+func useTestPIISecretResolver() {
+	secret, err := pii.NewSecretString("command-test-only-secret")
+	if err != nil {
+		panic(err)
+	}
+	pseudonym, err := pii.NewPseudonymContext(secret, "command-test")
+	if err != nil {
+		panic(err)
+	}
+	resolvePIIContext = func(context.Context, pii.Mode, string) (pii.PseudonymContext, error) {
+		return pseudonym, nil
+	}
+	resetPIIInvocation()
 }
 
 // halJSON wraps items in a HAL response envelope.

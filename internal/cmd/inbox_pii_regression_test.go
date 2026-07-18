@@ -1,0 +1,301 @@
+package cmd
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/operator-kit/hs-cli/internal/output"
+	"github.com/operator-kit/hs-cli/internal/pii"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const criticalPIIEmail = "alice.critical@example.com"
+
+func executePIIFixtureCommand(
+	t *testing.T,
+	mock *mockClient,
+	piiMode string,
+	outputFormat string,
+	execute func() error,
+) string {
+	t.Helper()
+
+	previousOutput := output.Out
+	saveRestore(t)
+	buf := setupTest(mock)
+	t.Cleanup(func() { output.Out = previousOutput })
+	t.Setenv("HS_INBOX_PII_SECRET", "pii-regression-test-secret")
+
+	cfg.InboxPIIMode = piiMode
+	format = outputFormat
+	require.NoError(t, execute())
+	return buf.String()
+}
+
+func TestPIIOutputBoundary_FailsClosedForInvalidJSON(t *testing.T) {
+	previousOutput := output.Out
+	saveRestore(t)
+	buf := setupTest(&mockClient{})
+	t.Cleanup(func() { output.Out = previousOutput })
+
+	cfg.InboxPIIMode = "all"
+	err := printRawWithPII(json.RawMessage(`alice.critical@example.com`))
+	require.Error(t, err)
+	assert.Empty(t, buf.String(), "invalid JSON must never fall back to raw output")
+}
+
+func TestPIIOutputBoundary_AllInboxJSONUsesPresenter(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "inbox_") || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == "inbox_pii_helpers.go" {
+			continue
+		}
+		contents, readErr := os.ReadFile(filepath.Clean(name))
+		require.NoError(t, readErr)
+		assert.NotContains(t, string(contents), "output.PrintRaw(", "%s bypasses the PII JSON presenter", name)
+	}
+}
+
+func TestPIIRegression_Critical01_CustomersModeRedactsTopLevelCustomerJSON(t *testing.T) {
+	const customer = `{
+		"id": 101,
+		"firstName": "Alice",
+		"lastName": "Critical",
+		"email": "alice.critical@example.com",
+		"phone": "+1 415 555 0199"
+	}`
+
+	surfaces := []struct {
+		name    string
+		newMock func() *mockClient
+		args    []string
+	}{
+		{
+			name: "list",
+			newMock: func() *mockClient {
+				return &mockClient{
+					ListCustomersFn: func(context.Context, url.Values) (json.RawMessage, error) {
+						return halJSON("customers", "["+customer+"]"), nil
+					},
+				}
+			},
+			args: []string{"list"},
+		},
+		{
+			name: "get",
+			newMock: func() *mockClient {
+				return &mockClient{
+					GetCustomerFn: func(context.Context, string, url.Values) (json.RawMessage, error) {
+						return json.RawMessage(customer), nil
+					},
+				}
+			},
+			args: []string{"get", "101"},
+		},
+	}
+
+	for _, outputFormat := range []string{"json", "json-full"} {
+		for _, surface := range surfaces {
+			outputFormat := outputFormat
+			surface := surface
+			t.Run(surface.name+"/"+outputFormat, func(t *testing.T) {
+				command := newCustomersCmd()
+				command.SetArgs(surface.args)
+				out := executePIIFixtureCommand(t, surface.newMock(), "customers", outputFormat, command.Execute)
+
+				for _, rawPII := range []string{"Alice", "Critical", criticalPIIEmail, "+1 415 555 0199"} {
+					assert.NotContains(t, out, rawPII, "top-level customer PII must be redacted in customers mode")
+				}
+			})
+		}
+	}
+}
+
+func TestPIIRegression_Critical02_PIIBearingCommandsCannotBypassRedaction(t *testing.T) {
+	t.Run("rating comments", func(t *testing.T) {
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetRatingFn: func(context.Context, string) (json.RawMessage, error) {
+						return json.RawMessage(`{
+					"id": 7,
+					"rating": "great",
+					"comments": "Please follow up with alice.critical@example.com"
+				}`), nil
+					},
+				}
+				command := newRatingsCmd()
+				command.SetArgs([]string{"get", "7"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
+
+				assert.NotContains(t, out, criticalPIIEmail, "rating comments must pass through the PII output boundary")
+			})
+		}
+	})
+
+	t.Run("report payloads", func(t *testing.T) {
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetReportFn: func(context.Context, string, url.Values) (json.RawMessage, error) {
+						return json.RawMessage(`{
+					"customers": [{"id": 101, "email": "alice.critical@example.com"}]
+				}`), nil
+					},
+				}
+				command := newReportsCmd()
+				command.SetArgs([]string{"customers"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
+
+				assert.NotContains(t, out, criticalPIIEmail, "report payloads must pass through the PII output boundary")
+			})
+		}
+	})
+
+	t.Run("attachment metadata", func(t *testing.T) {
+		for _, outputFormat := range []string{"table", "json-full"} {
+			t.Run(outputFormat, func(t *testing.T) {
+				mock := &mockClient{
+					GetAttachmentDataFn: func(context.Context, string, string) (json.RawMessage, error) {
+						return json.RawMessage(`{
+					"filename": "alice.critical@example.com",
+					"mimeType": "text/plain",
+					"data": "c2Vuc2l0aXZl"
+				}`), nil
+					},
+				}
+				command := newConversationAttachmentsCmd()
+				command.SetArgs([]string{"get", "42", "9"})
+				out := executePIIFixtureCommand(t, mock, "all", outputFormat, command.Execute)
+
+				assert.NotContains(t, out, criticalPIIEmail, "attachment metadata must pass through the PII output boundary")
+			})
+		}
+	})
+
+	t.Run("conversation custom-field values", func(t *testing.T) {
+		mock := &mockClient{
+			GetConversationFn: func(context.Context, string, url.Values) (json.RawMessage, error) {
+				return json.RawMessage(`{
+					"id": 42,
+					"number": 1042,
+					"subject": "Escalation",
+					"customFields": [{
+						"id": 17,
+						"name": "Escalation contact",
+						"value": "alice.critical@example.com"
+					}]
+				}`), nil
+			},
+		}
+		command := conversationsGetCmd()
+		command.SetArgs([]string{"42"})
+		out := executePIIFixtureCommand(t, mock, "all", "json-full", command.Execute)
+
+		assert.NotContains(t, out, criticalPIIEmail, "custom-field values must be scanned for PII")
+	})
+}
+
+func TestPIIRegression_High06_InvalidModeStopsBeforeInboxAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileMode string
+		envMode  string
+	}{
+		{name: "file", fileMode: "typo"},
+		{name: "environment", fileMode: "customers", envMode: "typo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home, buf := setupE2E(t)
+			cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+			require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: "+tt.fileMode+"\n"), 0o600))
+			t.Setenv("HS_INBOX_PII_MODE", tt.envMode)
+
+			apiCalled := false
+			apiClient = &mockClient{
+				ListMailboxesFn: func(context.Context, url.Values) (json.RawMessage, error) {
+					apiCalled = true
+					return json.RawMessage(`{"_embedded":{"mailboxes":[{"id":1,"name":"PII fixture"}]}}`), nil
+				},
+			}
+			previousOutput := output.Out
+			output.Out = buf
+			t.Cleanup(func() { output.Out = previousOutput })
+
+			setRootArgs(t, []string{"inbox", "mailboxes", "list"})
+			err := rootCmd.Execute()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "PII mode")
+			assert.False(t, apiCalled)
+			assert.NotContains(t, buf.String(), "PII fixture")
+		})
+	}
+}
+
+func TestPIIRegression_High06_InvalidModeStopsMCPStartup(t *testing.T) {
+	home, _ := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+
+	setRootArgs(t, []string{"mcp"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PII mode")
+}
+
+func TestPIIRegression_High06_InvalidModeDoesNotBlockVersion(t *testing.T) {
+	home, buf := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+	SetVersion("1.2.3", "abc123", "2026-07-15")
+
+	setRootArgs(t, []string{"version"})
+	require.NoError(t, rootCmd.Execute())
+	assert.Contains(t, buf.String(), "1.2.3")
+}
+
+func TestPIIRegression_High05_SecretFailureStopsBeforeInboxAPI(t *testing.T) {
+	home, buf := setupE2E(t)
+	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("inbox_pii_mode: all\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+	t.Setenv("HS_INBOX_PII_SECRET", "")
+
+	apiCalled := false
+	apiClient = &mockClient{
+		ListMailboxesFn: func(context.Context, url.Values) (json.RawMessage, error) {
+			apiCalled = true
+			return json.RawMessage(`{"_embedded":{"mailboxes":[{"id":1,"name":"PII fixture"}]}}`), nil
+		},
+	}
+	previousOutput := output.Out
+	output.Out = buf
+	t.Cleanup(func() { output.Out = previousOutput })
+
+	originalResolver := resolvePIIContext
+	resolvePIIContext = func(context.Context, pii.Mode, string) (pii.PseudonymContext, error) {
+		return pii.PseudonymContext{}, errors.New("PII redaction key unavailable; set HS_INBOX_PII_SECRET")
+	}
+	t.Cleanup(func() { resolvePIIContext = originalResolver })
+
+	setRootArgs(t, []string{"inbox", "mailboxes", "list"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HS_INBOX_PII_SECRET")
+	assert.False(t, apiCalled)
+	assert.NotContains(t, buf.String(), "PII fixture")
+}

@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - Go 1.25+
+- Docker Desktop or Docker Engine for recommended local unit and race-test runs
 
 ## Project structure
 
@@ -114,6 +115,41 @@ The Docker wrappers set an isolated `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME`,
 `APPDATA`, `GOCACHE`, and `GOMODCACHE` inside the container. This keeps full
 test runs from reading or deleting credentials/config from the host dev
 environment while still reusing Docker volumes for Go module/build caches.
+The wrappers use a digest-pinned `golang:1.25.9-bookworm` image.
+
+### Race detector
+
+The canonical local race suite runs in the same isolated Docker environment as
+the full unit suite. Developers do not need to install or configure CGO or a C
+compiler on the host:
+
+```bash
+bash ./scripts/test-race.sh
+bash ./scripts/test-race.sh ./internal/pii/... -count=1
+```
+
+```powershell
+.\scripts\test-race.ps1
+.\scripts\test-race.ps1 ./internal/pii/... -count=1
+```
+
+CI runs this Docker suite for broad concurrency coverage and a separate native
+Windows job for Windows-only files such as the PII secret-store lock. A
+developer changing Windows-specific code can run that job locally when a
+recent MinGW-w64 GCC is already available on `PATH`:
+
+```powershell
+.\scripts\test-race-native-windows.ps1
+```
+
+The native wrapper validates that GCC provides `libsynchronization.a`, enables
+CGO, and selects the compiler only for its own process. Native Windows tooling
+is optional for normal development because the authoritative Windows run is in
+CI.
+
+See the official Go documentation for the
+[race detector requirements](https://go.dev/doc/articles/race_detector) and
+[Go 1.25+ Windows CGO requirements](https://go.dev/wiki/MinimumRequirements).
 
 ## Test architecture
 
@@ -122,6 +158,139 @@ environment while still reusing Docker volumes for Go module/build caches.
 - **config package**: Uses `t.TempDir()` for filesystem tests and `t.Setenv()` for env var tests
 - **output package**: Formatters write to `bytes.Buffer` for assertion
 - **selfupdate package**: Uses `httptest.Server` for GitHub API mocking, `DirOverride`/`InstallDirOverride` for filesystem isolation
+
+### PII regression architecture
+
+The normative invariants for all 14 completed review findings live in
+[`docs/pii-redaction-hardening-contract.md`](docs/pii-redaction-hardening-contract.md).
+Treat its extension checklist as required review criteria for any new
+PII-bearing command, presenter, identity rule, runtime target, or installer
+path.
+
+The current investigation of OpenAI's local Privacy Filter model is recorded in
+[docs/openai-privacy-filter-evaluation.md](docs/openai-privacy-filter-evaluation.md).
+It is an evaluation and migration proposal, not an implementation decision; its
+quality, performance, parity, and supply-chain gates must pass before changing
+the production detector.
+
+The implementation runbook is
+[docs/openai-privacy-filter-migration-plan.md](docs/openai-privacy-filter-migration-plan.md).
+It defines the single-detector target, phase entry and exit criteria, permanent
+test lanes, numerical quality and performance budgets, failure handling,
+preview rollout, rollback, and retirement sequence. Treat its gate fixtures and
+budgets as reviewed source: do not rebaseline them from candidate results.
+For this migration, the pinned Docker evaluation in CI is authoritative for
+model comparison and performance selection. Personal-machine and local Windows
+results are sanity evidence only and must not approve or rewrite a baseline.
+
+Normal tests use the synthetic corpus at
+`internal/pii/testdata/multilingual_privacy_corpus.json`; it contains no
+production or Help Scout API data. The hermetic evaluator injects exact fixture
+name spans and checks redaction, preservation, customer/staff separation, and
+long-content behavior. The existing model-release smoke test loads the real
+bundle and scores the same corpus for complete expected-name coverage,
+unexpected person spans, chunking, and a two-minute evaluation budget:
+
+```bash
+HS_PII_MODEL_SMOKE_DIR=/path/to/extracted/bundle \
+  go test ./internal/pii/ner -run TestRuntimeBundleSmoke -count=1 -v -timeout=5m
+```
+
+The model-tag workflow runs that smoke on every advertised Linux and macOS
+target. Normal unit jobs skip it when `HS_PII_MODEL_SMOKE_DIR` is absent.
+
+The Privacy Filter G0 smoke contract is frozen under
+`internal/pii/testdata/privacy-filter/v1/`; the separately versioned broad
+quality corpus is under `internal/pii/testdata/privacy-filter/broad/v1/`.
+Their strict typed loaders reject unknown fields, duplicate IDs, invalid UTF-8
+byte spans, contradictory mode expectations, incomplete policy coverage,
+unprovenanced generated credentials, and secret families without both
+must-detect and preservation variations. The broad loader enforces one target
+per case and at least 100 independent cases for every percentage-gated kind and
+language direction. Percentage gates remain `not-run` if those denominators are
+absent.
+
+Broad format labels are executable: generated JSON and YAML parse, URL targets
+live inside a credential parameter, and Markdown, HTML, log, shell, and command
+targets are embedded in their advertised structures. Repeated, overlapping,
+markup-split, and developer-owned secret scenarios live in the adversarial
+smoke corpus instead of distorting one-case/one-target percentage denominators.
+Repeated values share one leak sentinel, while split and overlapping values add
+fragment sentinels so partial redaction still fails the affected output and
+metric slices.
+
+Generated secret families use structurally realistic, provider-neutral
+namespaces and a non-issuable secret-key envelope. Exact production-provider
+prefixes and real private-key PEM labels are forbidden by hermetic tests so
+GitHub push protection remains an independent supply-chain control rather than
+requiring fixture bypasses.
+
+G0 boundary tags freeze fixture taxonomy and generic `RedactText` expectations;
+they are not evidence that each table, JSON, CSV, MCP, error, or diagnostic
+renderer was independently integrated. Those concrete presentation-boundary
+regressions remain part of G5.
+
+Regenerate deterministic fixtures and byte-exact performance workload
+identities with:
+
+```bash
+go run ./internal/pii/evaluation/cmd/corpusgen -repo-root .
+go run ./internal/pii/evaluation/cmd/performancegen -repo-root .
+```
+
+Normal `go test ./...` verifies that checked output is byte-for-byte
+reproducible. It also executes the corpus and report JSON schemas, validates the
+complete sliced metric contract, independently scans credential-shaped fixture
+material for provenance, and rejects semantic weakening of workload sizes,
+metrics, statistics, profile applicability, or payload hashes.
+
+The current DistilBERT-plus-regex baseline is generated by the dedicated
+Privacy Filter evaluation workflow. It hash-verifies the existing immutable
+model bundle, mounts the weights read-only into the digest-pinned G0 image,
+disables inference networking, and uploads an aggregate synthetic-only report:
+
+```bash
+./scripts/privacy-filter-g0-baseline.sh
+```
+
+A local invocation always records `evidence_authority=local-sanity` and
+`authoritative=false`. Only the GitHub Actions Docker job may attempt the
+authoritative G0 baseline, and a failed or `not-run` gate makes both the Go
+command and an independent workflow JSON check fail. The failed report is still
+uploaded for diagnosis.
+
+G0 is currently `not-run`: `performance/hardware-identities.json` explicitly
+records H0/H1/H2 as unprovisioned because their actual runner names, CPU models,
+machine fields, and fingerprints have not been supplied. Do not invent those
+values. Once the stable hosts are provisioned, record their concrete identities
+and reviewed fingerprints, run Docker CI, and replace the source-controlled
+`performance/approved-baseline.json` not-run marker with the reviewed report
+identity. A 90-day Actions artifact alone is not an approval anchor.
+
+Privacy Filter weights, Python, and candidate model integration remain absent
+from Phase 0.
+
+Command tests call `setRootArgs`, which automatically moves annotated fixture
+values into the protected stdin envelope before Cobra parses argv. A regression
+that intentionally proves raw-argv rejection must call `rootCmd.SetArgs`
+directly and reset Cobra's changed flags first.
+
+### Protected inputs and pseudonym keys
+
+Use `markProtectedFlags` for any new flag that can contain PII, credentials,
+authored free text, or a private local path. The root preflight accepts those
+values only from the schema-1 `--protected-input` envelope. MCP transports all
+string values through that channel and uses the annotation to scrub genuinely
+sensitive values from child failures without erasing public IDs from output.
+
+Enabled PII engines accept only a `pii.PseudonymContext`, never bare secret
+material. The context combines the private HMAC key, explicit public key ID,
+and identity schema. The setup resolver persists a versioned keyring record;
+under the cross-process lock it migrates the pre-versioning 32-byte record by
+preserving those exact secret bytes and generating an independent random key
+ID. Never derive a public key ID from secret material: that would provide an
+offline verifier. Explicit deployments must set `HS_INBOX_PII_SECRET` and
+`HS_INBOX_PII_KEY_ID` together and rotate them together.
 
 ## Release
 

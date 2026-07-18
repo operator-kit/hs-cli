@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "partition": "long-input",
+  "cases": [
+    {
+      "id": "long-private-person-near-end",
+      "language": "en",
+      "script": "Latin",
+      "shape": "long-thread",
+      "risk": "high",
+      "reason": "A private person near the end of long synthetic content must not be truncated.",
+      "text": "Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Escalate the private case to Morgan Longfixture for resolution.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 3669,
+          "end": 3687,
+          "value": "Morgan Longfixture",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Morgan Longfixture"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Morgan Longfixture"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Morgan Longfixture"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "long-input",
+        "far-context",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "long-public-release-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "long-thread",
+      "risk": "preservation",
+      "reason": "Long content must not over-redact a public release marker.",
+      "text": "Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. Operational fixture context without private values. The public release marker is EXAMPLE-RELEASE-2026-07.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "release-marker",
+          "kind": "account_number",
+          "start": 3669,
+          "end": 3692,
+          "value": "EXAMPLE-RELEASE-2026-07",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-RELEASE-2026-07"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-RELEASE-2026-07"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-RELEASE-2026-07"
+          ]
+        }
+      },
+      "tags": [
+        "long-input",
+        "preservation",
+        "existing-contract"
+      ]
+    }
+  ]
+}

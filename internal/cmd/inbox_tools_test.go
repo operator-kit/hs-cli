@@ -48,7 +48,7 @@ func TestBriefingTeamOverview(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -107,7 +107,7 @@ func TestBriefingAgentSummary(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -157,7 +157,7 @@ func TestBriefingAgentSummaryJSON(t *testing.T) {
 	format = "json"
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99", "--format", "json"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99", "--format", "json"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -208,7 +208,7 @@ func TestBriefingAgentWithThreads(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99", "--embed", "threads"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99", "--embed", "threads"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -263,7 +263,7 @@ func TestBriefingAgentThreadsJSON(t *testing.T) {
 	format = "json"
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99", "--embed", "threads", "--format", "json"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99", "--embed", "threads", "--format", "json"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -336,7 +336,7 @@ func TestBriefingNoResults(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "No results.")
@@ -352,7 +352,7 @@ func TestBriefingEmbedWithoutAssignedTo(t *testing.T) {
 	defer func() { output.Out = os.Stdout }()
 
 	// Explicit --assigned-to "" to override cobra flag state from prior tests
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--embed", "threads", "--assigned-to", ""})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--embed", "threads", "--assigned-to", ""})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--embed threads requires --assigned-to")
@@ -379,7 +379,7 @@ func TestBriefingTeamOverviewNoThreadEmbed(t *testing.T) {
 	defer func() { output.Out = os.Stdout }()
 
 	// Explicit --embed "" to reset cobra flag state from prior tests
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--embed", ""})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--embed", ""})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Alex M")
 }
@@ -406,7 +406,7 @@ func TestBriefingAgentViewsAlwaysEmbedThreads(t *testing.T) {
 	defer func() { output.Out = os.Stdout }()
 
 	// Tier 2: no --embed threads flag, but API should still embed
-	rootCmd.SetArgs([]string{"inbox", "tools", "briefing", "--assigned-to", "99"})
+	setRootArgs(t, []string{"inbox", "tools", "briefing", "--assigned-to", "99"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "A")
 }

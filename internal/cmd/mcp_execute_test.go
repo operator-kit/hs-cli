@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestMCPBuildInvocation_BuildsCLIArgs(t *testing.T) {
 		Flags: []mcpFlagSpec{
 			{Name: "no-paginate", Property: "no_paginate", Type: "bool"},
 			{Name: "page", Property: "page", Type: "int"},
-			{Name: "tag", Property: "tag", Type: "stringSlice"},
+			{Name: "tag", Property: "tag", Type: "stringSlice", Protected: true},
 		},
 	}
 
@@ -30,19 +31,36 @@ func TestMCPBuildInvocation_BuildsCLIArgs(t *testing.T) {
 		"output_mode": json.RawMessage(`"json_full"`),
 	}
 
-	argv, commandLine, err := runner.buildInvocation(spec, args)
+	invocation, err := runner.buildExecutionInvocation(spec, args)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{
+		"--protected-input", "-",
 		"inbox", "conversations", "get",
-		"12345",
+		"__HS_PROTECTED_ARG_0__",
 		"--no-paginate=true",
 		"--page", "2",
-		"--tag", "vip",
-		"--tag", "billing",
 		"--format", "json-full",
-	}, argv)
-	assert.Equal(t, "hs inbox conversations get 12345 --no-paginate=true --page 2 --tag vip --tag billing --format json-full", commandLine)
+	}, invocation.Args)
+	assert.Equal(t, "hs inbox conversations get [protected] --no-paginate=true --page 2 --tag [protected] --format json-full", invocation.SafeDisplay)
+	assert.ElementsMatch(t, []string{"vip", "billing"}, invocation.ProtectedValues)
+
+	var envelope protectedInputEnvelope
+	require.NoError(t, json.Unmarshal(invocation.Stdin, &envelope))
+	assert.Equal(t, protectedInputSchema, envelope.Schema)
+	assert.Equal(t, spec.CommandPath, envelope.Command)
+	assert.Equal(t, []protectedPositionalInput{{Index: 0, Value: "12345"}}, envelope.Positionals)
+	assert.JSONEq(t, `["vip","billing"]`, string(envelope.Flags["tag"]))
+}
+
+func TestRedactProtectedValues_CoversQuotedAndJSONEscapedErrors(t *testing.T) {
+	protected := "private line one\nline two <tag>"
+	rendered := fmt.Sprintf("raw=%s quoted=%q json=%s", protected, protected, `"private line one\nline two \u003ctag\u003e"`)
+	out := redactProtectedValues(rendered, []string{protected})
+	assert.NotContains(t, out, "private line")
+	assert.NotContains(t, out, "line two")
+	assert.NotContains(t, out, "tag")
+	assert.Contains(t, out, "[protected]")
 }
 
 func TestMCPBuildInvocation_RejectsUnknownArguments(t *testing.T) {
@@ -78,14 +96,15 @@ func TestMCPBuildInvocation_ForwardsGlobalConfigAndDebug(t *testing.T) {
 		CommandPath: []string{"inbox", "mailboxes", "list"},
 	}
 
-	argv, _, err := runner.buildInvocation(spec, map[string]json.RawMessage{})
+	invocation, err := runner.buildExecutionInvocation(spec, map[string]json.RawMessage{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"--config", "/tmp/hs-config.yaml",
 		"--debug=true",
 		"inbox", "mailboxes", "list",
 		"--format", "json",
-	}, argv)
+	}, invocation.Args)
+	assert.Empty(t, invocation.Stdin)
 }
 
 func TestMCPBuildInvocation_RejectsEmptyRequiredPositionalArgument(t *testing.T) {

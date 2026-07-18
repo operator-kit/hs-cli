@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "secret_marker": "[REDACTED_SECRET]",
+  "kinds": [
+    {
+      "kind": "person",
+      "replacement": "deterministic-person",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "address",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "email",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "phone",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "url",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "private_date",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "account_number",
+      "replacement": "deterministic-token",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "kind": "secret",
+      "replacement": "constant-secret-marker",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    }
+  ],
+  "identity_policy": [
+    {
+      "id": "known-customer-person",
+      "kind": "person",
+      "identity_type": "customer",
+      "replacement": "deterministic-person",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "id": "known-staff-person",
+      "kind": "person",
+      "identity_type": "user",
+      "replacement": "deterministic-person",
+      "actions": {"off": "preserve", "customers": "preserve", "all": "redact"}
+    },
+    {
+      "id": "unknown-third-party-person",
+      "kind": "person",
+      "identity_type": "unknown",
+      "replacement": "deterministic-person",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "id": "customer-secret",
+      "kind": "secret",
+      "identity_type": "customer",
+      "replacement": "constant-secret-marker",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "id": "staff-secret",
+      "kind": "secret",
+      "identity_type": "user",
+      "replacement": "constant-secret-marker",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    },
+    {
+      "id": "third-party-secret",
+      "kind": "secret",
+      "identity_type": "unknown",
+      "replacement": "constant-secret-marker",
+      "actions": {"off": "preserve", "customers": "redact", "all": "redact"}
+    }
+  ]
+}

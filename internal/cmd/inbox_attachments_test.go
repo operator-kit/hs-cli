@@ -36,7 +36,7 @@ func TestConversationAttachmentsUpload(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{
+	setRootArgs(t, []string{
 		"inbox", "conversations", "attachments", "upload", "10",
 		"--thread-id", "99",
 		"--file", filePath,
@@ -65,7 +65,7 @@ func TestConversationAttachmentsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "attachments", "list", "42"})
+	setRootArgs(t, []string{"inbox", "conversations", "attachments", "list", "42"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "file.txt")
 }
@@ -82,7 +82,7 @@ func TestConversationAttachmentsGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "attachments", "get", "42", "7"})
+	setRootArgs(t, []string{"inbox", "conversations", "attachments", "get", "42", "7"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "invoice.pdf")
 }
@@ -99,7 +99,7 @@ func TestConversationAttachmentsDelete(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "attachments", "delete", "42", "7"})
+	setRootArgs(t, []string{"inbox", "conversations", "attachments", "delete", "42", "7"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Deleted attachment 7 from conversation 42")
 }

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "model_version": "0.2.0",
+  "model_repository": "Xenova/distilbert-base-multilingual-cased-ner-hrl",
+  "model_revision": "c2a4dbf593c57f47004c5bc2d3770d311aee9c43",
+  "onnx_runtime_version": "1.23.0",
+  "bundles": [
+    {
+      "goos": "darwin",
+      "goarch": "amd64",
+      "archive": {
+        "url": "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v0.2.0/pii-model-0.2.0-darwin-amd64.tar.gz",
+        "filename": "pii-model-0.2.0-darwin-amd64.tar.gz",
+        "sha256": "6c42a556168d6f4251d34032b85a699a0e222c9ed14e1548f401525a0b51c5bd",
+        "size": 104434052,
+        "max_size": 115343360
+      },
+      "runtime_source": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-osx-x86_64-1.23.0.tgz",
+        "sha256": "a8e43edcaa349cbfc51578a7fc61ea2b88793ccf077b4bc65aca58999d20cf0f",
+        "size": 11621905
+      },
+      "runtime_library": "libonnxruntime.dylib",
+      "max_expanded_size": 188743680,
+      "files": [
+        {"name": "config.json", "sha256": "38847be4dc6699b1218a749ed69f888c2ccc7b4deba98e3c4a1cac8cb34d54c8", "size": 927},
+        {"name": "model_quantized.onnx", "sha256": "24a0b98f4dd4cd92842f5a541272f86f760225a64a29928eddef14bdb2edb986", "size": 135359829},
+        {"name": "tokenizer.json", "sha256": "bf1b59b7b11c95f194f51708d918eea378e09d05f84c0e1656dc5180e8117088", "size": 2919362},
+        {"name": "libonnxruntime.dylib", "sha256": "091d265e49da84ac8eafd6ff76b67688555192a272d784a252d550a858797d6f", "size": 39582416}
+      ]
+    },
+    {
+      "goos": "darwin",
+      "goarch": "arm64",
+      "archive": {
+        "url": "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v0.2.0/pii-model-0.2.0-darwin-arm64.tar.gz",
+        "filename": "pii-model-0.2.0-darwin-arm64.tar.gz",
+        "sha256": "01c7675685a779519d8cf1cb8c506f17bb46aab9abdb127f0813e7a01a6bbd4c",
+        "size": 102767226,
+        "max_size": 115343360
+      },
+      "runtime_source": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-osx-arm64-1.23.0.tgz",
+        "sha256": "8182db0ebb5caa21036a3c78178f17fabb98a7916bdab454467c8f4cf34bcfdf",
+        "size": 9962096
+      },
+      "runtime_library": "libonnxruntime.dylib",
+      "max_expanded_size": 188743680,
+      "files": [
+        {"name": "config.json", "sha256": "38847be4dc6699b1218a749ed69f888c2ccc7b4deba98e3c4a1cac8cb34d54c8", "size": 927},
+        {"name": "model_quantized.onnx", "sha256": "24a0b98f4dd4cd92842f5a541272f86f760225a64a29928eddef14bdb2edb986", "size": 135359829},
+        {"name": "tokenizer.json", "sha256": "bf1b59b7b11c95f194f51708d918eea378e09d05f84c0e1656dc5180e8117088", "size": 2919362},
+        {"name": "libonnxruntime.dylib", "sha256": "d3859aecdb70ea099f5b5f4185fe16f0527c6680b18731e6e96fc971ec767cca", "size": 35011904}
+      ]
+    },
+    {
+      "goos": "linux",
+      "goarch": "amd64",
+      "archive": {
+        "url": "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v0.2.0/pii-model-0.2.0-linux-amd64.tar.gz",
+        "filename": "pii-model-0.2.0-linux-amd64.tar.gz",
+        "sha256": "17aaf46aecb79ce9758f7fcca813894a2a9d24e97976bcf1b91ecf93c9f6dbfb",
+        "size": 101057017,
+        "max_size": 115343360
+      },
+      "runtime_source": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-linux-x64-1.23.0.tgz",
+        "sha256": "b6deea7f2e22c10c043019f294a0ea4d2a6c0ae52a009c34847640db75ec5580",
+        "size": 8257032
+      },
+      "runtime_library": "libonnxruntime.so",
+      "max_expanded_size": 188743680,
+      "files": [
+        {"name": "config.json", "sha256": "38847be4dc6699b1218a749ed69f888c2ccc7b4deba98e3c4a1cac8cb34d54c8", "size": 927},
+        {"name": "model_quantized.onnx", "sha256": "24a0b98f4dd4cd92842f5a541272f86f760225a64a29928eddef14bdb2edb986", "size": 135359829},
+        {"name": "tokenizer.json", "sha256": "bf1b59b7b11c95f194f51708d918eea378e09d05f84c0e1656dc5180e8117088", "size": 2919362},
+        {"name": "libonnxruntime.so", "sha256": "98b0253652d36c706cd9b873f3e8dc74e107c26cf9694672fb4d88da1c00f250", "size": 22207288}
+      ]
+    },
+    {
+      "goos": "linux",
+      "goarch": "arm64",
+      "archive": {
+        "url": "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v0.2.0/pii-model-0.2.0-linux-arm64.tar.gz",
+        "filename": "pii-model-0.2.0-linux-arm64.tar.gz",
+        "sha256": "a50e5abd1e665e2fae8476b741d11c90b09ef6259d7dae2a42bc7fd78b980cd9",
+        "size": 100017916,
+        "max_size": 115343360
+      },
+      "runtime_source": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.0/onnxruntime-linux-aarch64-1.23.0.tgz",
+        "sha256": "0b9f47d140411d938e47915824d8daaa424df95a88b5f1fc843172a75168f7a0",
+        "size": 7216713
+      },
+      "runtime_library": "libonnxruntime.so",
+      "max_expanded_size": 188743680,
+      "files": [
+        {"name": "config.json", "sha256": "38847be4dc6699b1218a749ed69f888c2ccc7b4deba98e3c4a1cac8cb34d54c8", "size": 927},
+        {"name": "model_quantized.onnx", "sha256": "24a0b98f4dd4cd92842f5a541272f86f760225a64a29928eddef14bdb2edb986", "size": 135359829},
+        {"name": "tokenizer.json", "sha256": "bf1b59b7b11c95f194f51708d918eea378e09d05f84c0e1656dc5180e8117088", "size": 2919362},
+        {"name": "libonnxruntime.so", "sha256": "cb068adc50115db2cca077b385a15b35cc07a14ef3bb71aa5d7c66f1982f5264", "size": 18562312}
+      ]
+    }
+  ]
+}

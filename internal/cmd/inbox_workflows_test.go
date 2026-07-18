@@ -25,7 +25,7 @@ func TestWorkflowsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "list"})
+	setRootArgs(t, []string{"inbox", "workflows", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -44,7 +44,7 @@ func TestWorkflowsListFilters(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "list", "--mailbox-id", "10", "--type", "manual"})
+	setRootArgs(t, []string{"inbox", "workflows", "list", "--mailbox-id", "10", "--type", "manual"})
 	require.NoError(t, rootCmd.Execute())
 }
 
@@ -63,7 +63,7 @@ func TestWorkflowsUpdateStatus(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "update-status", "5", "--status", "inactive"})
+	setRootArgs(t, []string{"inbox", "workflows", "update-status", "5", "--status", "inactive"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Workflow 5 status set to inactive")
@@ -74,7 +74,7 @@ func TestWorkflowsUpdateStatusRejectsInvalid(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "update-status", "5", "--status", "paused"})
+	setRootArgs(t, []string{"inbox", "workflows", "update-status", "5", "--status", "paused"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `"active" or "inactive"`)
@@ -93,7 +93,7 @@ func TestWorkflowsRun(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "run", "1", "--conversation-ids", "100,200"})
+	setRootArgs(t, []string{"inbox", "workflows", "run", "1", "--conversation-ids", "100,200"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Workflow 1 executed")
@@ -109,7 +109,7 @@ func TestWorkflowsRunRejectsNonIntegerIDs(t *testing.T) {
 	setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "run", "1", "--conversation-ids", "100,abc"})
+	setRootArgs(t, []string{"inbox", "workflows", "run", "1", "--conversation-ids", "100,abc"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `invalid conversation ID "abc"`)
@@ -130,7 +130,7 @@ func TestWorkflowsRunRejectsMoreThan50IDs(t *testing.T) {
 		ids[i] = fmt.Sprintf("%d", i+1)
 	}
 
-	rootCmd.SetArgs([]string{"inbox", "workflows", "run", "1", "--conversation-ids", strings.Join(ids, ",")})
+	setRootArgs(t, []string{"inbox", "workflows", "run", "1", "--conversation-ids", strings.Join(ids, ",")})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "at most 50 IDs")

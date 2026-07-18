@@ -19,6 +19,7 @@ func newDocsAssetsCmd() *cobra.Command {
 	articleUploadCmd := docsAssetsArticleUploadCmd()
 	permission.Annotate(articleUploadCmd, "assets", permission.OpWrite)
 	articleUploadCmd.Flags().String("file", "", "file path to upload (required)")
+	markProtectedFlags(articleUploadCmd, "file")
 	articleUploadCmd.MarkFlagRequired("file")
 	articleCmd.AddCommand(articleUploadCmd)
 
@@ -26,6 +27,7 @@ func newDocsAssetsCmd() *cobra.Command {
 	settingsUploadCmd := docsAssetsSettingsUploadCmd()
 	permission.Annotate(settingsUploadCmd, "assets", permission.OpWrite)
 	settingsUploadCmd.Flags().String("file", "", "file path to upload (required)")
+	markProtectedFlags(settingsUploadCmd, "file")
 	settingsUploadCmd.MarkFlagRequired("file")
 	settingsCmd.AddCommand(settingsUploadCmd)
 

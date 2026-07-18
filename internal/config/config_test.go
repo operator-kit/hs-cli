@@ -64,6 +64,30 @@ inbox_pii_mode: all
 	assert.True(t, cfg.InboxPIIAllowUnredacted)
 }
 
+func TestLoadFile_DoesNotApplyEnvironment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`inbox_app_id: from-file
+inbox_pii_mode: typo
+`), 0o600))
+	t.Setenv("HS_INBOX_APP_ID", "from-env")
+	t.Setenv("HS_INBOX_PII_MODE", "all")
+
+	cfg, err := LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "from-file", cfg.InboxAppID)
+	assert.Equal(t, "typo", cfg.InboxPIIMode)
+}
+
+func TestLoad_EnvironmentCanOverrideInvalidFileMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("inbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "customers")
+
+	cfg, err := Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "customers", cfg.InboxPIIMode)
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

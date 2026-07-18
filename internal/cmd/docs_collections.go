@@ -37,6 +37,7 @@ func newDocsCollectionsCmd() *cobra.Command {
 	createCmd.Flags().String("visibility", "", "visibility (public|private)")
 	createCmd.Flags().Int("order", 0, "display order")
 	createCmd.Flags().String("description", "", "collection description")
+	markProtectedFlags(createCmd, "name", "description")
 	createCmd.MarkFlagRequired("site")
 	createCmd.MarkFlagRequired("name")
 
@@ -46,6 +47,7 @@ func newDocsCollectionsCmd() *cobra.Command {
 	updateCmd.Flags().String("visibility", "", "visibility (public|private)")
 	updateCmd.Flags().Int("order", 0, "display order")
 	updateCmd.Flags().String("description", "", "collection description")
+	markProtectedFlags(updateCmd, "name", "description")
 
 	deleteCmd := docsCollectionsDeleteCmd()
 	permission.Annotate(deleteCmd, "collections", permission.OpDelete)

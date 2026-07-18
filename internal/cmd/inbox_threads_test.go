@@ -26,7 +26,7 @@ func TestThreadsList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "list", "10"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "list", "10"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -48,7 +48,7 @@ func TestThreadsListLineitemAction(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "list", "10"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "list", "10"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -82,7 +82,7 @@ func TestThreadsReply(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "reply", "10",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "reply", "10",
 		"--customer", "a@b.com",
 		"--body", "My reply",
 		"--status", "closed",
@@ -116,7 +116,7 @@ func TestThreadsNote(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "note", "10",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "note", "10",
 		"--body", "Internal note",
 		"--user-id", "6",
 		"--status", "pending",
@@ -145,7 +145,7 @@ func TestThreadsCreateChat(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "create-chat", "10",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "create-chat", "10",
 		"--customer", "chat@example.com",
 		"--body", "Chat body",
 		"--imported",
@@ -170,7 +170,7 @@ func TestThreadsCreateCustomer(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "create-customer", "10",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "create-customer", "10",
 		"--customer", "customer@example.com",
 		"--body", "Customer body"})
 	require.NoError(t, rootCmd.Execute())
@@ -191,7 +191,7 @@ func TestThreadsCreatePhone(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "create-phone", "10",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "create-phone", "10",
 		"--body", "Phone body"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Created create-phone thread on conversation 10.")
@@ -216,7 +216,7 @@ func TestThreadsUpdate(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "update", "10", "20",
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "update", "10", "20",
 		"--text", "Updated body",
 		"--status", "closed"})
 	require.NoError(t, rootCmd.Execute())
@@ -235,7 +235,7 @@ func TestThreadsSource(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "source", "10", "20"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "source", "10", "20"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "source payload")
 }
@@ -252,7 +252,7 @@ func TestThreadsSourceRFC822(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "source-rfc822", "10", "20"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "source-rfc822", "10", "20"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "From: test@example.com")
 }
@@ -271,7 +271,7 @@ func TestThreadsList_PIIRedactsWhenEnabled(t *testing.T) {
 	t.Setenv("HS_INBOX_PII_ALLOW_UNREDACTED", "0")
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "list", "10"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "list", "10"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -290,7 +290,7 @@ func TestThreadsList_UnredactedDeniedWhenDisallowed(t *testing.T) {
 	t.Setenv("HS_INBOX_PII_ALLOW_UNREDACTED", "0")
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "--unredacted", "conversations", "threads", "list", "10"})
+	setRootArgs(t, []string{"inbox", "--unredacted", "conversations", "threads", "list", "10"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--unredacted is disabled")
@@ -307,7 +307,7 @@ func TestThreadsSourceRFC822_RedactedWhenEnabled(t *testing.T) {
 	t.Setenv("HS_INBOX_PII_ALLOW_UNREDACTED", "0")
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "conversations", "threads", "source-rfc822", "10", "20"})
+	setRootArgs(t, []string{"inbox", "conversations", "threads", "source-rfc822", "10", "20"})
 	require.NoError(t, rootCmd.Execute())
 
 	out := buf.String()
@@ -327,7 +327,7 @@ func TestThreadsSourceRFC822_UnredactedAllowed(t *testing.T) {
 	t.Setenv("HS_INBOX_PII_ALLOW_UNREDACTED", "1")
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "--unredacted", "conversations", "threads", "source-rfc822", "10", "20"})
+	setRootArgs(t, []string{"inbox", "--unredacted", "conversations", "threads", "source-rfc822", "10", "20"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "From: test@example.com")

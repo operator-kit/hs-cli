@@ -21,7 +21,7 @@ func TestRatingsGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "ratings", "get", "7"})
+	setRootArgs(t, []string{"inbox", "ratings", "get", "7"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "great")
 }

@@ -1,6 +1,7 @@
 package pii
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -8,7 +9,7 @@ import (
 // --- RedactText regex sweep tests (requires NER to be attached) ---
 
 func TestRedactText_EmailInText(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Please email support@example.com for help", nil)
 	if strings.Contains(out, "support@example.com") {
 		t.Fatalf("email should be redacted: %q", out)
@@ -16,7 +17,7 @@ func TestRedactText_EmailInText(t *testing.T) {
 }
 
 func TestRedactText_PhoneInText(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Call us at 555-123-4567 for support", nil)
 	if strings.Contains(out, "555-123-4567") {
 		t.Fatalf("phone should be redacted: %q", out)
@@ -24,7 +25,7 @@ func TestRedactText_PhoneInText(t *testing.T) {
 }
 
 func TestRedactText_PhoneWithExtension(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Call (800) 555-1234 ext 5678", nil)
 	if strings.Contains(out, "555-1234") {
 		t.Fatalf("phone with ext should be redacted: %q", out)
@@ -32,7 +33,7 @@ func TestRedactText_PhoneWithExtension(t *testing.T) {
 }
 
 func TestRedactText_SSN_Formatted(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("SSN is 123-45-6789", nil)
 	if strings.Contains(out, "123-45-6789") {
 		t.Fatalf("formatted SSN should be redacted: %q", out)
@@ -40,7 +41,7 @@ func TestRedactText_SSN_Formatted(t *testing.T) {
 }
 
 func TestRedactText_SSN_ContextTriggered(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Social security number: 123456789", nil)
 	if strings.Contains(out, "123456789") {
 		t.Fatalf("SSN with context should be redacted: %q", out)
@@ -48,7 +49,7 @@ func TestRedactText_SSN_ContextTriggered(t *testing.T) {
 }
 
 func TestRedactText_CreditCard(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Card: 4111-1111-1111-1111", nil)
 	if strings.Contains(out, "4111-1111-1111-1111") {
 		t.Fatalf("credit card should be redacted: %q", out)
@@ -56,7 +57,7 @@ func TestRedactText_CreditCard(t *testing.T) {
 }
 
 func TestRedactText_IPv4(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Server at 192.168.1.100 is down", nil)
 	if strings.Contains(out, "192.168.1.100") {
 		t.Fatalf("IPv4 should be redacted: %q", out)
@@ -64,7 +65,7 @@ func TestRedactText_IPv4(t *testing.T) {
 }
 
 func TestRedactText_MAC(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Device MAC: AA:BB:CC:DD:EE:FF", nil)
 	if strings.Contains(out, "AA:BB:CC:DD:EE:FF") {
 		t.Fatalf("MAC should be redacted: %q", out)
@@ -72,7 +73,7 @@ func TestRedactText_MAC(t *testing.T) {
 }
 
 func TestRedactText_URL(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Visit https://example.com/account/settings for details", nil)
 	if strings.Contains(out, "https://example.com") {
 		t.Fatalf("URL should be redacted: %q", out)
@@ -80,7 +81,7 @@ func TestRedactText_URL(t *testing.T) {
 }
 
 func TestRedactText_Address(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Located at 123 Main Street", nil)
 	if strings.Contains(out, "123 Main Street") {
 		t.Fatalf("address should be redacted: %q", out)
@@ -88,7 +89,7 @@ func TestRedactText_Address(t *testing.T) {
 }
 
 func TestRedactText_POBox(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	out := e.RedactText("Send to P.O. Box 1234", nil)
 	if strings.Contains(out, "P.O. Box 1234") {
 		t.Fatalf("PO Box should be redacted: %q", out)
@@ -96,10 +97,24 @@ func TestRedactText_POBox(t *testing.T) {
 }
 
 func TestRedactText_ZipCode(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
-	out := e.RedactText("Zip code is 90210-1234", nil)
-	if strings.Contains(out, "90210-1234") {
-		t.Fatalf("zip code should be redacted: %q", out)
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
+	for _, text := range []string{
+		"Zip code is 90210",
+		"Zip code is 90210-1234",
+		"Send to P.O. Box 1234, 90210",
+	} {
+		out := e.RedactText(text, nil)
+		if strings.Contains(out, "90210") {
+			t.Fatalf("zip code should be redacted: %q", out)
+		}
+	}
+}
+
+func TestRedactText_FiveDigitOperationalNumberIsPreserved(t *testing.T) {
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
+	text := "Order 12345 is ready for dispatch"
+	if out := e.RedactText(text, nil); out != text {
+		t.Fatalf("operational number should not be treated as a ZIP code: %q", out)
 	}
 }
 
@@ -110,10 +125,53 @@ func TestRedactText_MultipleNERSpans(t *testing.T) {
 		NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.95},
 		NameSpan{Text: "Bob Jones", Start: 16, End: 25, Score: 0.90},
 	)
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	out := e.RedactText("Alice Smith met Bob Jones today", nil)
 	if strings.Contains(out, "Alice Smith") || strings.Contains(out, "Bob Jones") {
 		t.Fatalf("both NER names should be redacted: %q", out)
+	}
+}
+
+func TestRedactText_OverlappingNERSpansCoverUnion(t *testing.T) {
+	d := nerWith(
+		NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.95},
+		NameSpan{Text: "Smith-Jones", Start: 6, End: 17, Score: 0.90},
+	)
+	e := mustTestEngine(ModeAll, "", WithNER(d))
+	out := e.RedactText("Alice Smith-Jones replied", nil)
+	if strings.Contains(out, "Alice") || strings.Contains(out, "Smith") || strings.Contains(out, "Jones") {
+		t.Fatalf("overlapping NER spans should redact their full union: %q", out)
+	}
+}
+
+func TestPIIRegression_Critical04_NERNamesWithUnicodeBoundariesAreRedacted(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		pii  string
+	}{
+		{name: "Arabic", text: "تواصل مع أحمد علي اليوم", pii: "أحمد علي"},
+		{name: "Chinese", text: "客户张伟需要帮助", pii: "张伟"},
+		{name: "accented Latin", text: "Élodie Martin requested help", pii: "Élodie Martin"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			start := strings.Index(tt.text, tt.pii)
+			d := nerWith(NameSpan{
+				Text:  tt.pii,
+				Start: start,
+				End:   start + len(tt.pii),
+				Score: 0.99,
+			})
+			e := mustTestEngine(ModeAll, "", WithNER(d))
+
+			out := e.RedactText(tt.text, nil)
+			if strings.Contains(out, tt.pii) {
+				t.Fatalf("Unicode name %q should be redacted, got %q", tt.pii, out)
+			}
+		})
 	}
 }
 
@@ -121,7 +179,7 @@ func TestRedactText_NERAndKnownOverlap(t *testing.T) {
 	// NER detects "Alice Smith", known identity also has Alice Smith
 	// Should not double-redact
 	d := nerWith(NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.95})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	out := e.RedactText("Alice Smith sent a message", []KnownIdentity{{
 		Type:  "customer",
 		First: "Alice",
@@ -140,7 +198,7 @@ func TestRedactText_NERSpanContainsKnownWord(t *testing.T) {
 	// NER detects "Alice Johnson" but known identity has "Alice Smith"
 	// "Alice" is in inserted set, so NER span should be skipped
 	d := nerWith(NameSpan{Text: "Alice Johnson", Start: 0, End: 13, Score: 0.90})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	out := e.RedactText("Alice Johnson wrote a letter", []KnownIdentity{{
 		Type:  "customer",
 		First: "Alice",
@@ -155,7 +213,7 @@ func TestRedactText_NERSpanContainsKnownWord(t *testing.T) {
 func TestRedactText_NERWithRegexSweep(t *testing.T) {
 	// Both a name and an email in the same text
 	d := nerWith(NameSpan{Text: "John Williams", Start: 8, End: 21, Score: 0.95})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	out := e.RedactText("Contact John Williams at john@example.com for help", nil)
 	if strings.Contains(out, "John Williams") {
 		t.Fatalf("NER name should be redacted: %q", out)
@@ -166,7 +224,7 @@ func TestRedactText_NERWithRegexSweep(t *testing.T) {
 }
 
 func TestRedactText_ModeCustomers_RedactsCustomer(t *testing.T) {
-	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	e := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	out := e.RedactText("Hello Alice", []KnownIdentity{{
 		Type:  "customer",
 		First: "Alice",
@@ -179,7 +237,7 @@ func TestRedactText_ModeCustomers_RedactsCustomer(t *testing.T) {
 }
 
 func TestRedactText_ModeCustomers_ProtectsUserNames(t *testing.T) {
-	e := NewEngine(ModeCustomers, "", WithNER(noNER()))
+	e := mustTestEngine(ModeCustomers, "", WithNER(noNER()))
 	known := []KnownIdentity{
 		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
 		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
@@ -200,7 +258,7 @@ func TestRedactText_ModeCustomers_NERProtectsUserNames(t *testing.T) {
 		NameSpan{Text: "Brenda Torres", Start: 0, End: 13, Score: 0.95},
 		NameSpan{Text: "Alice Smith", Start: 22, End: 33, Score: 0.93},
 	)
-	e := NewEngine(ModeCustomers, "", WithNER(d))
+	e := mustTestEngine(ModeCustomers, "", WithNER(d))
 	known := []KnownIdentity{
 		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
 		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
@@ -218,7 +276,7 @@ func TestRedactText_ModeAll_RedactsBothTypes(t *testing.T) {
 	d := nerWith(
 		NameSpan{Text: "Brenda Torres", Start: 0, End: 13, Score: 0.95},
 	)
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	known := []KnownIdentity{
 		{Type: "customer", First: "Alice", Last: "Smith", Email: "alice@example.com"},
 		{Type: "user", First: "Brenda", Last: "Torres", Email: "brenda@company.com"},
@@ -234,7 +292,7 @@ func TestRedactText_ModeAll_RedactsBothTypes(t *testing.T) {
 
 func TestRedactText_MixedPIITypes(t *testing.T) {
 	d := nerWith(NameSpan{Text: "Alice Smith", Start: 0, End: 11, Score: 0.92})
-	e := NewEngine(ModeAll, "", WithNER(d))
+	e := mustTestEngine(ModeAll, "", WithNER(d))
 	text := "Alice Smith, email: alice@example.com, phone: 555-123-4567, SSN: 123-45-6789"
 	out := e.RedactText(text, nil)
 	if strings.Contains(out, "Alice Smith") {
@@ -252,7 +310,7 @@ func TestRedactText_MixedPIITypes(t *testing.T) {
 }
 
 func TestRedactText_PlainTextNoNames(t *testing.T) {
-	e := NewEngine(ModeAll, "", WithNER(noNER()))
+	e := mustTestEngine(ModeAll, "", WithNER(noNER()))
 	// Text with no PII should pass through mostly unchanged
 	text := "The weather is nice today"
 	out := e.RedactText(text, nil)
@@ -261,12 +319,32 @@ func TestRedactText_PlainTextNoNames(t *testing.T) {
 	}
 }
 
+type failingNameDetector struct{}
+
+func (failingNameDetector) DetectNames(string) ([]NameSpan, error) {
+	return nil, errors.New("inference failed")
+}
+
+func TestRedactText_NERFailureFailsClosed(t *testing.T) {
+	e := mustTestEngine(ModeAll, "", WithNER(failingNameDetector{}))
+	if out := e.RedactText("Alice Smith needs help", nil); out != RedactTextNotice {
+		t.Fatalf("detector failure must hide the field, got %q", out)
+	}
+}
+
+func TestPIIRegression_High07_UnusableRuntimeKeepsFreeTextFailClosed(t *testing.T) {
+	e := mustTestEngine(ModeAll, "")
+	if out := e.RedactText("Alice Smith needs help", nil); out != RedactTextNotice {
+		t.Fatalf("engine without a usable runtime emitted free-form text: %q", out)
+	}
+}
+
 func TestRedactText_NERDeterministicAcrossEngines(t *testing.T) {
 	// Same secret, same NER spans → same output
 	d1 := nerWith(NameSpan{Text: "John Doe", Start: 0, End: 8, Score: 0.95})
 	d2 := nerWith(NameSpan{Text: "John Doe", Start: 0, End: 8, Score: 0.95})
-	e1 := NewEngine(ModeAll, "same-secret", WithNER(d1))
-	e2 := NewEngine(ModeAll, "same-secret", WithNER(d2))
+	e1 := mustTestEngine(ModeAll, "same-secret", WithNER(d1))
+	e2 := mustTestEngine(ModeAll, "same-secret", WithNER(d2))
 	out1 := e1.RedactText("John Doe is here", nil)
 	out2 := e2.RedactText("John Doe is here", nil)
 	if out1 != out2 {

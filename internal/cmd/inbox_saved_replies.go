@@ -36,16 +36,16 @@ func newSavedRepliesCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "savedReplies", "saved-replies")
 			if err != nil {
 				if isJSON() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
 				return err
 			}
 
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items))
 				}
-				return output.PrintRaw(mustMarshal(cleanRawItems(items, cleanSavedReply)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanSavedReply)))
 			}
 
 			replies := make([]types.SavedReply, 0, len(items))
@@ -69,6 +69,7 @@ func newSavedRepliesCmd() *cobra.Command {
 	}
 	listCmd.Flags().String("mailbox-id", "", "filter by mailbox ID")
 	listCmd.Flags().String("query", "", "search query")
+	markProtectedFlags(listCmd, "query")
 
 	getCmd := &cobra.Command{
 		Use:   "get <id>",
@@ -81,9 +82,9 @@ func newSavedRepliesCmd() *cobra.Command {
 			}
 			if isJSON() {
 				if !isJSONClean() {
-					return output.PrintRaw(data)
+					return printRawWithPII(data)
 				}
-				return output.PrintRaw(mustMarshal(cleanRawObject(data, cleanSavedReply)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanSavedReply)))
 			}
 
 			var r types.SavedReply
@@ -176,6 +177,7 @@ func savedReplyCreateUpdateFlags(cmd *cobra.Command) {
 	cmd.Flags().String("body", "", "saved reply body text")
 	cmd.Flags().Bool("private", false, "mark saved reply as private")
 	cmd.Flags().String("json", "", "full request body as JSON object")
+	markProtectedFlags(cmd, "name", "subject", "body", "json")
 }
 
 func savedReplyBodyFromFlags(cmd *cobra.Command, isCreate bool) (map[string]any, error) {

@@ -21,7 +21,7 @@ func TestCustomerPropertiesList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "properties", "customers", "list"})
+	setRootArgs(t, []string{"inbox", "properties", "customers", "list"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Tier")
 }
@@ -36,7 +36,7 @@ func TestCustomerPropertiesGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "properties", "customers", "get", "1"})
+	setRootArgs(t, []string{"inbox", "properties", "customers", "get", "1"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "text")
 }
@@ -50,7 +50,7 @@ func TestConversationPropertiesList(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "properties", "conversations", "list"})
+	setRootArgs(t, []string{"inbox", "properties", "conversations", "list"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Priority")
 }
@@ -65,7 +65,7 @@ func TestConversationPropertiesGet(t *testing.T) {
 	buf := setupTest(mock)
 	defer func() { output.Out = os.Stdout }()
 
-	rootCmd.SetArgs([]string{"inbox", "properties", "conversations", "get", "2"})
+	setRootArgs(t, []string{"inbox", "properties", "conversations", "get", "2"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "select")
 }

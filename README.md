@@ -37,6 +37,49 @@ go build -o build/hs ./cmd/hs
 
 ## Quick start
 
+### Protected command input
+
+Values such as customer emails, search queries, message bodies, authored Docs
+content, credential secrets, and local upload paths must not be typed on the
+command line. Direct use is rejected, and flags marked `protected input only`
+in `--help` must be supplied in a schema-versioned JSON envelope over stdin or
+through a private regular file. To keep values out of shell history, start the
+command first and only then paste the envelope—do not embed it in a shell
+pipeline:
+
+```bash
+hs --protected-input - inbox conversations threads reply 67890
+```
+
+Then paste the envelope into its stdin and signal EOF (`Ctrl-D` on Unix;
+`Ctrl-Z`, then Enter, in a Windows terminal):
+
+```json
+{
+  "schema": 1,
+  "command": ["inbox", "conversations", "threads", "reply"],
+  "flags": {
+    "customer": "user@example.com",
+    "body": "Thanks for reaching out!"
+  }
+}
+```
+
+The `command` array must match the invoked command exactly. `flags` accepts
+string and string-array values. Protected files are limited to 4 MiB, must be
+regular files, and on Unix must not be accessible to group or other users:
+
+```bash
+chmod 600 request.json
+hs --protected-input request.json inbox conversations threads reply 67890
+```
+
+On Windows, prefer stdin or restrict the file ACL yourself; the CLI can verify
+the regular file type but cannot infer privacy from Go's portable mode bits.
+
+MCP performs this transport automatically. Its child argv and rendered command
+errors contain placeholders, never the supplied protected values.
+
 ### Inbox API (conversations, customers, mailboxes, etc.)
 
 ```bash
@@ -46,24 +89,14 @@ hs inbox auth login
 # List conversations
 hs inbox conversations list
 
-# Filter by status, mailbox, tag, search
+# Filter by status, mailbox, and tag
 hs inbox conversations list --status pending --mailbox 12345
-hs inbox conversations list --query "billing issue"
 
 # Get a conversation with threads
 hs inbox conversations get 67890 --embed threads
 
-# Reply to a conversation
-hs inbox conversations threads reply 67890 --customer user@example.com --body "Thanks for reaching out!"
-
-# Add an internal note
-hs inbox conversations threads note 67890 --body "Escalated to engineering"
-
-# Create a conversation
-hs inbox conversations create --mailbox 12345 --subject "New issue" --customer user@example.com --body "Details here"
-
 # List customers, users, tags
-hs inbox customers list --query "alice@example.com"
+hs inbox customers list
 hs inbox users list
 hs inbox tags list
 
@@ -81,7 +114,6 @@ hs inbox workflows run 33333 --conversation-ids 100,200,300
 
 # Webhooks
 hs inbox webhooks list
-hs inbox webhooks create --url https://example.com/hook --events "convo.created" --secret my-secret
 ```
 
 See [full Inbox API reference](docs/inbox-api.md) for all commands, flags, and options.
@@ -96,26 +128,15 @@ hs docs auth login
 hs docs sites list
 hs docs collections list --site <site-id>
 
-# List and search articles
+# List articles
 hs docs articles list --collection <collection-id>
-hs docs articles search --query "password reset"
 
 # Get article details (including draft version)
 hs docs articles get <id>
 hs docs articles get <id> --draft
 
-# Create an article
-hs docs articles create --collection <id> --name "Getting Started" --text "<p>Welcome...</p>"
-
 # Manage categories
 hs docs categories list <collection-id>
-hs docs categories create --collection <id> --name "FAQs"
-
-# Redirects
-hs docs redirects create --site <id> --url-mapping /old --redirect /new
-
-# Upload assets
-hs docs assets article upload --file ./screenshot.png
 ```
 
 See [full Docs API reference](docs/docs-api.md) for all commands, flags, and options.
@@ -173,9 +194,10 @@ hs inbox conversations list --no-paginate            # fetch all pages
 
 ```bash
 # Set config values
-hs inbox config set --inbox-app-id xxx --inbox-app-secret yyy
+hs inbox config set --inbox-app-id xxx
 hs inbox config set --inbox-default-mailbox 12345 --format json
-hs inbox config set --docs-api-key your-docs-key
+
+# Use auth login prompts or the protected-input envelope for credential values.
 
 # View config
 hs inbox config get
@@ -196,7 +218,8 @@ Config file: `~/.config/hs/config.yaml` (Linux/macOS) or `%APPDATA%\helpscout\co
 | `HS_FORMAT` | Output format |
 | `HS_INBOX_PII_MODE` | PII redaction mode: `off`, `customers`, `all` |
 | `HS_INBOX_PII_ALLOW_UNREDACTED` | Allow `--unredacted` bypass |
-| `HS_INBOX_PII_SECRET` | Secret salt for deterministic pseudonyms |
+| `HS_INBOX_PII_SECRET` | Optional explicit private HMAC key; requires `HS_INBOX_PII_KEY_ID` |
+| `HS_INBOX_PII_KEY_ID` | Public rotation ID paired with an explicit PII secret |
 | `HS_INBOX_PERMISSIONS` | Inbox permission policy |
 | `HS_DOCS_PERMISSIONS` | Docs permission policy |
 | `HS_NO_UPDATE_CHECK` | Disable daily update check (`1`) |
@@ -233,6 +256,17 @@ Tool names are namespaced (e.g. `helpscout_inbox_conversations_list`). Default o
 
 hs-cli includes an ML-powered PII redaction system designed for shared terminals, MCP/LLM workflows, and incident-safe exports.
 
+Maintainers should treat the
+[PII redaction hardening contract](docs/pii-redaction-hardening-contract.md)
+as the normative checklist for all 14 completed security and privacy findings.
+The [OpenAI Privacy Filter evaluation](docs/openai-privacy-filter-evaluation.md)
+documents the candidate model's coverage gains, footprint and runtime trade-offs,
+and the gated path recommended before any detector migration.
+The accompanying
+[single-detector migration plan](docs/openai-privacy-filter-migration-plan.md)
+defines the phased implementation, permanent regression and performance tests,
+objective pass/fail gates, preview, rollback, and eventual DistilBERT retirement.
+
 ### Why this matters
 
 Traditional redaction tools either hide entire blocks of content (destroying context) or rely on brittle regex patterns that miss real names. hs-cli takes a different approach:
@@ -253,11 +287,20 @@ Redaction is applied in layered stages:
 
 ### Deterministic anonymization — no PII stored
 
-Fake names are **computed, not stored**. The CLI never writes a mapping of real identities to fake ones — not to disk, not to a database, nowhere. Each time you run a command, fake names are derived on-the-fly from the original using a one-way hash. Because the hash is deterministic, the same real identity always produces the same fake name across commands and sessions — so you can follow conversations and cross-reference outputs naturally, without any PII being persisted.
+Fake names are **computed, not stored**. The CLI never writes a mapping of real identities to fake ones — not to disk, not to a database, nowhere. Each time you run a command, fake names are derived on-the-fly with keyed HMAC. Because the derivation is deterministic, the same real identity produces the same fake name across commands and sessions — so you can follow conversations and cross-reference outputs naturally, without any PII mapping being persisted. Display names include a short deterministic disambiguator and the public key ID so distinct people and secret rotations remain visually distinguishable; generated emails retain their established deterministic format.
 
 When the command finishes, all in-memory mappings are discarded.
 
-Setting `HS_INBOX_PII_SECRET` (optional) adds a secret salt to the hash, making fake names unique to your environment and harder to reverse-engineer.
+When neither key variable is set, the CLI generates a private 32-byte secret and
+an independent public key ID, then stores the versioned record in the OS
+keyring. Existing raw secret records are migrated under the initialization lock
+without changing the secret bytes. For an explicit cross-machine identity
+domain, set both `HS_INBOX_PII_SECRET` and `HS_INBOX_PII_KEY_ID`; the key ID is
+normalized to lowercase and must contain 1–32 letters, numbers, `.`, `_`, or
+`-`. Keep both stable for
+deterministic display identities, and change both intentionally during a
+rotation. The public ID is supplied independently and is never derived from the
+secret.
 
 ### NER model management
 
@@ -269,7 +312,9 @@ hs pii-model status      # check install status
 hs pii-model uninstall   # remove the model from disk
 ```
 
-The model supports Linux (amd64/arm64), macOS (amd64/arm64), and Windows (amd64/arm64).
+The model runtime currently supports Linux (amd64/arm64) and macOS
+(amd64/arm64). Windows keeps free-form content fail-closed until a native
+runtime/model smoke test is available.
 
 ### Quick start
 

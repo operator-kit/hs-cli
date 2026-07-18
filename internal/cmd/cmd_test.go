@@ -7,8 +7,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +19,99 @@ import (
 	"github.com/operator-kit/hs-cli/internal/output"
 	"github.com/operator-kit/hs-cli/internal/selfupdate"
 )
+
+// setRootArgs lets command tests describe ordinary CLI inputs while exercising
+// the same protected transport required from real callers. Values never enter
+// the argv passed to Cobra when their flag is annotated as protected.
+func setRootArgs(t *testing.T, args []string) {
+	t.Helper()
+	resetChangedFlags(rootCmd)
+	protectedInputPath = ""
+
+	command := testCommandForArgs(rootCmd, args)
+	protected := make(map[string]any)
+	safeArgs := make([]string, 0, len(args)+2)
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if !strings.HasPrefix(arg, "--") {
+			safeArgs = append(safeArgs, arg)
+			continue
+		}
+
+		nameValue := strings.TrimPrefix(arg, "--")
+		name, value, inline := strings.Cut(nameValue, "=")
+		flag := lookupCommandFlag(command, name)
+		if flag == nil || flag.Annotations == nil {
+			safeArgs = append(safeArgs, arg)
+			continue
+		}
+		if _, isProtected := flag.Annotations[protectedFlagAnnotation]; !isProtected {
+			safeArgs = append(safeArgs, arg)
+			continue
+		}
+		if !inline {
+			if index+1 >= len(args) {
+				t.Fatalf("test protected flag --%s has no value", name)
+			}
+			index++
+			value = args[index]
+		}
+
+		switch flag.Value.Type() {
+		case "stringSlice":
+			values, _ := protected[name].([]string)
+			values = append(values, strings.Split(value, ",")...)
+			protected[name] = values
+		case "stringArray":
+			values, _ := protected[name].([]string)
+			protected[name] = append(values, value)
+		default:
+			protected[name] = value
+		}
+	}
+
+	if len(protected) > 0 {
+		envelope := protectedInputEnvelope{
+			Schema:  protectedInputSchema,
+			Command: commandPathSegments(command),
+			Flags:   make(map[string]json.RawMessage, len(protected)),
+		}
+		for name, value := range protected {
+			raw, err := json.Marshal(value)
+			require.NoError(t, err)
+			envelope.Flags[name] = raw
+		}
+		raw, err := json.Marshal(envelope)
+		require.NoError(t, err)
+		rootCmd.SetIn(bytes.NewReader(raw))
+		safeArgs = append([]string{"--" + protectedInputFlagName, "-"}, safeArgs...)
+	}
+	rootCmd.SetArgs(safeArgs)
+}
+
+func testCommandForArgs(root *cobra.Command, args []string) *cobra.Command {
+	current := root
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		for _, child := range current.Commands() {
+			if child.Name() == arg || child.HasAlias(arg) {
+				current = child
+				break
+			}
+		}
+	}
+	return current
+}
+
+func resetChangedFlags(command *cobra.Command) {
+	command.Flags().VisitAll(func(flag *pflag.Flag) { flag.Changed = false })
+	command.PersistentFlags().VisitAll(func(flag *pflag.Flag) { flag.Changed = false })
+	for _, child := range command.Commands() {
+		resetChangedFlags(child)
+	}
+}
 
 // isolateHome creates a sandboxed home directory so E2E tests don't touch
 // the real config, keyring, or shell rc files.
@@ -57,8 +152,15 @@ func saveRestore(t *testing.T) {
 	origSetFormat := setFormat
 	origSetPIIMode := setInboxPIIMode
 	origSetPIIAllowRaw := setInboxPIIAllow
+	origResolvePIIContext := resolvePIIContext
+	origInvocationPIIPrepared := invocationPIIPrepared
+	origInvocationPIIMode := invocationPIIMode
+	origInvocationPIIContext := invocationPIIContext
+	origInvocationProtectedValues := append([]string(nil), invocationProtectedValues...)
 
 	selfupdate.DirOverride = t.TempDir()
+	versionStr = "dev"
+	resetPIIInvocation()
 
 	t.Cleanup(func() {
 		cfg = origCfg
@@ -79,6 +181,11 @@ func saveRestore(t *testing.T) {
 		setFormat = origSetFormat
 		setInboxPIIMode = origSetPIIMode
 		setInboxPIIAllow = origSetPIIAllowRaw
+		resolvePIIContext = origResolvePIIContext
+		invocationPIIPrepared = origInvocationPIIPrepared
+		invocationPIIMode = origInvocationPIIMode
+		invocationPIIContext = origInvocationPIIContext
+		invocationProtectedValues = origInvocationProtectedValues
 		configSetCmd.Flags().VisitAll(func(f *pflag.Flag) {
 			f.Changed = false
 		})
@@ -91,6 +198,7 @@ func setupE2E(t *testing.T) (home string, buf *bytes.Buffer) {
 	t.Helper()
 	home = isolateHome(t)
 	saveRestore(t)
+	useTestPIISecretResolver()
 
 	// Prevent update check from hitting the network
 	versionStr = "dev"
@@ -112,7 +220,7 @@ func TestVersionCmd(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"version"})
+	setRootArgs(t, []string{"version"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "1.0.0")
@@ -126,7 +234,7 @@ func TestUpdateCmd_DevBuild(t *testing.T) {
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"update"})
+	setRootArgs(t, []string{"update"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Skipping update: running dev build")
@@ -141,7 +249,7 @@ func TestAuthStatus_NotAuthenticated_E2E(t *testing.T) {
 	t.Setenv("HS_INBOX_APP_ID", "")
 	t.Setenv("HS_INBOX_APP_SECRET", "")
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "status"})
+	setRootArgs(t, []string{"inbox", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Not authenticated")
@@ -161,7 +269,7 @@ func TestAuthStatus_WithConfigCreds_E2E(t *testing.T) {
 	}))
 	cfgPath = cfgFile
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "status"})
+	setRootArgs(t, []string{"inbox", "auth", "status"})
 	require.NoError(t, rootCmd.Execute())
 	assert.Contains(t, buf.String(), "Authenticated")
 }
@@ -169,7 +277,7 @@ func TestAuthStatus_WithConfigCreds_E2E(t *testing.T) {
 func TestAuthLogout_E2E(t *testing.T) {
 	_, buf := setupE2E(t)
 
-	rootCmd.SetArgs([]string{"inbox", "auth", "logout"})
+	setRootArgs(t, []string{"inbox", "auth", "logout"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Credentials removed")
@@ -196,10 +304,10 @@ func TestConfigFile_E2E(t *testing.T) {
 	// Write config
 	cfgFile := filepath.Join(home, ".config", "hs", "config.yaml")
 	require.NoError(t, config.Save(cfgFile, &config.Config{
-		InboxAppID:       "file-id",
-		InboxAppSecret:   "file-secret",
+		InboxAppID:          "file-id",
+		InboxAppSecret:      "file-secret",
 		InboxDefaultMailbox: 12345,
-		Format:         "json",
+		Format:              "json",
 	}))
 
 	// Clear env vars so config file is used
@@ -223,7 +331,7 @@ func TestEnvOverridesConfig_E2E(t *testing.T) {
 	require.NoError(t, config.Save(cfgFile, &config.Config{
 		InboxAppID:     "file-id",
 		InboxAppSecret: "file-secret",
-		Format:       "table",
+		Format:         "table",
 	}))
 
 	// Env vars override
@@ -253,7 +361,7 @@ func TestCommandWithEnvCreds_E2E(t *testing.T) {
 	format = "table"
 	t.Cleanup(func() { output.Out = os.Stdout })
 
-	rootCmd.SetArgs([]string{"inbox", "mailboxes", "list"})
+	setRootArgs(t, []string{"inbox", "mailboxes", "list"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Support")

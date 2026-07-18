@@ -1,0 +1,306 @@
+{
+  "schema": 1,
+  "partition": "obfuscated-messy-pii",
+  "cases": [
+    {
+      "id": "messy-bracketed-email",
+      "language": "en",
+      "script": "Latin",
+      "shape": "markdown",
+      "risk": "high",
+      "reason": "A bracketed-at and bracketed-dot private email remains private.",
+      "text": "Reply to fixture.person [at] example [dot] invalid about the request.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "obfuscated-email",
+          "kind": "email",
+          "start": 9,
+          "end": 50,
+          "value": "fixture.person [at] example [dot] invalid",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "fixture.person [at] example [dot] invalid"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "fixture.person [at] example [dot] invalid"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "fixture.person [at] example [dot] invalid"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "messy",
+        "obfuscated",
+        "email"
+      ]
+    },
+    {
+      "id": "messy-phone-words",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A private phone written partly as words must be covered contextually.",
+      "text": "Her private phone is five five five, one two three, four five six seven.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "word-phone",
+          "kind": "phone",
+          "start": 21,
+          "end": 71,
+          "value": "five five five, one two three, four five six seven",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "five five five, one two three, four five six seven"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "five five five, one two three, four five six seven"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "five five five, one two three, four five six seven"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "messy",
+        "obfuscated",
+        "phone"
+      ]
+    },
+    {
+      "id": "messy-line-broken-address",
+      "language": "en",
+      "script": "Latin",
+      "shape": "html",
+      "risk": "high",
+      "reason": "A private address split by markup and a line break must be covered.",
+      "text": "Address: <span>77 Example</span>\nLane, Fixture City",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "split-address",
+          "kind": "address",
+          "start": 15,
+          "end": 51,
+          "value": "77 Example</span>\nLane, Fixture City",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "77 Example</span>\nLane, Fixture City"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "77 Example</span>\nLane, Fixture City"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "77 Example</span>\nLane, Fixture City"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "messy",
+        "line-break",
+        "address"
+      ]
+    },
+    {
+      "id": "messy-unicode-handle",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A person-identifying handle with Unicode punctuation remains private.",
+      "text": "The customer's developer handle is @fixture‐développeur.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "unicode-handle",
+          "kind": "person",
+          "start": 35,
+          "end": 58,
+          "value": "@fixture‐développeur",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "@fixture‐développeur"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "@fixture‐développeur"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "@fixture‐développeur"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "messy",
+        "unicode",
+        "person"
+      ]
+    },
+    {
+      "id": "messy-semver-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "code",
+      "risk": "preservation",
+      "reason": "A semantic version is operational text, not an account identifier.",
+      "text": "require example/module v2.17.4-example",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "semantic-version",
+          "kind": "account_number",
+          "start": 23,
+          "end": 38,
+          "value": "v2.17.4-example",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "v2.17.4-example"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "v2.17.4-example"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "v2.17.4-example"
+          ]
+        }
+      },
+      "tags": [
+        "messy",
+        "version",
+        "preservation"
+      ]
+    },
+    {
+      "id": "messy-placeholder-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "shell",
+      "risk": "preservation",
+      "reason": "A clearly marked shell placeholder should remain readable.",
+      "text": "export CUSTOMER_ID=EXAMPLE_CUSTOMER_ID_PLACEHOLDER",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "placeholder-id",
+          "kind": "account_number",
+          "start": 19,
+          "end": 50,
+          "value": "EXAMPLE_CUSTOMER_ID_PLACEHOLDER",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE_CUSTOMER_ID_PLACEHOLDER"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE_CUSTOMER_ID_PLACEHOLDER"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE_CUSTOMER_ID_PLACEHOLDER"
+          ]
+        }
+      },
+      "tags": [
+        "messy",
+        "placeholder",
+        "preservation"
+      ]
+    }
+  ]
+}

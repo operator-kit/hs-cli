@@ -1,35 +1,59 @@
 package ner
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"crypto/sha256"
-	"encoding/hex"
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
+const (
+	readyMarkerName    = ".ready.json"
+	readyMarkerSchema  = 1
+	maxReadyMarkerSize = 8 * 1024
+)
+
 // Paths holds resolved file paths for the model bundle.
 type Paths struct {
-	RuntimeLib    string // platform-specific ONNX Runtime shared lib
-	ModelONNX     string // model_quantized.onnx
-	TokenizerJSON string // tokenizer.json
-	ConfigJSON    string // config.json
+	RuntimeLib    string
+	ModelONNX     string
+	TokenizerJSON string
+	ConfigJSON    string
 }
 
-// baseURL is the GitHub release download URL template.
-const baseURL = "https://github.com/operator-kit/hs-cli/releases/download/pii-model-v%s/pii-model-%s-%s-%s.tar.gz"
+type ModelState string
 
-// ProgressFunc reports download progress (bytesRead, totalBytes).
-// totalBytes may be -1 if unknown.
+const (
+	ModelUnsupported         ModelState = "unsupported"
+	ModelAbsent              ModelState = "absent"
+	ModelInstalledUnverified ModelState = "installed-unverified"
+	ModelCorrupt             ModelState = "corrupt"
+	ModelReady               ModelState = "ready"
+)
+
+type ModelStatus struct {
+	State    ModelState
+	Platform Platform
+	Dir      string
+	Present  bool
+	Reason   string
+}
+
+// Usable is deliberately strict: only a manifest-verified, smoke-tested bundle
+// may be attached to the redaction engine.
+func (s ModelStatus) Usable() bool {
+	return s.State == ModelReady
+}
+
+// ProgressFunc reports verified download progress. totalBytes is always the
+// exact trusted archive size.
 type ProgressFunc func(bytesRead, totalBytes int64)
 
-// CacheDir returns the OS-specific cache directory for the PII model.
 func CacheDir() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
@@ -48,7 +72,7 @@ func CacheDir() (string, error) {
 			dir = filepath.Join(home, "AppData", "Local")
 		}
 		return filepath.Join(dir, "hs", "pii-model"), nil
-	default: // linux, freebsd, etc
+	default:
 		dir := os.Getenv("XDG_CACHE_HOME")
 		if dir == "" {
 			home, err := os.UserHomeDir()
@@ -61,75 +85,170 @@ func CacheDir() (string, error) {
 	}
 }
 
-// IsModelReady checks whether the model bundle is present and matches
-// the expected version without downloading anything.
-func IsModelReady() bool {
+func Status() ModelStatus {
+	platform := CurrentPlatform()
 	dir, err := CacheDir()
 	if err != nil {
-		return false
+		return ModelStatus{State: ModelCorrupt, Platform: platform, Reason: err.Error()}
 	}
-	data, err := os.ReadFile(filepath.Join(dir, ".version"))
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(data)) == ModelVersion
+	return statusAt(dir, platform)
 }
 
-// ModelPaths returns resolved paths if the model is installed, or an error.
-func ModelPaths() (*Paths, error) {
-	dir, err := CacheDir()
+func statusAt(dir string, platform Platform) ModelStatus {
+	manifest, err := LoadTrustedManifest()
 	if err != nil {
-		return nil, err
+		return ModelStatus{
+			State:    ModelCorrupt,
+			Platform: platform,
+			Dir:      dir,
+			Reason:   err.Error(),
+		}
 	}
-	if !IsModelReady() {
-		return nil, fmt.Errorf("model not installed (run \"hs pii-model install\")")
+	return statusAtWithManifest(dir, platform, manifest)
+}
+
+func statusAtWithManifest(cacheRoot string, platform Platform, manifest TrustedManifest) ModelStatus {
+	status := ModelStatus{Platform: platform, Dir: cacheRoot}
+	if info, err := os.Stat(cacheRoot); err == nil && info.IsDir() {
+		status.Present = true
+	}
+	capability := RuntimeCapabilityFor(platform)
+	if !capability.Supported {
+		status.State = ModelUnsupported
+		status.Reason = capability.Reason
+		return status
+	}
+	bundle, err := manifest.BundleFor(platform)
+	if err != nil {
+		status.State = ModelCorrupt
+		status.Reason = err.Error()
+		return status
 	}
 
-	libName := runtimeLibName()
-	p := &Paths{
-		RuntimeLib:    filepath.Join(dir, libName),
+	trustedDir := trustedInstallDir(cacheRoot, platform, bundle)
+	if info, err := os.Lstat(trustedDir); err == nil {
+		status.Dir = trustedDir
+		status.Present = true
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			status.State = ModelCorrupt
+			status.Reason = "trusted install path is not a real directory"
+			return status
+		}
+		if reason := validateTrustedInstall(trustedDir, platform, bundle, manifest); reason != "" {
+			status.State = ModelCorrupt
+			status.Reason = reason
+			return status
+		}
+		status.State = ModelReady
+		return status
+	} else if !os.IsNotExist(err) {
+		status.State = ModelCorrupt
+		status.Reason = fmt.Sprintf("inspect trusted install: %v", err)
+		return status
+	}
+
+	version, err := os.ReadFile(filepath.Join(cacheRoot, ".version"))
+	if os.IsNotExist(err) {
+		status.State = ModelAbsent
+		return status
+	}
+	if err != nil {
+		status.State = ModelCorrupt
+		status.Reason = fmt.Sprintf("read legacy version marker: %v", err)
+		return status
+	}
+	if strings.TrimSpace(string(version)) != ModelVersion {
+		status.State = ModelCorrupt
+		status.Reason = "legacy model version does not match this hs version"
+		return status
+	}
+
+	legacyPaths := pathsAt(cacheRoot, platform)
+	for _, file := range []string{
+		legacyPaths.RuntimeLib,
+		legacyPaths.ModelONNX,
+		legacyPaths.TokenizerJSON,
+		legacyPaths.ConfigJSON,
+	} {
+		info, statErr := os.Lstat(file)
+		if statErr != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			status.State = ModelCorrupt
+			status.Reason = fmt.Sprintf("missing or invalid legacy model file %s", filepath.Base(file))
+			return status
+		}
+	}
+	status.State = ModelInstalledUnverified
+	status.Reason = "legacy installation is not verified against the trusted manifest; reinstall it before use"
+	return status
+}
+
+func validateTrustedInstall(
+	dir string,
+	platform Platform,
+	bundle BundleManifest,
+	manifest TrustedManifest,
+) string {
+	marker, err := readReadyMarker(filepath.Join(dir, readyMarkerName))
+	if err != nil {
+		return fmt.Sprintf("invalid ready marker: %v", err)
+	}
+	if marker.SchemaVersion != readyMarkerSchema ||
+		marker.ModelVersion != manifest.ModelVersion ||
+		marker.Platform != platform.Key() ||
+		marker.ArchiveSHA256 != bundle.Archive.SHA256 ||
+		marker.ManifestSHA256 != manifest.Fingerprint() {
+		return "ready marker does not match the trusted manifest"
+	}
+	for _, expected := range bundle.Files {
+		info, statErr := os.Lstat(filepath.Join(dir, expected.Name))
+		if statErr != nil || !info.Mode().IsRegular() || info.Size() != expected.Size {
+			return fmt.Sprintf("missing or invalid trusted model file %s", expected.Name)
+		}
+	}
+	return ""
+}
+
+func IsModelReady() bool {
+	return Status().State == ModelReady
+}
+
+func ModelPaths() (*Paths, error) {
+	status := Status()
+	if status.State != ModelReady {
+		if status.Reason != "" {
+			return nil, fmt.Errorf("PII model %s: %s", status.State, status.Reason)
+		}
+		return nil, fmt.Errorf("PII model %s (run \"hs pii-model install\")", status.State)
+	}
+	return pathsAt(status.Dir, status.Platform), nil
+}
+
+func pathsAt(dir string, platform Platform) *Paths {
+	return &Paths{
+		RuntimeLib:    filepath.Join(dir, runtimeLibNameFor(platform)),
 		ModelONNX:     filepath.Join(dir, "model_quantized.onnx"),
 		TokenizerJSON: filepath.Join(dir, "tokenizer.json"),
 		ConfigJSON:    filepath.Join(dir, "config.json"),
 	}
-
-	// Verify all files exist
-	for _, f := range []string{p.RuntimeLib, p.ModelONNX, p.TokenizerJSON, p.ConfigJSON} {
-		if _, err := os.Stat(f); err != nil {
-			return nil, fmt.Errorf("missing file %s: %w", filepath.Base(f), err)
-		}
-	}
-	return p, nil
 }
 
-// EnsureModel downloads and extracts the model bundle if not present.
 func EnsureModel(progress ProgressFunc) (*Paths, error) {
-	if IsModelReady() {
-		return ModelPaths()
-	}
+	return EnsureModelContext(context.Background(), progress)
+}
 
-	dir, err := CacheDir()
+func EnsureModelContext(ctx context.Context, progress ProgressFunc) (*Paths, error) {
+	cacheRoot, err := CacheDir()
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("creating cache dir: %w", err)
-	}
-
-	url := bundleURL()
-	if err := downloadAndExtract(url, dir, progress); err != nil {
-		return nil, fmt.Errorf("download: %w", err)
-	}
-
-	// Write version marker
-	if err := os.WriteFile(filepath.Join(dir, ".version"), []byte(ModelVersion), 0o644); err != nil {
+	manifest, err := LoadTrustedManifest()
+	if err != nil {
 		return nil, err
 	}
-
-	return ModelPaths()
+	installer := NewBundleInstaller(cacheRoot, CurrentPlatform(), manifest)
+	return installer.Install(ctx, progress)
 }
 
-// RemoveModel deletes the cached model bundle.
 func RemoveModel() error {
 	dir, err := CacheDir()
 	if err != nil {
@@ -138,12 +257,22 @@ func RemoveModel() error {
 	return os.RemoveAll(dir)
 }
 
-func bundleURL() string {
-	return fmt.Sprintf(baseURL, ModelVersion, ModelVersion, runtime.GOOS, runtime.GOARCH)
+func trustedInstallDir(cacheRoot string, platform Platform, bundle BundleManifest) string {
+	return filepath.Join(
+		cacheRoot,
+		"versions",
+		ModelVersion,
+		platform.Key(),
+		bundle.Archive.SHA256,
+	)
 }
 
 func runtimeLibName() string {
-	switch runtime.GOOS {
+	return runtimeLibNameFor(CurrentPlatform())
+}
+
+func runtimeLibNameFor(platform Platform) string {
+	switch platform.OS {
 	case "darwin":
 		return "libonnxruntime.dylib"
 	case "windows":
@@ -153,86 +282,78 @@ func runtimeLibName() string {
 	}
 }
 
-func downloadAndExtract(url, dir string, progress ProgressFunc) error {
-	resp, err := http.Get(url)
+type readyMarker struct {
+	SchemaVersion  int    `json:"schema_version"`
+	ModelVersion   string `json:"model_version"`
+	Platform       string `json:"platform"`
+	ArchiveSHA256  string `json:"archive_sha256"`
+	ManifestSHA256 string `json:"manifest_sha256"`
+}
+
+func writeReadyMarker(
+	dir string,
+	platform Platform,
+	bundle BundleManifest,
+	manifest TrustedManifest,
+) error {
+	marker := readyMarker{
+		SchemaVersion:  readyMarkerSchema,
+		ModelVersion:   manifest.ModelVersion,
+		Platform:       platform.Key(),
+		ArchiveSHA256:  bundle.Archive.SHA256,
+		ManifestSHA256: manifest.Fingerprint(),
+	}
+	data, err := json.MarshalIndent(marker, "", "  ")
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
-	}
-
-	var reader io.Reader = resp.Body
-	if progress != nil {
-		reader = &progressReader{r: resp.Body, total: resp.ContentLength, fn: progress}
-	}
-
-	// Stream through gzip → tar → extract
-	gz, err := gzip.NewReader(reader)
-	if err != nil {
-		return fmt.Errorf("gzip: %w", err)
-	}
-	defer gz.Close()
-
-	tr := tar.NewReader(gz)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("tar: %w", err)
-		}
-
-		// Security: prevent path traversal
-		name := filepath.Base(hdr.Name)
-		if name == "." || name == ".." || strings.Contains(hdr.Name, "..") {
-			continue
-		}
-
-		switch hdr.Typeflag {
-		case tar.TypeReg:
-			dst := filepath.Join(dir, name)
-			if err := extractFile(dst, tr, hdr.Mode); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func extractFile(dst string, r io.Reader, mode int64) error {
-	// Compute SHA-256 while writing
-	h := sha256.New()
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(mode)|0o644)
+	data = append(data, '\n')
+	file, err := os.OpenFile(
+		filepath.Join(dir, readyMarkerName),
+		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
+		0o600,
+	)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(io.MultiWriter(f, h), r); err != nil {
-		f.Close()
+	if written, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return err
+	} else if written != len(data) {
+		_ = file.Close()
+		return io.ErrShortWrite
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
 		return err
 	}
-	if err := f.Close(); err != nil {
-		return err
+	return file.Close()
+}
+
+func readReadyMarker(markerPath string) (readyMarker, error) {
+	info, err := os.Lstat(markerPath)
+	if err != nil {
+		return readyMarker{}, err
 	}
-
-	// Write sidecar hash file
-	hashHex := hex.EncodeToString(h.Sum(nil))
-	return os.WriteFile(dst+".sha256", []byte(hashHex), 0o644)
-}
-
-type progressReader struct {
-	r     io.Reader
-	read  int64
-	total int64
-	fn    ProgressFunc
-}
-
-func (p *progressReader) Read(buf []byte) (int, error) {
-	n, err := p.r.Read(buf)
-	p.read += int64(n)
-	p.fn(p.read, p.total)
-	return n, err
+	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxReadyMarkerSize {
+		return readyMarker{}, fmt.Errorf("marker is not a bounded regular file")
+	}
+	data, err := os.ReadFile(markerPath)
+	if err != nil {
+		return readyMarker{}, err
+	}
+	var marker readyMarker
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&marker); err != nil {
+		return readyMarker{}, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return readyMarker{}, fmt.Errorf("marker contains trailing JSON")
+		}
+		return readyMarker{}, err
+	}
+	return marker, nil
 }

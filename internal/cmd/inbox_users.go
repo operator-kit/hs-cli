@@ -24,6 +24,7 @@ func newUsersCmd() *cobra.Command {
 	permission.Annotate(listCmd, "users", permission.OpRead)
 	listCmd.Flags().String("email", "", "filter by email")
 	listCmd.Flags().String("mailbox", "", "filter by mailbox ID")
+	markProtectedFlags(listCmd, "email")
 
 	getCmd := usersGetCmd()
 	permission.Annotate(getCmd, "users", permission.OpRead)
@@ -66,9 +67,9 @@ func usersListCmd() *cobra.Command {
 					return err
 				}
 				if !isJSONClean() {
-					return printRawWithPII(mustMarshal(items))
+					return printRawWithPII(mustMarshal(items), userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawItems(items, cleanUser)), userPIIContext)
 			}
 
 			items, pageInfo, err := api.PaginateAll(ctx, apiClient.ListUsers, params, "users", noPaginate)
@@ -123,9 +124,9 @@ func usersGetCmd() *cobra.Command {
 
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)), userPIIContext)
 			}
 
 			var u types.User
@@ -161,9 +162,9 @@ func usersMeCmd() *cobra.Command {
 			}
 			if isJSON() {
 				if !isJSONClean() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
-				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)))
+				return printRawWithPII(mustMarshal(cleanRawObject(data, cleanUser)), userPIIContext)
 			}
 
 			var u types.User
@@ -215,12 +216,12 @@ func newUsersStatusCmd() *cobra.Command {
 			items, err := extractEmbeddedWithCandidates(data, "statuses", "userStatuses", "status")
 			if err != nil {
 				if isJSON() {
-					return printRawWithPII(data)
+					return printRawWithPII(data, userPIIContext)
 				}
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(mustMarshal(items))
+				return printRawWithPII(mustMarshal(items), userPIIContext)
 			}
 
 			rows := make([]map[string]string, len(items))
@@ -247,7 +248,7 @@ func newUsersStatusCmd() *cobra.Command {
 				return err
 			}
 			if isJSON() {
-				return printRawWithPII(data)
+				return printRawWithPII(data, userPIIContext)
 			}
 			return output.Print("table", []string{"user_id", "status"}, []map[string]string{{
 				"user_id": args[0],
@@ -287,6 +288,7 @@ func newUsersStatusCmd() *cobra.Command {
 	}
 	setCmd.Flags().String("status", "", "status value")
 	setCmd.Flags().String("json", "", "full status payload as JSON object")
+	markProtectedFlags(setCmd, "json")
 
 	permission.Annotate(listCmd, "users", permission.OpRead)
 	permission.Annotate(getCmd, "users", permission.OpRead)

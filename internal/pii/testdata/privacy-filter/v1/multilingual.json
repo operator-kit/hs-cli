@@ -1,0 +1,992 @@
+{
+  "schema": 1,
+  "partition": "multilingual",
+  "cases": [
+    {
+      "id": "multilingual-fr-person-redact",
+      "language": "fr",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A French private person name must be removed.",
+      "text": "Élodie Martin demande une mise à jour privée.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 0,
+          "end": 14,
+          "value": "Élodie Martin",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Élodie Martin"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Élodie Martin"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Élodie Martin"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-fr-preserve",
+      "language": "fr",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public French product name must survive.",
+      "text": "Le produit public Example Atelier est disponible.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "product",
+          "kind": "person",
+          "start": 18,
+          "end": 33,
+          "value": "Example Atelier",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Example Atelier"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Example Atelier"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Example Atelier"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-de-account-redact",
+      "language": "de",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A German contextual private account reference must be removed.",
+      "text": "Die private Kundennummer lautet KONTO-EXAMPLE-4815.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "account",
+          "kind": "account_number",
+          "start": 32,
+          "end": 50,
+          "value": "KONTO-EXAMPLE-4815",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "KONTO-EXAMPLE-4815"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "KONTO-EXAMPLE-4815"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "KONTO-EXAMPLE-4815"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "account"
+      ]
+    },
+    {
+      "id": "multilingual-de-preserve",
+      "language": "de",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public German release date must survive.",
+      "text": "Die öffentliche Veröffentlichung ist am 18. Juli 2026.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "release-date",
+          "kind": "private_date",
+          "start": 42,
+          "end": 55,
+          "value": "18. Juli 2026",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "18. Juli 2026"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "18. Juli 2026"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "18. Juli 2026"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation"
+      ]
+    },
+    {
+      "id": "multilingual-es-phone-redact",
+      "language": "es",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Spanish private phone written with spaces must be removed.",
+      "text": "Su teléfono privado es 555 234 5678.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "phone",
+          "kind": "phone",
+          "start": 24,
+          "end": 36,
+          "value": "555 234 5678",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "555 234 5678"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "555 234 5678"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "555 234 5678"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "phone"
+      ]
+    },
+    {
+      "id": "multilingual-es-preserve",
+      "language": "es",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public Spanish city reference must survive.",
+      "text": "El evento público se celebra en Madrid.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "city",
+          "kind": "address",
+          "start": 33,
+          "end": 39,
+          "value": "Madrid",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Madrid"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Madrid"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Madrid"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-ar-person-redact",
+      "language": "ar",
+      "script": "Arabic",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "An Arabic private person name must be removed.",
+      "text": "تواصل مع أحمد علي بخصوص الحساب الخاص",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 16,
+          "end": 31,
+          "value": "أحمد علي",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "أحمد علي"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "أحمد علي"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "أحمد علي"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-ar-preserve",
+      "language": "ar",
+      "script": "Arabic",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "Arabic operational status text must survive.",
+      "text": "تم تحديث حالة الطلب العام بنجاح",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "status",
+          "kind": "account_number",
+          "start": 16,
+          "end": 46,
+          "value": "حالة الطلب العام",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "حالة الطلب العام"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "حالة الطلب العام"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "حالة الطلب العام"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-zh-person-redact",
+      "language": "zh",
+      "script": "Han",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Han private person name must be removed.",
+      "text": "客户张伟需要私人账户帮助",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 6,
+          "end": 12,
+          "value": "张伟",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "张伟"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "张伟"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "张伟"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-zh-preserve",
+      "language": "zh",
+      "script": "Han",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "Han operational ticket status must survive.",
+      "text": "公开工单状态已更新",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "status",
+          "kind": "account_number",
+          "start": 6,
+          "end": 18,
+          "value": "工单状态",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "工单状态"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "工单状态"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "工单状态"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-ja-address-redact",
+      "language": "ja",
+      "script": "Mixed",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Japanese private address must be removed.",
+      "text": "個人住所は東京都渋谷区例町4-2-8です",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "address",
+          "kind": "address",
+          "start": 15,
+          "end": 44,
+          "value": "東京都渋谷区例町4-2-8",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "東京都渋谷区例町4-2-8"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "東京都渋谷区例町4-2-8"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "東京都渋谷区例町4-2-8"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "address"
+      ]
+    },
+    {
+      "id": "multilingual-ja-preserve",
+      "language": "ja",
+      "script": "Mixed",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A public Japanese event date must survive.",
+      "text": "公開イベントは2026年9月4日です",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "event-date",
+          "kind": "private_date",
+          "start": 21,
+          "end": 36,
+          "value": "2026年9月4日",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "2026年9月4日"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "2026年9月4日"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "2026年9月4日"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation"
+      ]
+    },
+    {
+      "id": "multilingual-ko-account-redact",
+      "language": "ko",
+      "script": "Hangul",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Korean private account reference must be removed.",
+      "text": "비공개 고객 번호는 계정-EXAMPLE-7712입니다",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "account",
+          "kind": "account_number",
+          "start": 27,
+          "end": 46,
+          "value": "계정-EXAMPLE-7712",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "계정-EXAMPLE-7712"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "계정-EXAMPLE-7712"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "계정-EXAMPLE-7712"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "account"
+      ]
+    },
+    {
+      "id": "multilingual-ko-preserve",
+      "language": "ko",
+      "script": "Hangul",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A Korean public package version must survive.",
+      "text": "공개 패키지 버전은 EXAMPLE-v3.2입니다",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "version",
+          "kind": "account_number",
+          "start": 27,
+          "end": 39,
+          "value": "EXAMPLE-v3.2",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-v3.2"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-v3.2"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "EXAMPLE-v3.2"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation"
+      ]
+    },
+    {
+      "id": "multilingual-hi-person-redact",
+      "language": "hi",
+      "script": "Devanagari",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Hindi private person name must be removed.",
+      "text": "निजी ग्राहक आरव शर्मा ने सहायता मांगी",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 32,
+          "end": 57,
+          "value": "आरव शर्मा",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "आरव शर्मा"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "आरव शर्मा"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "आरव शर्मा"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-hi-preserve",
+      "language": "hi",
+      "script": "Devanagari",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A Hindi public city reference must survive.",
+      "text": "सार्वजनिक कार्यक्रम दिल्ली में है",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "city",
+          "kind": "address",
+          "start": 56,
+          "end": 74,
+          "value": "दिल्ली",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "दिल्ली"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "दिल्ली"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "दिल्ली"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-pt-date-redact",
+      "language": "pt",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "A Portuguese date of birth must be removed.",
+      "text": "A data de nascimento privada é 12 de março de 1991.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "birth-date",
+          "kind": "private_date",
+          "start": 32,
+          "end": 52,
+          "value": "12 de março de 1991",
+          "match": "covering",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "12 de março de 1991"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "12 de março de 1991"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "12 de março de 1991"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "date"
+      ]
+    },
+    {
+      "id": "multilingual-pt-preserve",
+      "language": "pt",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "A Portuguese public release date must survive.",
+      "text": "O lançamento público será em 20 de julho de 2026.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "release-date",
+          "kind": "private_date",
+          "start": 32,
+          "end": 51,
+          "value": "20 de julho de 2026",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "20 de julho de 2026"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "20 de julho de 2026"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "20 de julho de 2026"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation"
+      ]
+    },
+    {
+      "id": "multilingual-en-person-redact",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "high",
+      "reason": "An English private person name anchors the language slice.",
+      "text": "Private customer Morgan Example needs help.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "person",
+          "kind": "person",
+          "start": 17,
+          "end": 31,
+          "value": "Morgan Example",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Morgan Example"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Morgan Example"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Morgan Example"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "multilingual",
+        "existing-contract"
+      ]
+    },
+    {
+      "id": "multilingual-en-preserve",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "preservation",
+      "reason": "English public operational text anchors the preservation slice.",
+      "text": "Public project Example Compiler is healthy.",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "project",
+          "kind": "person",
+          "start": 15,
+          "end": 31,
+          "value": "Example Compiler",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "preserve",
+            "all": "preserve"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Example Compiler"
+          ]
+        },
+        "customers": {
+          "required_absent": [],
+          "required_present": [
+            "Example Compiler"
+          ]
+        },
+        "all": {
+          "required_absent": [],
+          "required_present": [
+            "Example Compiler"
+          ]
+        }
+      },
+      "tags": [
+        "multilingual",
+        "preservation",
+        "existing-contract"
+      ]
+    }
+  ]
+}

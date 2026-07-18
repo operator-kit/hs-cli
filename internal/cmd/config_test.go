@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestConfigSet(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-app-secret", "mysecret", "--inbox-default-mailbox", "42", "--format", "json", "--inbox-pii-mode", "customers", "--inbox-pii-allow-unredacted"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-app-secret", "mysecret", "--inbox-default-mailbox", "42", "--format", "json", "--inbox-pii-mode", "customers", "--inbox-pii-allow-unredacted"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Contains(t, buf.String(), "Config saved")
@@ -66,7 +67,7 @@ func TestConfigSet_Partial(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "new-id"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "new-id"})
 	require.NoError(t, rootCmd.Execute())
 
 	loaded, err := config.Load(cfgFile)
@@ -94,7 +95,7 @@ func TestConfigSet_MutualFields(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-default-mailbox", "99"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "myid", "--inbox-default-mailbox", "99"})
 	require.NoError(t, rootCmd.Execute())
 
 	loaded, err := config.Load(cfgFile)
@@ -128,7 +129,7 @@ func TestConfigGet(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get"})
+	setRootArgs(t, []string{"inbox", "config", "get"})
 	require.NoError(t, rootCmd.Execute())
 
 	output := buf.String()
@@ -162,7 +163,7 @@ func TestConfigGet_SingleKey(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "inbox-app-id"})
+	setRootArgs(t, []string{"inbox", "config", "get", "inbox-app-id"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, "myid\n", buf.String())
@@ -177,7 +178,7 @@ func TestConfigPath(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "path"})
+	setRootArgs(t, []string{"inbox", "config", "path"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, cfgFile+"\n", buf.String())
@@ -203,7 +204,7 @@ func TestConfigGet_SinglePIIModeKey(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "get", "inbox-pii-mode"})
+	setRootArgs(t, []string{"inbox", "config", "get", "inbox-pii-mode"})
 	require.NoError(t, rootCmd.Execute())
 
 	assert.Equal(t, "customers\n", buf.String())
@@ -219,8 +220,71 @@ func TestConfigSet_InvalidPIIMode(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"inbox", "config", "set", "--inbox-pii-mode", "bad"})
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", "bad"})
 	err := rootCmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid --inbox-pii-mode")
+}
+
+func TestConfigSet_RepairsInvalidPIIModeAndPreservesFileFields(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte(`inbox_app_id: original-id
+inbox_app_secret: original-secret
+inbox_default_mailbox: 42
+inbox_pii_mode: typo
+format: json
+`), 0o600))
+	t.Setenv("HS_INBOX_APP_ID", "environment-id")
+	t.Setenv("HS_INBOX_APP_SECRET", "environment-secret")
+	t.Setenv("HS_INBOX_PII_MODE", "all")
+
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", " Customers "})
+	require.NoError(t, rootCmd.Execute())
+
+	stored, err := config.LoadFile(cfgPath)
+	require.NoError(t, err)
+	assert.Equal(t, "original-id", stored.InboxAppID)
+	assert.Equal(t, "original-secret", stored.InboxAppSecret)
+	assert.Equal(t, 42, stored.InboxDefaultMailbox)
+	assert.Equal(t, "json", stored.Format)
+	assert.Equal(t, "customers", stored.InboxPIIMode)
+}
+
+func TestConfigSet_InvalidStoredModeRequiresModeRepair(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte("inbox_app_id: original\ninbox_pii_mode: typo\n"), 0o600))
+	t.Setenv("HS_INBOX_PII_MODE", "")
+
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-app-id", "replacement"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inbox_pii_mode")
+
+	stored, readErr := os.ReadFile(cfgPath)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(stored), "inbox_app_id: original")
+}
+
+func TestConfigSet_MalformedYAMLIsNotOverwritten(t *testing.T) {
+	saveRestore(t)
+	versionStr = "dev"
+
+	cfgPath = filepath.Join(t.TempDir(), "config.yaml")
+	const malformed = "{{{invalid"
+	require.NoError(t, os.WriteFile(cfgPath, []byte(malformed), 0o600))
+
+	setRootArgs(t, []string{"inbox", "config", "set", "--inbox-pii-mode", "all"})
+	require.Error(t, rootCmd.Execute())
+
+	stored, err := os.ReadFile(cfgPath)
+	require.NoError(t, err)
+	assert.Equal(t, malformed, string(stored))
 }

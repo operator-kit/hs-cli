@@ -48,3 +48,22 @@ func TestBuildMCPToolSpec_IncludesOutputModeSchema(t *testing.T) {
 	}
 	assert.True(t, found, "expected conversations list tool to be present")
 }
+
+func TestBuildMCPToolSpec_ClassifiesProtectedFlags(t *testing.T) {
+	tools, err := discoverMCPTools()
+	require.NoError(t, err)
+	for _, tool := range tools {
+		if tool.Name != "helpscout_inbox_conversations_threads_reply" {
+			continue
+		}
+		protected := map[string]bool{}
+		for _, flag := range tool.Flags {
+			protected[flag.Name] = flag.Protected
+		}
+		assert.True(t, protected["customer"])
+		assert.True(t, protected["body"])
+		assert.False(t, protected["status"])
+		return
+	}
+	t.Fatal("reply MCP tool not found")
+}

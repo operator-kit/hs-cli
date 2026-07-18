@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -26,14 +28,18 @@ func piiModelInstallCmd() *cobra.Command {
 		Use:   "install",
 		Short: "Download PII redaction model for the current platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if ner.IsModelReady() {
+			status := ner.Status()
+			if status.State == ner.ModelUnsupported {
+				return fmt.Errorf("cannot install PII model: %s", status.Reason)
+			}
+			if status.Usable() {
 				fmt.Fprintln(cmd.OutOrStdout(), "PII model already installed.")
 				return nil
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Downloading PII model v%s...\n", ner.ModelVersion)
 
-			_, err := ner.EnsureModel(func(read, total int64) {
+			paths, err := ner.EnsureModelContext(cmd.Context(), func(read, total int64) {
 				if total > 0 {
 					pct := float64(read) / float64(total) * 100
 					fmt.Fprintf(cmd.ErrOrStderr(), "\r  %.0f%% (%d / %d MB)", pct, read/1024/1024, total/1024/1024)
@@ -46,8 +52,7 @@ func piiModelInstallCmd() *cobra.Command {
 				return fmt.Errorf("install failed: %w", err)
 			}
 
-			dir, _ := ner.CacheDir()
-			fmt.Fprintf(cmd.OutOrStdout(), "Model installed to %s\n", dir)
+			fmt.Fprintf(cmd.OutOrStdout(), "Model installed to %s\n", filepath.Dir(paths.ModelONNX))
 			return nil
 		},
 	}
@@ -58,20 +63,37 @@ func piiModelStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show PII model installation status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !ner.IsModelReady() {
-				fmt.Fprintln(cmd.OutOrStdout(), "PII model: not installed")
-				fmt.Fprintln(cmd.OutOrStdout(), "Run 'hs pii-model install' to download.")
-				return nil
-			}
-
-			dir, _ := ner.CacheDir()
-			fmt.Fprintf(cmd.OutOrStdout(), "PII model: installed (v%s)\n", ner.ModelVersion)
-			fmt.Fprintf(cmd.OutOrStdout(), "Location: %s\n", dir)
-			fmt.Fprintln(cmd.OutOrStdout(), "Model: distilbert-base-multilingual-cased-ner-hrl (INT8)")
-			fmt.Fprintln(cmd.OutOrStdout(), "Languages: Arabic, German, English, Spanish, French, Italian, Latvian, Dutch, Portuguese, Chinese")
+			writePIIModelStatus(cmd.OutOrStdout(), ner.Status())
 			return nil
 		},
 	}
+}
+
+func writePIIModelStatus(out io.Writer, status ner.ModelStatus) {
+	switch status.State {
+	case ner.ModelUnsupported:
+		fmt.Fprintf(out, "PII model: unsupported on %s\n", status.Platform.Key())
+		fmt.Fprintln(out, status.Reason)
+		return
+	case ner.ModelAbsent:
+		fmt.Fprintln(out, "PII model: not installed")
+		fmt.Fprintln(out, "Run 'hs pii-model install' to download.")
+		return
+	case ner.ModelCorrupt:
+		fmt.Fprintln(out, "PII model: corrupt or incomplete")
+		fmt.Fprintln(out, status.Reason)
+		fmt.Fprintln(out, "Run 'hs pii-model install' to replace it.")
+		return
+	case ner.ModelInstalledUnverified:
+		fmt.Fprintf(out, "PII model: installed, unverified legacy bundle (v%s)\n", ner.ModelVersion)
+		fmt.Fprintln(out, "The files predate trusted-manifest verification and will not be loaded.")
+	case ner.ModelReady:
+		fmt.Fprintf(out, "PII model: installed and verified (v%s)\n", ner.ModelVersion)
+	}
+
+	fmt.Fprintf(out, "Location: %s\n", status.Dir)
+	fmt.Fprintln(out, "Model: distilbert-base-multilingual-cased-ner-hrl (INT8)")
+	fmt.Fprintln(out, "Languages: Arabic, German, English, Spanish, French, Italian, Latvian, Dutch, Portuguese, Chinese")
 }
 
 func piiModelUninstallCmd() *cobra.Command {
@@ -79,18 +101,17 @@ func piiModelUninstallCmd() *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove cached PII model files",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !ner.IsModelReady() {
+			status := ner.Status()
+			if !status.Present {
 				fmt.Fprintln(cmd.OutOrStdout(), "PII model is not installed.")
 				return nil
 			}
 
-			dir, _ := ner.CacheDir()
 			if err := ner.RemoveModel(); err != nil {
 				return fmt.Errorf("uninstall failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed PII model from %s\n", dir)
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed PII model from %s\n", status.Dir)
 			return nil
 		},
 	}
 }
-
