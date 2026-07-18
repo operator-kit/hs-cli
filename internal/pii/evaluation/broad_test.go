@@ -2,12 +2,16 @@ package evaluation
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func broadCorpusDir(t *testing.T) string {
@@ -92,7 +96,7 @@ func TestPrivacyFilterCorpusGeneratorIsByteReproducible(t *testing.T) {
 	if err := os.MkdirAll(tempSmoke, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"schema.json", "command-output-payloads.json", "preservation.json"} {
+	for _, name := range []string{"schema.json", "command-output-payloads.json", "people-third-parties.json", "preservation.json"} {
 		raw, readErr := os.ReadFile(filepath.Join(repoRoot, smokeRelative, name))
 		if readErr != nil {
 			t.Fatal(readErr)
@@ -107,6 +111,7 @@ func TestPrivacyFilterCorpusGeneratorIsByteReproducible(t *testing.T) {
 	generated := []string{
 		filepath.Join(smokeRelative, "secrets.json"),
 		filepath.Join(smokeRelative, "command-output-payloads.json"),
+		filepath.Join(smokeRelative, "people-third-parties.json"),
 		filepath.Join(smokeRelative, "preservation.json"),
 	}
 	broadFiles := append(append([]string(nil), BroadCorpusPartitions...), "manifest")
@@ -126,6 +131,84 @@ func TestPrivacyFilterCorpusGeneratorIsByteReproducible(t *testing.T) {
 			t.Fatalf("generated corpus file %s is stale; run %s", relative,
 				fmt.Sprintf("go run ./internal/pii/evaluation/cmd/corpusgen -repo-root ."))
 		}
+	}
+}
+
+func TestBroadGeneratedFormatsAreSemanticallyStructured(t *testing.T) {
+	corpus, err := LoadBroadCorpusDir(broadCorpusDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonCases, urlCases := 0, 0
+	for _, fixture := range corpus.Cases {
+		target := fixture.Targets[0]
+		switch fixture.Shape {
+		case "json":
+			jsonCases++
+			var decoded map[string]string
+			if !json.Valid([]byte(fixture.Text)) || json.Unmarshal([]byte(fixture.Text), &decoded) != nil || len(decoded) != 1 {
+				t.Fatalf("case %q advertises invalid or empty JSON", fixture.ID)
+			}
+		case "yaml":
+			var decoded map[string]any
+			if err := yaml.Unmarshal([]byte(fixture.Text), &decoded); err != nil || len(decoded) != 1 {
+				t.Fatalf("case %q advertises invalid YAML: %v", fixture.ID, err)
+			}
+		case "url":
+			urlCases++
+			rawURL := strings.TrimPrefix(fixture.Text, "endpoint=")
+			parsed, parseErr := url.Parse(rawURL)
+			if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.Query().Get("credential") == "" {
+				t.Fatalf("case %q does not contain a credential inside a valid URL: %v", fixture.ID, parseErr)
+			}
+			if !strings.Contains(parsed.RawQuery, "credential="+target.Value) {
+				t.Fatalf("case %q target is outside the URL credential parameter", fixture.ID)
+			}
+		case "markdown":
+			validMarkdownTarget := strings.Contains(fixture.Text, "`"+target.Value+"`")
+			if strings.Contains(target.Value, "**") {
+				validMarkdownTarget = strings.Count(target.Value, "**") == 2 && strings.Contains(fixture.Text, target.Value)
+			}
+			if !validMarkdownTarget {
+				t.Fatalf("case %q target is not embedded in Markdown", fixture.ID)
+			}
+		case "html":
+			if !strings.HasPrefix(fixture.Text, "<p>") || !strings.Contains(fixture.Text, "<code>"+target.Value+"</code></p>") {
+				t.Fatalf("case %q target is not embedded in the HTML element", fixture.ID)
+			}
+		case "shell":
+			if !strings.HasPrefix(fixture.Text, "MESSAGE_") || !strings.HasSuffix(fixture.Text, "'") {
+				t.Fatalf("case %q is not a shell assignment", fixture.ID)
+			}
+		case "log":
+			if !strings.Contains(fixture.Text, " credential=\""+target.Value+"\"") {
+				t.Fatalf("case %q target is not inside the structured log field", fixture.ID)
+			}
+		case "command-payload":
+			if !strings.Contains(fixture.Text, " --credential=\""+target.Value+"\"") {
+				t.Fatalf("case %q target is not inside the command argument", fixture.ID)
+			}
+		}
+
+		if strings.Contains(target.Value, "<wbr>") && fixture.Shape != "html" {
+			t.Fatalf("case %q applies HTML obfuscation outside HTML", fixture.ID)
+		}
+		if strings.Contains(target.Value, "**") && fixture.Shape != "markdown" {
+			t.Fatalf("case %q applies Markdown obfuscation outside Markdown", fixture.ID)
+		}
+		if fixture.SecretFixture != nil && fixture.SecretFixture.Role == "must-detect" {
+			variation := syntheticVariation(*target.Synthetic)
+			for _, fragment := range syntheticLeakFragments(target.Value, variation) {
+				for _, mode := range []Mode{ModeCustomers, ModeAll} {
+					if !contains(fixture.Outputs.For(mode).RequiredAbsent, fragment) {
+						t.Fatalf("case %q lacks %s fragment leak sentinel", fixture.ID, mode)
+					}
+				}
+			}
+		}
+	}
+	if jsonCases == 0 || urlCases == 0 {
+		t.Fatalf("semantic format validation did not exercise JSON and URL cases")
 	}
 }
 

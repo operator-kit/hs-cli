@@ -210,6 +210,20 @@ per case and at least 100 independent cases for every percentage-gated kind and
 language direction. Percentage gates remain `not-run` if those denominators are
 absent.
 
+Broad format labels are executable: generated JSON and YAML parse, URL targets
+live inside a credential parameter, and Markdown, HTML, log, shell, and command
+targets are embedded in their advertised structures. Repeated, overlapping,
+markup-split, and developer-owned secret scenarios live in the adversarial
+smoke corpus instead of distorting one-case/one-target percentage denominators.
+Repeated values share one leak sentinel, while split and overlapping values add
+fragment sentinels so partial redaction still fails the affected output and
+metric slices.
+
+G0 boundary tags freeze fixture taxonomy and generic `RedactText` expectations;
+they are not evidence that each table, JSON, CSV, MCP, error, or diagnostic
+renderer was independently integrated. Those concrete presentation-boundary
+regressions remain part of G5.
+
 Regenerate deterministic fixtures and byte-exact performance workload
 identities with:
 

@@ -1927,6 +1927,159 @@
       ]
     },
     {
+      "id": "command-secret-repeated",
+      "language": "en",
+      "script": "Latin",
+      "shape": "command-payload",
+      "risk": "critical",
+      "reason": "Two occurrences of one credential require two detector spans and one deduplicated leak sentinel.",
+      "text": "--authorization=\"Bearer cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm\" --retry-authorization=\"Bearer cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm\"",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "secret-first",
+          "kind": "secret",
+          "start": 24,
+          "end": 71,
+          "value": "cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-repeated-command-secret",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "secret-second",
+          "kind": "secret",
+          "start": 103,
+          "end": 150,
+          "value": "cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-repeated-command-secret",
+            "recipe": "command-secret",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "cmdtok_nvI4kbFjvd_-YJO1FXKVSIN3KL8vzp6ytM3NsNzm"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "command-output",
+        "adversarial",
+        "repeated-secret",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
+      "id": "command-secret-overlapping-account",
+      "language": "en",
+      "script": "Latin",
+      "shape": "log",
+      "risk": "critical",
+      "reason": "An account-shaped fragment inside a secret must not survive partial redaction.",
+      "text": "level=error credential=\"postgresql://svc_d04a8mlc:P9!tjVhrhyR8TynSwEP5S@192.0.2.42:5432/support\"",
+      "known_identities": [],
+      "targets": [
+        {
+          "id": "secret",
+          "kind": "secret",
+          "start": 24,
+          "end": 95,
+          "value": "postgresql://svc_d04a8mlc:P9!tjVhrhyR8TynSwEP5S@192.0.2.42:5432/support",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-overlapping-database-secret",
+            "recipe": "database-connection",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "account-fragment",
+          "kind": "account_number",
+          "start": 37,
+          "end": 49,
+          "value": "svc_d04a8mlc",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "postgresql://svc_d04a8mlc:P9!tjVhrhyR8TynSwEP5S@192.0.2.42:5432/support",
+            "svc_d04a8mlc"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "postgresql://svc_d04a8mlc:P9!tjVhrhyR8TynSwEP5S@192.0.2.42:5432/support",
+            "svc_d04a8mlc"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "postgresql://svc_d04a8mlc:P9!tjVhrhyR8TynSwEP5S@192.0.2.42:5432/support",
+            "svc_d04a8mlc"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "command-output",
+        "adversarial",
+        "overlapping-secret",
+        "fragment-sentinel",
+        "synthetic-generator:v1"
+      ]
+    },
+    {
       "id": "command-private-email",
       "language": "en",
       "script": "Latin",

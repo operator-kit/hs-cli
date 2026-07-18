@@ -404,6 +404,14 @@ func validateCase(fixture *Case) error {
 			if generated != target.Value {
 				return fmt.Errorf("%s: secret target %q does not match its deterministic synthetic provenance", prefix, target.ID)
 			}
+			if target.Synthetic.Purpose == "must-detect" &&
+				(target.Actions.Customers != ActionRedact || target.Actions.All != ActionRedact) {
+				return fmt.Errorf("%s: must-detect secret target %q must redact in customers and all", prefix, target.ID)
+			}
+			if target.Synthetic.Purpose == "preserve" &&
+				(target.Actions.Customers != ActionPreserve || target.Actions.All != ActionPreserve) {
+				return fmt.Errorf("%s: preservation secret target %q must preserve in customers and all", prefix, target.ID)
+			}
 		} else if target.Synthetic != nil {
 			return fmt.Errorf("%s: non-secret target %q declares secret synthetic provenance", prefix, target.ID)
 		}
@@ -530,14 +538,6 @@ func validateSecretFixture(prefix string, fixture *Case) error {
 			continue
 		}
 		hasSecret = true
-		if fixture.SecretFixture.Role == "must-detect" &&
-			(target.Actions.Customers != ActionRedact || target.Actions.All != ActionRedact) {
-			return fmt.Errorf("%s: must-detect secret target %q must redact in customers and all", prefix, target.ID)
-		}
-		if fixture.SecretFixture.Role == "preserve" &&
-			(target.Actions.Customers != ActionPreserve || target.Actions.All != ActionPreserve) {
-			return fmt.Errorf("%s: near-miss secret target %q must be preserved", prefix, target.ID)
-		}
 		if target.Synthetic == nil || target.Synthetic.Recipe != fixture.SecretFixture.Family ||
 			target.Synthetic.Purpose != fixture.SecretFixture.Role {
 			return fmt.Errorf("%s: secret target %q provenance contradicts the fixture family or role", prefix, target.ID)

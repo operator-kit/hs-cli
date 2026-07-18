@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -50,26 +52,34 @@ func GenerateSyntheticValue(provenance SyntheticProvenance) (string, error) {
 		return "", fmt.Errorf("unsupported synthetic purpose %q", provenance.Purpose)
 	}
 	if provenance.Purpose == "preserve" {
-		return generateSyntheticNearMiss(provenance)
+		value, err := generateSyntheticNearMiss(provenance)
+		if err != nil {
+			return "", err
+		}
+		return representSyntheticValue(provenance, value), nil
 	}
-	return generateSyntheticCredential(provenance)
+	value, err := generateSyntheticCredential(provenance)
+	if err != nil {
+		return "", err
+	}
+	return representSyntheticValue(provenance, value), nil
 }
 
 func generateSyntheticCredential(provenance SyntheticProvenance) (string, error) {
 	switch provenance.Recipe {
 	case "api-key":
-		return varySyntheticCredential(provenance, "ak_"+syntheticAlphabet(provenance, "api", upperAlphaNumeric, 32)), nil
+		return "ak_" + syntheticAlphabet(provenance, "api", upperAlphaNumeric, 32), nil
 	case "access-token":
-		return varySyntheticCredential(provenance, "access_token_"+syntheticAlphabet(provenance, "access", alphaNumeric, 40)), nil
+		return "access_token_" + syntheticAlphabet(provenance, "access", alphaNumeric, 40), nil
 	case "oauth-token":
-		return varySyntheticCredential(provenance, "oat2_"+syntheticAlphabet(provenance, "oauth", alphaNumericDash, 52)), nil
+		return "oat2_" + syntheticAlphabet(provenance, "oauth", alphaNumericDash, 52), nil
 	case "password":
-		return varySyntheticCredential(provenance, "R7!"+syntheticAlphabet(provenance, "password", alphaNumeric, 14)+"#q2"), nil
+		return "R7!" + syntheticAlphabet(provenance, "password", alphaNumeric, 14) + "#q2", nil
 	case "jwt":
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 		payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"offline-fixture","aud":"privacy-eval"}`))
 		signature := syntheticAlphabet(provenance, "jwt-signature", alphaNumericDash, 43)
-		return varySyntheticCredential(provenance, header+"."+payload+"."+signature), nil
+		return header + "." + payload + "." + signature, nil
 	case "one-time-code":
 		switch syntheticVariation(provenance) % 5 {
 		case 0:
@@ -91,19 +101,19 @@ func generateSyntheticCredential(provenance SyntheticProvenance) (string, error)
 	case "database-connection":
 		user := "svc_" + syntheticAlphabet(provenance, "db-user", lowerAlphaNumeric, 8)
 		password := "P9!" + syntheticAlphabet(provenance, "db-password", alphaNumeric, 18)
-		return varySyntheticCredential(provenance, "postgresql://"+user+":"+password+"@192.0.2.42:5432/support"), nil
+		return "postgresql://" + user + ":" + password + "@192.0.2.42:5432/support", nil
 	case "cookie-authorization":
-		return varySyntheticCredential(provenance, "session="+syntheticAlphabet(provenance, "cookie", alphaNumericDash, 48)), nil
+		return "session=" + syntheticAlphabet(provenance, "cookie", alphaNumericDash, 48), nil
 	case "webhook-secret":
-		return varySyntheticCredential(provenance, "whsig_"+syntheticAlphabet(provenance, "webhook", alphaNumeric, 40)), nil
+		return "whsig_" + syntheticAlphabet(provenance, "webhook", alphaNumeric, 40), nil
 	case "cloud-credential":
-		return varySyntheticCredential(provenance, "CLDX"+syntheticAlphabet(provenance, "cloud", upperAlphaNumeric, 16)), nil
+		return "CLDX" + syntheticAlphabet(provenance, "cloud", upperAlphaNumeric, 16), nil
 	case "source-control-token":
-		return varySyntheticCredential(provenance, "scm_"+syntheticAlphabet(provenance, "source-control", alphaNumeric, 36)), nil
+		return "scm_" + syntheticAlphabet(provenance, "source-control", alphaNumeric, 36), nil
 	case "payment-credential":
-		return varySyntheticCredential(provenance, "paylive_"+syntheticAlphabet(provenance, "payment", alphaNumeric, 32)), nil
+		return "paylive_" + syntheticAlphabet(provenance, "payment", alphaNumeric, 32), nil
 	case "observability-token":
-		return varySyntheticCredential(provenance, "obsap_"+syntheticHex(provenance, "observability", 32)), nil
+		return "obsap_" + syntheticHex(provenance, "observability", 32), nil
 	case "command-secret":
 		return "cmdtok_" + syntheticAlphabet(provenance, "command", alphaNumericDash, 40), nil
 	default:
@@ -231,28 +241,37 @@ func syntheticVariation(provenance SyntheticProvenance) int {
 	return variation
 }
 
-func varySyntheticCredential(provenance SyntheticProvenance, value string) string {
+// representSyntheticValue returns the exact bytes placed in a generated
+// fixture. Structured formats deliberately use their serialized form so the
+// provenance check and byte spans describe what the detector actually sees.
+func representSyntheticValue(provenance SyntheticProvenance, value string) string {
 	if !strings.HasPrefix(provenance.Seed, "broad-secret-") {
 		return value
 	}
 	variation := syntheticVariation(provenance)
-	if variation < 8 || len(value) < 8 {
+	switch variation {
+	case 1, 2, 8, 13:
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			panic(err)
+		}
+		return string(encoded[1 : len(encoded)-1])
+	case 4:
+		return url.QueryEscape(value)
+	}
+	if provenance.Purpose != "must-detect" || len(value) < 8 {
 		return value
 	}
 	middle := len(value) / 2
 	switch variation {
-	case 8:
-		return value[:middle] + "\n" + value[middle:]
 	case 9:
-		return value[:middle] + " " + value[middle:]
+		return value[:middle] + "\t" + value[middle:]
 	case 10:
 		return value[:middle] + "·" + value[middle:]
-	case 11:
+	case 5:
+		return value[:middle] + "**" + value[middle:] + "**"
+	case 6:
 		return value[:middle] + "<wbr>" + value[middle:]
-	case 12:
-		return value[:middle] + "**" + value[middle:]
-	case 13:
-		return value + " / " + value
 	default:
 		return value
 	}

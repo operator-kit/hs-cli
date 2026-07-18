@@ -32,7 +32,7 @@ func TestG0DockerBaselineKeepsWeightsReadOnlyAndInferenceOffline(t *testing.T) {
 	for _, required := range []string{
 		"needs: hermetic", "HS_PII_G0_EVIDENCE_AUTHORITY: docker-ci", "HS_PII_G0_AUTHORITATIVE: \"true\"",
 		"distilbert-baseline.json", "any(.gates[]; .gate == \"G0\" and .state == \"pass\")",
-		"if: always()", "go.mod", "go.sum", "patches/onnxruntime-purego/go.mod",
+		"if: always()", "go.mod", "go.sum", "patches/onnxruntime-purego/**",
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Fatalf("G0 evaluation workflow is missing required ordering/evidence control %q", required)

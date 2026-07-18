@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +20,9 @@ func GeneratePrivacyFilterTestdata(repoRoot string) error {
 		return err
 	}
 	if err := rewriteCommandBoundaryFixtures(filepath.Join(smokeDir, "command-output-payloads.json")); err != nil {
+		return err
+	}
+	if err := rewritePeopleAdversarialFixtures(filepath.Join(smokeDir, "people-third-parties.json")); err != nil {
 		return err
 	}
 	if err := rewriteSupplementalPreservationFixtures(filepath.Join(smokeDir, "preservation.json")); err != nil {
@@ -98,7 +102,8 @@ func rewriteCommandBoundaryFixtures(path string) error {
 	retained := make([]Case, 0, len(document.Cases)+len(RequiredOutputBoundaries)*2)
 	for _, fixture := range document.Cases {
 		if fixture.ID == "command-secret-all-boundaries" || strings.HasPrefix(fixture.ID, "command-boundary-") ||
-			strings.HasPrefix(fixture.ID, "command-secret-boundary-") {
+			strings.HasPrefix(fixture.ID, "command-secret-boundary-") ||
+			fixture.ID == "command-secret-repeated" || fixture.ID == "command-secret-overlapping-account" {
 			continue
 		}
 		retained = append(retained, fixture)
@@ -148,7 +153,99 @@ func rewriteCommandBoundaryFixtures(path string) error {
 			generated = append(generated, fixture)
 		}
 	}
+	generated = append(generated, generateRepeatedSecretFixture(), generateOverlappingSecretFixture())
 	document.Cases = append(generated, retained...)
+	return writeCorpusDocument(path, document)
+}
+
+func generateRepeatedSecretFixture() Case {
+	provenance := SyntheticProvenance{
+		Generator: SyntheticSecretGenerator, Version: SyntheticSecretVersion,
+		Seed: "smoke-repeated-command-secret", Recipe: "command-secret", Purpose: "must-detect",
+	}
+	value, err := GenerateSyntheticValue(provenance)
+	if err != nil {
+		panic(err)
+	}
+	text := "--authorization=\"Bearer " + value + "\" --retry-authorization=\"Bearer " + value + "\""
+	first := strings.Index(text, value)
+	second := strings.LastIndex(text, value)
+	actions := ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact}
+	return makeGeneratedMultiTargetCase(
+		"command-secret-repeated", "en", "Latin", "command-payload", RiskCritical,
+		"Two occurrences of one credential require two detector spans and one deduplicated leak sentinel.", text,
+		[]Target{
+			{ID: "secret-first", Kind: SpanSecret, Start: first, End: first + len(value), Value: value, Match: MatchCovering, Synthetic: &provenance, Actions: actions},
+			{ID: "secret-second", Kind: SpanSecret, Start: second, End: second + len(value), Value: value, Match: MatchCovering, Synthetic: &provenance, Actions: actions},
+		},
+		[]string{"command-output", "adversarial", "repeated-secret", "synthetic-generator:v1"}, nil,
+	)
+}
+
+func generateOverlappingSecretFixture() Case {
+	provenance := SyntheticProvenance{
+		Generator: SyntheticSecretGenerator, Version: SyntheticSecretVersion,
+		Seed: "smoke-overlapping-database-secret", Recipe: "database-connection", Purpose: "must-detect",
+	}
+	value, err := GenerateSyntheticValue(provenance)
+	if err != nil {
+		panic(err)
+	}
+	fragmentStartInValue := len("postgresql://")
+	fragmentEndInValue := fragmentStartInValue + strings.Index(value[fragmentStartInValue:], ":")
+	fragment := value[fragmentStartInValue:fragmentEndInValue]
+	text := "level=error credential=\"" + value + "\""
+	secretStart := strings.Index(text, value)
+	fragmentStart := strings.Index(text, fragment)
+	actions := ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact}
+	return makeGeneratedMultiTargetCase(
+		"command-secret-overlapping-account", "en", "Latin", "log", RiskCritical,
+		"An account-shaped fragment inside a secret must not survive partial redaction.", text,
+		[]Target{
+			{ID: "secret", Kind: SpanSecret, Start: secretStart, End: secretStart + len(value), Value: value, Match: MatchCovering, Synthetic: &provenance, Actions: actions},
+			{ID: "account-fragment", Kind: SpanAccountNumber, Start: fragmentStart, End: fragmentStart + len(fragment), Value: fragment, Match: MatchExact, Actions: actions},
+		},
+		[]string{"command-output", "adversarial", "overlapping-secret", "fragment-sentinel", "synthetic-generator:v1"}, nil,
+	)
+}
+
+func rewritePeopleAdversarialFixtures(path string) error {
+	document, err := readCorpusDocument(path)
+	if err != nil {
+		return err
+	}
+	retained := document.Cases[:0]
+	for _, fixture := range document.Cases {
+		if fixture.ID != "person-developer-owned-secret" {
+			retained = append(retained, fixture)
+		}
+	}
+	document.Cases = retained
+	provenance := SyntheticProvenance{
+		Generator: SyntheticSecretGenerator, Version: SyntheticSecretVersion,
+		Seed: "smoke-developer-owned-secret", Recipe: "source-control-token", Purpose: "must-detect",
+	}
+	secret, err := GenerateSyntheticValue(provenance)
+	if err != nil {
+		return err
+	}
+	customer, developer := "Alice Fixture", "Rowan Exampleton"
+	text := "Customer " + customer + " said developer " + developer + " pasted repository credential " + secret + "."
+	actions := ModeActions{Off: ActionPreserve, Customers: ActionRedact, All: ActionRedact}
+	document.Cases = append(document.Cases, makeGeneratedMultiTargetCase(
+		"person-developer-owned-secret", "en", "Latin", "prose", RiskCritical,
+		"A customer mentioning an unknown developer and that developer's credential must protect both identities and the secret.", text,
+		[]Target{
+			{ID: "customer", Kind: SpanPerson, Start: strings.Index(text, customer), End: strings.Index(text, customer) + len(customer), Value: customer, Match: MatchExact, IdentityID: "customer-alice", Actions: actions},
+			{ID: "developer", Kind: SpanPerson, Start: strings.Index(text, developer), End: strings.Index(text, developer) + len(developer), Value: developer, Match: MatchExact, Actions: actions},
+			{ID: "developer-secret", Kind: SpanSecret, Start: strings.Index(text, secret), End: strings.Index(text, secret) + len(secret), Value: secret, Match: MatchCovering, Synthetic: &provenance, Actions: actions},
+		},
+		[]string{"people", "third-party", "developer-owned-secret", "adversarial", "synthetic-generator:v1"}, nil,
+	))
+	document.Cases[len(document.Cases)-1].KnownIdentities = []KnownIdentity{{
+		ID: "customer-alice", Type: "customer", First: "Alice", Last: "Fixture",
+		Email: "alice.fixture@example.invalid", Phone: "",
+	}}
 	return writeCorpusDocument(path, document)
 }
 
@@ -324,14 +421,18 @@ func generateBroadSecrets() CorpusDocument {
 					match = MatchExact
 				}
 				text, start := wrapFixtureShape(shape, context, value, variation)
-				document.Cases = append(document.Cases, makeGeneratedCase(
+				fixture := makeGeneratedCase(
 					fmt.Sprintf("broad-secret-%s-%s-%02d", family, role, variation), "en", "Latin", shape, risk,
 					"Locked broad "+family+" variation.", text,
 					Target{ID: "value", Kind: SpanSecret, Start: start, End: start + len(value), Value: value,
 						Match: match, Synthetic: &provenance, Actions: actions},
 					[]string{"broad-quality", "secret-family:" + family, fmt.Sprintf("variation:%02d", variation)},
 					&SecretFixtureRole{Family: family, Role: role},
-				))
+				)
+				if role == "must-detect" {
+					addLeakSentinels(&fixture, syntheticLeakFragments(value, variation))
+				}
+				document.Cases = append(document.Cases, fixture)
 			}
 		}
 	}
@@ -492,20 +593,66 @@ func broadLanguageProfiles() []languageGeneratorProfile {
 }
 
 func makeGeneratedCase(id, language, script, shape string, risk RiskTier, reason, text string, target Target, tags []string, secret *SecretFixtureRole) Case {
+	return makeGeneratedMultiTargetCase(id, language, script, shape, risk, reason, text, []Target{target}, tags, secret)
+}
+
+func makeGeneratedMultiTargetCase(id, language, script, shape string, risk RiskTier, reason, text string, targets []Target, tags []string, secret *SecretFixtureRole) Case {
 	fixture := Case{
 		ID: id, Language: language, Script: script, Shape: shape, Risk: risk, Reason: reason, Text: text,
-		KnownIdentities: []KnownIdentity{}, Targets: []Target{target}, Tags: tags, SecretFixture: secret,
+		KnownIdentities: []KnownIdentity{}, Targets: targets, Tags: tags, SecretFixture: secret,
 	}
 	for _, mode := range Modes {
 		expected := OutputExpectation{RequiredAbsent: []string{}, RequiredPresent: []string{}}
-		if target.Actions.For(mode) == ActionRedact {
-			expected.RequiredAbsent = append(expected.RequiredAbsent, target.Value)
-		} else {
-			expected.RequiredPresent = append(expected.RequiredPresent, target.Value)
+		for _, target := range targets {
+			if target.Actions.For(mode) == ActionRedact {
+				expected.RequiredAbsent = appendUnique(expected.RequiredAbsent, target.Value)
+			} else {
+				expected.RequiredPresent = appendUnique(expected.RequiredPresent, target.Value)
+			}
 		}
 		setOutputExpectation(&fixture.Outputs, mode, expected)
 	}
 	return fixture
+}
+
+func addLeakSentinels(fixture *Case, sentinels []string) {
+	for _, mode := range []Mode{ModeCustomers, ModeAll} {
+		expected := fixture.Outputs.For(mode)
+		for _, sentinel := range sentinels {
+			expected.RequiredAbsent = appendUnique(expected.RequiredAbsent, sentinel)
+		}
+		setOutputExpectation(&fixture.Outputs, mode, expected)
+	}
+}
+
+func syntheticLeakFragments(value string, variation int) []string {
+	marker := ""
+	switch variation {
+	case 5:
+		marker = "**"
+		value = strings.TrimSuffix(value, marker)
+	case 6:
+		marker = "<wbr>"
+	case 9:
+		marker = "\t"
+	case 10:
+		marker = "·"
+	}
+	if marker == "" {
+		return nil
+	}
+	parts := strings.SplitN(value, marker, 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return nil
+	}
+	return []string{parts[0], parts[1]}
+}
+
+func appendUnique(values []string, value string) []string {
+	if contains(values, value) {
+		return values
+	}
+	return append(values, value)
 }
 
 func setOutputExpectation(outputs *ModeOutputs, mode Mode, expected OutputExpectation) {
@@ -525,19 +672,24 @@ func wrapFixtureShape(shape, context, value string, variation int) (string, int)
 	case "json":
 		prefix, suffix = fmt.Sprintf(`{"message_%d":"%s`, variation, context), `"}`
 	case "yaml":
-		prefix = fmt.Sprintf("message_%d: %s", variation, context)
+		prefix, suffix = fmt.Sprintf("message_%d: \"%s", variation, context), "\""
 	case "shell":
 		prefix, suffix = fmt.Sprintf("MESSAGE_%d='%s", variation, context), "'"
 	case "url":
-		prefix = fmt.Sprintf("endpoint=https://192.0.2.10/%d ; %s", variation, context)
+		prefix = fmt.Sprintf("endpoint=https://192.0.2.10/%d?credential=", variation)
+		suffix = "&note=" + url.QueryEscape(context)
 	case "markdown":
-		prefix, suffix = "**"+context, "**"
+		if strings.Contains(value, "**") {
+			prefix = context
+		} else {
+			prefix, suffix = context+"`", "`"
+		}
 	case "html":
-		prefix, suffix = "<p>"+context, "</p>"
+		prefix, suffix = "<p>"+context+"<code>", "</code></p>"
 	case "quoted-reply":
 		prefix = "> " + context
 	case "log":
-		prefix = fmt.Sprintf("level=warn sample=%d message=%q value=", variation, context)
+		prefix, suffix = fmt.Sprintf("level=warn sample=%d message=%q credential=\"", variation, context), "\""
 	case "stack-trace":
 		prefix = fmt.Sprintf("Trace[%d]: %s", variation, context)
 	case "code":
@@ -547,7 +699,7 @@ func wrapFixtureShape(shape, context, value string, variation int) (string, int)
 	case "long-thread":
 		prefix = strings.Repeat("Earlier public context. ", 20) + context
 	case "command-payload":
-		prefix = fmt.Sprintf("--sample=%d --message=%q --value=", variation, context)
+		prefix, suffix = fmt.Sprintf("--sample=%d --message=%q --credential=\"", variation, context), "\""
 	}
 	text := prefix + value + suffix
 	return text, len(prefix)

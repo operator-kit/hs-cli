@@ -320,6 +320,107 @@
         "false-positive",
         "preservation"
       ]
+    },
+    {
+      "id": "person-developer-owned-secret",
+      "language": "en",
+      "script": "Latin",
+      "shape": "prose",
+      "risk": "critical",
+      "reason": "A customer mentioning an unknown developer and that developer's credential must protect both identities and the secret.",
+      "text": "Customer Alice Fixture said developer Rowan Exampleton pasted repository credential scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC.",
+      "known_identities": [
+        {
+          "id": "customer-alice",
+          "type": "customer",
+          "first": "Alice",
+          "last": "Fixture",
+          "email": "alice.fixture@example.invalid",
+          "phone": ""
+        }
+      ],
+      "targets": [
+        {
+          "id": "customer",
+          "kind": "person",
+          "start": 9,
+          "end": 22,
+          "value": "Alice Fixture",
+          "match": "exact",
+          "identity_id": "customer-alice",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "developer",
+          "kind": "person",
+          "start": 38,
+          "end": 54,
+          "value": "Rowan Exampleton",
+          "match": "exact",
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        },
+        {
+          "id": "developer-secret",
+          "kind": "secret",
+          "start": 84,
+          "end": 124,
+          "value": "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC",
+          "match": "covering",
+          "synthetic": {
+            "generator": "hs-privacy-structural",
+            "version": 1,
+            "seed": "smoke-developer-owned-secret",
+            "recipe": "source-control-token",
+            "purpose": "must-detect"
+          },
+          "actions": {
+            "off": "preserve",
+            "customers": "redact",
+            "all": "redact"
+          }
+        }
+      ],
+      "outputs": {
+        "off": {
+          "required_absent": [],
+          "required_present": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ]
+        },
+        "customers": {
+          "required_absent": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ],
+          "required_present": []
+        },
+        "all": {
+          "required_absent": [
+            "Alice Fixture",
+            "Rowan Exampleton",
+            "scm_R3tydKFEWU7MSUONQxDlNA3YA3NHsxD0OlHC"
+          ],
+          "required_present": []
+        }
+      },
+      "tags": [
+        "people",
+        "third-party",
+        "developer-owned-secret",
+        "adversarial",
+        "synthetic-generator:v1"
+      ]
     }
   ]
 }

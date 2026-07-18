@@ -355,6 +355,9 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 			}
 			for _, target := range fixture.Targets {
 				observed := strings.Contains(output, target.Value)
+				if target.Actions.For(mode) == ActionRedact {
+					observed = targetLeakObserved(output, target, expected.RequiredAbsent)
+				}
 				for _, slice := range outputDimensions(fixture, target) {
 					counts := outputSlice(outputSlices, mode, slice.dimension, slice.name)
 					if target.Actions.For(mode) == ActionRedact {
@@ -426,6 +429,15 @@ func Evaluate(corpus *Corpus, observations []CaseObservation, metadata EvidenceM
 		Gates:             evaluateGates(metadata, finalOutput),
 	}
 	return report, nil
+}
+
+func targetLeakObserved(output string, target Target, requiredAbsent []string) bool {
+	for _, sentinel := range requiredAbsent {
+		if strings.Contains(target.Value, sentinel) && strings.Contains(output, sentinel) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateEvidenceMetadata(metadata EvidenceMetadata) error {

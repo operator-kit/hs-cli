@@ -22,35 +22,35 @@
     {
       "name": "secrets",
       "file": "secrets.json",
-      "sha256": "a9e66ece7cf42089e15f628ba9e89e64a75f3a0219b0f778a633dafd0c96c505",
+      "sha256": "ffc8d19f6ac60cf02fb5eee1a063a987b3353f554aba27b70e84ea26d9fc2504",
       "cases": 392,
       "targets": 392
     },
     {
       "name": "account-identifiers",
       "file": "account-identifiers.json",
-      "sha256": "1673af4a577dea8c7fac93629b8124d405e91d452988908178501add6a746e4d",
+      "sha256": "200706e4aac65b9425306f3cd8008792d1d6d9f71083104b823572bca0db1100",
       "cases": 200,
       "targets": 200
     },
     {
       "name": "private-public-dates",
       "file": "private-public-dates.json",
-      "sha256": "93e90cf5c56f6bd69ceeaa1c35d10dafaa968ae951c9e03907f028661e159f38",
+      "sha256": "d2196b09c82305cf3e8bb75a697b497d8767e76681d967231d7d7995ecbe447f",
       "cases": 200,
       "targets": 200
     },
     {
       "name": "multilingual",
       "file": "multilingual.json",
-      "sha256": "29acae80717b878b7374d20273c150e31cc99f013e4cdd3b74b5159f8b722532",
+      "sha256": "ac05c80ef45d21e40a878fffe70c5d6c61ef0a905a9c1af62675a5af498ebc45",
       "cases": 2000,
       "targets": 2000
     },
     {
       "name": "preservation",
       "file": "preservation.json",
-      "sha256": "9f79836b23e7b3703debc975135a72b9fd03c1423a5be95fcae690151ba4a390",
+      "sha256": "7675d469c64774afa296ca17e85be783a3bf76f18f12ba9e9ac60e44bfc46c6b",
       "cases": 100,
       "targets": 100
     }

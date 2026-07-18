@@ -181,6 +181,116 @@ func TestMetricMatchingUsesMaximumOneToOneAssignment(t *testing.T) {
 	}
 }
 
+func TestRepeatedSecretMetricsRequireTwoSpansAndCatchEitherLeakedCopy(t *testing.T) {
+	fixture := generateRepeatedSecretFixture()
+	value := fixture.Targets[0].Value
+	safeOutput := strings.ReplaceAll(fixture.Text, value, SecretMarker)
+	complete := CaseObservation{
+		CaseID: fixture.ID,
+		Predictions: []PredictedSpan{
+			{Kind: SpanSecret, Start: fixture.Targets[0].Start, End: fixture.Targets[0].End},
+			{Kind: SpanSecret, Start: fixture.Targets[1].Start, End: fixture.Targets[1].End},
+		},
+		Outputs: map[Mode]string{ModeOff: fixture.Text, ModeCustomers: safeOutput, ModeAll: safeOutput},
+	}
+	report, err := Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{complete}, testMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Detector.RequiredMatch.TruePositive != 2 || report.Detector.RequiredMatch.FalseNegative != 0 || report.Detector.RequiredMatch.FalsePositive != 0 {
+		t.Fatalf("two correct repeated-secret predictions did not pass: %+v", report.Detector.RequiredMatch)
+	}
+	if outputMetricsForMode(t, report, ModeCustomers).RawValueLeaks != 0 {
+		t.Fatalf("fully removed repeated secret was reported as leaked")
+	}
+
+	missed := complete
+	missed.Predictions = missed.Predictions[:1]
+	report, err = Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{missed}, testMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Detector.RequiredMatch.TruePositive != 1 || report.Detector.RequiredMatch.FalseNegative != 1 {
+		t.Fatalf("a missing repeated-secret prediction was not scored as a miss: %+v", report.Detector.RequiredMatch)
+	}
+
+	secondStart := strings.LastIndex(fixture.Text, value)
+	leakyOutputs := []string{
+		strings.Replace(fixture.Text, value, SecretMarker, 1),
+		fixture.Text[:secondStart] + SecretMarker + fixture.Text[secondStart+len(value):],
+	}
+	for index, leakyOutput := range leakyOutputs {
+		leaked := complete
+		leaked.Outputs = map[Mode]string{ModeOff: fixture.Text, ModeCustomers: leakyOutput, ModeAll: safeOutput}
+		report, err = Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{leaked}, testMetadata())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if output := outputMetricsForMode(t, report, ModeCustomers); output.RequiredAbsent != 1 || output.RawValueLeaks != 1 {
+			t.Fatalf("surviving repeated credential copy %d was not caught by the deduplicated sentinel: %+v", index, output)
+		}
+	}
+}
+
+func TestOverlappingSecretFragmentSentinelCatchesPartialLeak(t *testing.T) {
+	fixture := generateOverlappingSecretFixture()
+	fragment := fixture.Targets[1].Value
+	observation := CaseObservation{
+		CaseID: fixture.ID,
+		Predictions: []PredictedSpan{
+			{Kind: SpanSecret, Start: fixture.Targets[0].Start, End: fixture.Targets[0].End},
+			{Kind: SpanAccountNumber, Start: fixture.Targets[1].Start, End: fixture.Targets[1].End},
+		},
+		Outputs: map[Mode]string{
+			ModeOff: fixture.Text, ModeCustomers: SecretMarker + " partial=" + fragment, ModeAll: SecretMarker,
+		},
+	}
+	report, err := Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{observation}, testMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output := outputMetricsForMode(t, report, ModeCustomers); output.RawValueLeaks != 1 {
+		t.Fatalf("overlapping account fragment leak was not caught: %+v", output)
+	}
+	if secretSlice := findOutputSlice(t, report.FinalOutputSlices, ModeCustomers, "kind", string(SpanSecret)); secretSlice.RawValueLeaks != 1 {
+		t.Fatalf("fragment leak did not fail the secret output slice: %+v", secretSlice)
+	}
+}
+
+func TestMarkupSplitSecretFragmentFailsAggregateAndKindSlice(t *testing.T) {
+	var fixture Case
+	for _, candidate := range generateBroadSecrets().Cases {
+		if candidate.ID == "broad-secret-api-key-must-detect-05" {
+			fixture = candidate
+			break
+		}
+	}
+	if fixture.ID == "" {
+		t.Fatal("generated Markdown split fixture not found")
+	}
+	fragments := syntheticLeakFragments(fixture.Targets[0].Value, 5)
+	if len(fragments) != 2 {
+		t.Fatalf("Markdown split fixture lacks fragment expectations: %v", fragments)
+	}
+	observation := CaseObservation{
+		CaseID: fixture.ID,
+		Predictions: []PredictedSpan{{
+			Kind: SpanSecret, Start: fixture.Targets[0].Start, End: fixture.Targets[0].End,
+		}},
+		Outputs: map[Mode]string{ModeOff: fixture.Text, ModeCustomers: SecretMarker + fragments[1], ModeAll: SecretMarker},
+	}
+	report, err := Evaluate(&Corpus{Cases: []Case{fixture}}, []CaseObservation{observation}, testMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output := outputMetricsForMode(t, report, ModeCustomers); output.RawValueLeaks != 1 {
+		t.Fatalf("split credential fragment did not fail aggregate output metrics: %+v", output)
+	}
+	if secretSlice := findOutputSlice(t, report.FinalOutputSlices, ModeCustomers, "kind", string(SpanSecret)); secretSlice.RawValueLeaks != 1 {
+		t.Fatalf("split credential fragment did not fail the secret output slice: %+v", secretSlice)
+	}
+}
+
 func TestMetricReportFreezesRequiredMatchAndEndToEndSlices(t *testing.T) {
 	text := "Engineer Rowan Vale joined the thread."
 	value := "Rowan Vale"
@@ -254,6 +364,17 @@ func findOutputSlice(t *testing.T, slices []OutputMetricSlice, mode Mode, dimens
 	}
 	t.Fatalf("output slice %s/%s/%s not found", mode, dimension, name)
 	return OutputMetricSlice{}
+}
+
+func outputMetricsForMode(t *testing.T, report *Report, mode Mode) OutputMetrics {
+	t.Helper()
+	for _, output := range report.FinalOutput {
+		if output.Mode == mode {
+			return output
+		}
+	}
+	t.Fatalf("output metrics for mode %q not found", mode)
+	return OutputMetrics{}
 }
 
 func testMetadata() EvidenceMetadata {

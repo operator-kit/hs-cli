@@ -112,6 +112,22 @@ func TestPrivacyCorpusSchemaIsStrictAndSelfConsistent(t *testing.T) {
 			t.Fatalf("multi-boundary tag shortcut was not rejected: %v", err)
 		}
 	})
+	t.Run("must-detect purpose binds actions without secret fixture metadata", func(t *testing.T) {
+		fixture := findCase(t, corpus, "command-boundary-table-must-detect")
+		fixture.Targets[1].Actions.Customers = ActionPreserve
+		fixture.Targets[1].Actions.All = ActionPreserve
+		if err := validateCase(&fixture); err == nil || !strings.Contains(err.Error(), "must-detect") {
+			t.Fatalf("must-detect purpose weakening was not rejected: %v", err)
+		}
+	})
+	t.Run("preservation purpose binds actions without secret fixture metadata", func(t *testing.T) {
+		fixture := findCase(t, corpus, "command-boundary-table-preserve")
+		fixture.Targets[1].Actions.Customers = ActionRedact
+		fixture.Targets[1].Actions.All = ActionRedact
+		if err := validateCase(&fixture); err == nil || !strings.Contains(err.Error(), "preservation secret") {
+			t.Fatalf("preservation purpose weakening was not rejected: %v", err)
+		}
+	})
 	t.Run("duplicate case IDs", func(t *testing.T) {
 		tempDir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(tempDir, "schema.json"), schemaRaw, 0o600); err != nil {
@@ -141,6 +157,35 @@ func TestPrivacyCorpusSchemaIsStrictAndSelfConsistent(t *testing.T) {
 			t.Fatalf("duplicate case ID was not rejected: %v", err)
 		}
 	})
+}
+
+func TestAdversarialSecretFixturesFreezeRepeatedOverlapAndOwnershipSemantics(t *testing.T) {
+	corpus, err := LoadCorpusDir(corpusDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repeated := findCase(t, corpus, "command-secret-repeated")
+	if len(repeated.Targets) != 2 || repeated.Targets[0].Value != repeated.Targets[1].Value || repeated.Targets[0].Start == repeated.Targets[1].Start {
+		t.Fatalf("repeated-secret fixture must contain two spans for one value: %+v", repeated.Targets)
+	}
+	for _, mode := range []Mode{ModeCustomers, ModeAll} {
+		if got := repeated.Outputs.For(mode).RequiredAbsent; len(got) != 1 || got[0] != repeated.Targets[0].Value {
+			t.Fatalf("repeated-secret %s leak sentinel is not deduplicated: %v", mode, got)
+		}
+	}
+	overlap := findCase(t, corpus, "command-secret-overlapping-account")
+	if len(overlap.Targets) != 2 || overlap.Targets[0].Start > overlap.Targets[1].Start || overlap.Targets[0].End < overlap.Targets[1].End {
+		t.Fatalf("overlapping secret/account fixture is not genuinely overlapping: %+v", overlap.Targets)
+	}
+	for _, mode := range []Mode{ModeCustomers, ModeAll} {
+		if !contains(overlap.Outputs.For(mode).RequiredAbsent, overlap.Targets[1].Value) {
+			t.Fatalf("overlapping fixture lacks its fragment sentinel in %s", mode)
+		}
+	}
+	owned := findCase(t, corpus, "person-developer-owned-secret")
+	if len(owned.KnownIdentities) != 1 || len(owned.Targets) != 3 || owned.Targets[2].Kind != SpanSecret {
+		t.Fatalf("developer-owned-secret scenario is incomplete: %+v", owned)
+	}
 }
 
 func TestPrivacyCorpusContainsRequiredRiskLanguageAndFormatSlices(t *testing.T) {
