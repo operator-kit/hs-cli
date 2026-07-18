@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,8 @@ const (
 	defaultMaxRedirects          = 3
 	staleStagingAge              = 24 * time.Hour
 )
+
+var trustedInstallPromotionMu sync.Mutex
 
 type InstallLimits struct {
 	OperationTimeout time.Duration
@@ -403,6 +406,9 @@ func extractTrustedFile(reader io.Reader, destination string, expected FileManif
 }
 
 func promoteTrustedInstall(contentDir, finalDir, cacheRoot string, platform Platform, manifest TrustedManifest) error {
+	trustedInstallPromotionMu.Lock()
+	defer trustedInstallPromotionMu.Unlock()
+
 	if status := statusAtWithManifest(cacheRoot, platform, manifest); status.State == ModelReady {
 		return nil
 	}
@@ -413,6 +419,12 @@ func promoteTrustedInstall(contentDir, finalDir, cacheRoot string, platform Plat
 
 	var replaced string
 	if _, err := os.Lstat(finalDir); err == nil {
+		// A different process may have completed the same content-addressed
+		// promotion after the first status check. Never move a trusted install
+		// out of place merely to replace it with identical content.
+		if status := statusAtWithManifest(cacheRoot, platform, manifest); status.State == ModelReady {
+			return nil
+		}
 		placeholder, tempErr := os.MkdirTemp(parent, ".replaced-")
 		if tempErr != nil {
 			return tempErr
