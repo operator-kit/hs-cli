@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -41,7 +42,7 @@ type schemaValidator struct {
 
 var supportedSchemaKeywords = stringSet(
 	"$schema", "$id", "$defs", "$ref", "title", "description", "type", "additionalProperties",
-	"required", "properties", "const", "enum", "pattern", "minLength", "minimum", "minItems", "items", "uniqueItems",
+	"required", "properties", "const", "enum", "pattern", "minLength", "minimum", "maximum", "minItems", "items", "uniqueItems",
 )
 
 func (v schemaValidator) validate(schema map[string]any, value any, path string) error {
@@ -187,11 +188,15 @@ func validateSchemaNumber(schema map[string]any, value json.Number, path string)
 			return fmt.Errorf("%s: number is not an integer", path)
 		}
 	}
-	if minimum, exists := schemaInteger(schema["minimum"]); exists {
-		integer, err := value.Int64()
-		if err != nil || integer < int64(minimum) {
-			return fmt.Errorf("%s: number is below minimum %d", path, minimum)
-		}
+	number, err := value.Float64()
+	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
+		return fmt.Errorf("%s: number is invalid", path)
+	}
+	if minimum, exists := schemaNumber(schema["minimum"]); exists && number < minimum {
+		return fmt.Errorf("%s: number is below minimum %g", path, minimum)
+	}
+	if maximum, exists := schemaNumber(schema["maximum"]); exists && number > maximum {
+		return fmt.Errorf("%s: number is above maximum %g", path, maximum)
 	}
 	return nil
 }
@@ -290,4 +295,13 @@ func schemaInteger(value any) (int, bool) {
 	}
 	parsed, err := strconv.Atoi(string(number))
 	return parsed, err == nil
+}
+
+func schemaNumber(value any) (float64, bool) {
+	number, ok := value.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	parsed, err := number.Float64()
+	return parsed, err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
 }

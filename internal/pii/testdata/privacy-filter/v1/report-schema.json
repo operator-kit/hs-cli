@@ -59,10 +59,10 @@
         "true_positive": {"type": "integer", "minimum": 0},
         "false_positive": {"type": "integer", "minimum": 0},
         "false_negative": {"type": "integer", "minimum": 0},
-        "precision": {"type": "number", "minimum": 0},
-        "recall": {"type": "number", "minimum": 0},
-        "f1": {"type": "number", "minimum": 0},
-        "f2": {"type": "number", "minimum": 0}
+        "precision": {"type": "number", "minimum": 0, "maximum": 1},
+        "recall": {"type": "number", "minimum": 0, "maximum": 1},
+        "f1": {"type": "number", "minimum": 0, "maximum": 1},
+        "f2": {"type": "number", "minimum": 0, "maximum": 1}
       }
     },
     "weightedMetric": {
@@ -72,9 +72,9 @@
         "true_positive_weight": {"type": "integer", "minimum": 0},
         "false_positive_weight": {"type": "integer", "minimum": 0},
         "false_negative_weight": {"type": "integer", "minimum": 0},
-        "precision": {"type": "number", "minimum": 0},
-        "recall": {"type": "number", "minimum": 0},
-        "f2": {"type": "number", "minimum": 0}
+        "precision": {"type": "number", "minimum": 0, "maximum": 1},
+        "recall": {"type": "number", "minimum": 0, "maximum": 1},
+        "f2": {"type": "number", "minimum": 0, "maximum": 1}
       }
     },
     "metricSlice": {
@@ -122,11 +122,11 @@
         "mode": {"enum": ["off", "customers", "all"]},
         "required_absent": {"type": "integer", "minimum": 0},
         "raw_value_leaks": {"type": "integer", "minimum": 0},
-        "leak_rate": {"type": "number", "minimum": 0},
+        "leak_rate": {"type": "number", "minimum": 0, "maximum": 1},
         "required_present": {"type": "integer", "minimum": 0},
         "preservation_failures": {"type": "integer", "minimum": 0},
-        "preservation_rate": {"type": "number", "minimum": 0},
-        "over_redaction_rate": {"type": "number", "minimum": 0},
+        "preservation_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "over_redaction_rate": {"type": "number", "minimum": 0, "maximum": 1},
         "exact_pass_through_checks": {"type": "integer", "minimum": 0},
         "exact_pass_through_failures": {"type": "integer", "minimum": 0}
       }
@@ -143,11 +143,11 @@
         "name": {"type": "string", "minLength": 1},
         "required_absent": {"type": "integer", "minimum": 0},
         "raw_value_leaks": {"type": "integer", "minimum": 0},
-        "leak_rate": {"type": "number", "minimum": 0},
+        "leak_rate": {"type": "number", "minimum": 0, "maximum": 1},
         "required_present": {"type": "integer", "minimum": 0},
         "preservation_failures": {"type": "integer", "minimum": 0},
-        "preservation_rate": {"type": "number", "minimum": 0},
-        "over_redaction_rate": {"type": "number", "minimum": 0}
+        "preservation_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "over_redaction_rate": {"type": "number", "minimum": 0, "maximum": 1}
       }
     },
     "caseResult": {
