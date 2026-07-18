@@ -683,7 +683,11 @@ func HasTag(fixture Case, wanted string) bool {
 }
 
 func HashFile(path string) (string, error) {
-	return HashFiles(path)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return hashBytes(raw), nil
 }
 
 func HashFiles(paths ...string) (string, error) {

@@ -1,8 +1,6 @@
 package evaluation
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,12 +8,6 @@ import (
 	"strings"
 	"testing"
 )
-
-func mustSHA256(t *testing.T, raw []byte) string {
-	t.Helper()
-	hash := sha256.Sum256(raw)
-	return hex.EncodeToString(hash[:])
-}
 
 func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	redactText := "private-value"
@@ -84,7 +76,10 @@ func TestDeterministicMetricAndGateEvaluator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	report.ReportSchemaSHA256 = mustSHA256(t, schemaRaw)
+	report.ReportSchemaSHA256, err = HashFile(filepath.Join(corpusDir(t), "report-schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := ValidateReportAgainstSchema(schemaRaw, report); err != nil {
 		t.Fatalf("metric report does not satisfy its frozen schema: %v", err)
 	}
