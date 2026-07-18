@@ -97,7 +97,7 @@ docker run --rm \
   --cap-drop ALL \
   --security-opt no-new-privileges \
   --pids-limit 512 \
-  --tmpfs /tmp:rw,nosuid,nodev,size=2g \
+  --tmpfs /tmp:rw,exec,nosuid,nodev,size=2g \
   --mount "type=bind,src=${ROOT_DIR},dst=/workspace,readonly" \
   --mount "type=bind,src=${STAGING},dst=/models/distilbert,readonly" \
   --mount "type=bind,src=${REPORT_DIR},dst=/reports" \
