@@ -51,6 +51,15 @@ func TestBroadQualityCorpusHasStatisticallyMeaningfulLockedDenominators(t *testi
 }
 
 func TestSyntheticSecretsMatchOutOfBandProvenanceWithoutMarkerDrivenValues(t *testing.T) {
+	forbiddenProviderSignatures := []string{
+		"ya29" + ".",
+		"whsec" + "_",
+		"AK" + "IA",
+		"ghp" + "_",
+		"rk_" + "live_",
+		"ddapi" + "_",
+		"-----BEGIN PRIVATE" + " KEY-----",
+	}
 	corpora := make([][]Case, 0, 2)
 	smoke, err := LoadCorpusDir(corpusDir(t))
 	if err != nil {
@@ -74,6 +83,11 @@ func TestSyntheticSecretsMatchOutOfBandProvenanceWithoutMarkerDrivenValues(t *te
 				generated, generationErr := GenerateSyntheticValue(*target.Synthetic)
 				if generationErr != nil || generated != target.Value {
 					t.Fatalf("case %q secret target %q provenance mismatch: %v", fixture.ID, target.ID, generationErr)
+				}
+				for _, signature := range forbiddenProviderSignatures {
+					if strings.Contains(target.Value, signature) {
+						t.Fatalf("case %q evaluated credential uses production-provider signature %q; use the provider-neutral synthetic namespace", fixture.ID, signature)
+					}
 				}
 				if target.Synthetic.Purpose == "must-detect" {
 					lower := strings.ToLower(target.Value)

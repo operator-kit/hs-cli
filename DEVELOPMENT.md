@@ -219,6 +219,12 @@ Repeated values share one leak sentinel, while split and overlapping values add
 fragment sentinels so partial redaction still fails the affected output and
 metric slices.
 
+Generated secret families use structurally realistic, provider-neutral
+namespaces and a non-issuable secret-key envelope. Exact production-provider
+prefixes and real private-key PEM labels are forbidden by hermetic tests so
+GitHub push protection remains an independent supply-chain control rather than
+requiring fixture bypasses.
+
 G0 boundary tags freeze fixture taxonomy and generic `RedactText` expectations;
 they are not evidence that each table, JSON, CSV, MCP, error, or diagnostic
 renderer was independently integrated. Those concrete presentation-boundary
