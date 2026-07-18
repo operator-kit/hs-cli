@@ -21,7 +21,7 @@ func TestG0DockerBaselineKeepsWeightsReadOnlyAndInferenceOffline(t *testing.T) {
 	for _, required := range []string{
 		"--network none", "--tmpfs /tmp:rw,exec,nosuid,nodev,size=2g", "dst=/models/distilbert,readonly", "HS_PII_G0_EVIDENCE_AUTHORITY",
 		"HS_PII_G0_AUTHORITATIVE", "HS_PII_G0_ARTIFACTS_JSON", "sha256sum", "GITHUB_ACTIONS", "RUNNER_NAME",
-		"ARCHIVE_NAMES", "-e '/^$/d'", "! -L",
+		"ARCHIVE_NAMES", "-e '/^$/d'", "chmod 0622 \"$REPORT_PATH\"", "chmod 0600 \"$REPORT_PATH\"", "! -L",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("G0 baseline script is missing required control %q", required)

@@ -45,7 +45,13 @@ if [[ ! -f "$ARCHIVE_PATH" ]] ||
 fi
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli-pii-g0-model.XXXXXX")"
-trap 'rm -rf "$STAGING"' EXIT
+cleanup() {
+  rm -rf "$STAGING"
+  if [[ -n "${REPORT_PATH:-}" && -f "$REPORT_PATH" ]]; then
+    chmod 0600 "$REPORT_PATH"
+  fi
+}
+trap cleanup EXIT
 ARCHIVE_NAMES="$(tar -tzf "$ARCHIVE_PATH" | sed -e 's#^\./##' -e '/^$/d' | LC_ALL=C sort)"
 while IFS= read -r name; do
   [[ -n "$name" && "$name" != */* && "$name" != "." && "$name" != ".." ]] || {
@@ -90,6 +96,11 @@ if [[ "$AUTHORITY" == "local-sanity" ]] &&
   echo "local-sanity evidence cannot write the checked-in performance baseline area" >&2
   exit 1
 fi
+# Docker hosts may remap container root to an unprivileged host identity. Create
+# the synthetic-only report as the runner, grant write-only access during the
+# isolated container run, and restore owner-only permissions in the EXIT trap.
+: > "$REPORT_PATH"
+chmod 0622 "$REPORT_PATH"
 
 docker run --rm \
   --network none \
